@@ -1,6 +1,7 @@
 package com.verbally.app.system
 
 import android.accessibilityservice.AccessibilityService
+import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.verbally.app.DictationCoordinator
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 
 class VerballyAccessibilityService : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val visibilityPolicy = OverlayVisibilityPolicy()
     private var overlay: FloatingDictationOverlay? = null
     private var appLabel: String? = null
     private val coordinator: DictationCoordinator by lazy {
@@ -48,12 +50,29 @@ class VerballyAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        appLabel = event?.packageName?.toString()
+        event ?: return
         val focused = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        if (focused?.isEditable == true) {
-            overlay?.show()
-        } else {
-            overlay?.hide()
+        val source = event.source
+        val decision = visibilityPolicy.decide(
+            event = OverlayVisibilityEvent(
+                eventType = event.eventType,
+                packageName = event.packageName?.toString(),
+                eventTime = event.eventTime,
+                sourceEditable = source?.isEditable,
+                sourceFocused = source?.isFocused,
+                focusedEditable = focused?.isEditable,
+                inputMethodEvent = event.packageName?.toString() == defaultInputMethodPackage(),
+            ),
+            overlayShown = overlay?.isShown == true,
+        )
+
+        when (decision) {
+            OverlayVisibilityDecision.SHOW -> {
+                appLabel = event.packageName?.toString()
+                overlay?.show()
+            }
+            OverlayVisibilityDecision.HIDE -> overlay?.hide()
+            OverlayVisibilityDecision.KEEP -> Unit
         }
     }
 
@@ -77,4 +96,8 @@ class VerballyAccessibilityService : AccessibilityService() {
                 }
         }
     }
+
+    private fun defaultInputMethodPackage(): String? =
+        Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+            ?.substringBefore("/")
 }

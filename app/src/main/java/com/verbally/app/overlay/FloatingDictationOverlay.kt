@@ -25,6 +25,9 @@ class FloatingDictationOverlay(
     private var button: Button? = null
     private var state = OverlayState.IDLE
 
+    val isShown: Boolean
+        get() = button != null
+
     fun show() {
         if (!Settings.canDrawOverlays(context) || button != null) return
         val view = Button(context).apply {
