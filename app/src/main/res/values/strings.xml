@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Verbally</string>
+    <string name="accessibility_service_label">Verbally 浮動聽寫</string>
+    <string name="accessibility_service_description">在文字輸入框中顯示浮動聽寫按鈕，並將轉錄結果貼到目前游標位置。</string>
+</resources>

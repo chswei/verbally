@@ -1,0 +1,21 @@
+package com.verbally.app.settings
+
+enum class CleanupProvider {
+    OPENAI,
+    GEMINI,
+}
+
+data class AppSettings(
+    val openAiApiKey: String = "",
+    val geminiApiKey: String = "",
+    val cleanupProvider: CleanupProvider = CleanupProvider.OPENAI,
+    val transcriptionModel: String = "gpt-4o-transcribe",
+    val openAiCleanupModel: String = "gpt-5.4-mini",
+    val geminiCleanupModel: String = "gemini-3.5-flash",
+)
+
+interface SettingsRepository {
+    fun load(): AppSettings
+    fun save(settings: AppSettings)
+    fun clearHistoryRequested()
+}
