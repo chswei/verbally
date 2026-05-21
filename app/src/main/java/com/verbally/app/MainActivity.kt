@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -44,6 +46,7 @@ import androidx.core.content.ContextCompat
 import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.permissions.PermissionAction
 import com.verbally.app.permissions.PermissionGuidance
+import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
 
 class MainActivity : ComponentActivity() {
@@ -79,7 +82,12 @@ fun VerballyApp(container: VerballyContainer) {
             }
             when (selectedTab) {
                 AppTab.ONBOARDING -> PermissionScreen()
-                AppTab.SETTINGS -> SettingsScreen(container)
+                AppTab.SETTINGS -> SettingsScreen(
+                    container = container,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                )
                 AppTab.HISTORY -> HistoryScreen(container)
             }
         }
@@ -163,54 +171,76 @@ private fun PermissionScreen() {
 }
 
 @Composable
-private fun SettingsScreen(container: VerballyContainer) {
+private fun SettingsScreen(container: VerballyContainer, modifier: Modifier = Modifier) {
     var settings by remember { mutableStateOf(container.settingsRepository.load()) }
     val context = LocalContext.current
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    SettingsScreenContent(
+        settings = settings,
+        onSettingsChange = { settings = it },
+        onSave = {
+            container.settingsRepository.save(settings)
+            Toast.makeText(context, "設定已儲存", Toast.LENGTH_SHORT).show()
+        },
+        onClearHistory = {
+            container.historyRepository.clear()
+            Toast.makeText(context, "歷史已清空", Toast.LENGTH_SHORT).show()
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun SettingsScreenContent(
+    settings: AppSettings,
+    onSettingsChange: (AppSettings) -> Unit,
+    onSave: () -> Unit,
+    onClearHistory: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         SecretField("OpenAI API Key", settings.openAiApiKey) {
-            settings = settings.copy(openAiApiKey = it)
+            onSettingsChange(settings.copy(openAiApiKey = it))
         }
         SecretField("Gemini API Key", settings.geminiApiKey) {
-            settings = settings.copy(geminiApiKey = it)
+            onSettingsChange(settings.copy(geminiApiKey = it))
         }
         OutlinedTextField(
             value = settings.transcriptionModel,
-            onValueChange = { settings = settings.copy(transcriptionModel = it) },
+            onValueChange = { onSettingsChange(settings.copy(transcriptionModel = it)) },
             label = { Text("OpenAI 轉錄模型") },
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = settings.openAiCleanupModel,
-            onValueChange = { settings = settings.copy(openAiCleanupModel = it) },
+            onValueChange = { onSettingsChange(settings.copy(openAiCleanupModel = it)) },
             label = { Text("OpenAI 整理模型") },
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = settings.geminiCleanupModel,
-            onValueChange = { settings = settings.copy(geminiCleanupModel = it) },
+            onValueChange = { onSettingsChange(settings.copy(geminiCleanupModel = it)) },
             label = { Text("Gemini 整理模型") },
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ProviderButton("OpenAI", settings.cleanupProvider == CleanupProvider.OPENAI) {
-                settings = settings.copy(cleanupProvider = CleanupProvider.OPENAI)
+                onSettingsChange(settings.copy(cleanupProvider = CleanupProvider.OPENAI))
             }
             ProviderButton("Gemini", settings.cleanupProvider == CleanupProvider.GEMINI) {
-                settings = settings.copy(cleanupProvider = CleanupProvider.GEMINI)
+                onSettingsChange(settings.copy(cleanupProvider = CleanupProvider.GEMINI))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                container.settingsRepository.save(settings)
-                Toast.makeText(context, "設定已儲存", Toast.LENGTH_SHORT).show()
-            }) {
+            Button(onClick = onSave) {
                 Text("儲存設定")
             }
-            TextButton(onClick = {
-                container.historyRepository.clear()
-                Toast.makeText(context, "歷史已清空", Toast.LENGTH_SHORT).show()
-            }) {
+            TextButton(onClick = onClearHistory) {
                 Text("清空歷史")
             }
         }
@@ -224,6 +254,7 @@ private fun SecretField(label: String, value: String, onChange: (String) -> Unit
         onValueChange = onChange,
         label = { Text(label) },
         visualTransformation = PasswordVisualTransformation(),
+        singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
 }

@@ -72,6 +72,14 @@
 ## Testing expectations
 
 - Use test-first changes for non-trivial provider, insertion, history, permission, and orchestration behavior.
+- For UI, Compose, permission-flow, overlay, accessibility, or device-facing behavior changes, run instrumentation checks on an Android target before reporting completion. Prefer the available emulator for automated instrumentation.
+- Treat the user's USB debugging phone as a personal device, not a disposable test target. Do not run `connectedDebugAndroidTest`, `adb install`, `adb uninstall`, or other commands that install, replace, clear, or remove apps on the USB device unless the user explicitly asks for that exact device run and acknowledges the app/data impact for that run.
+- If the user explicitly approves a USB device run, warn that instrumentation may install/replace the debug app and test APK, and may remove or reset app data depending on Gradle/Android behavior.
+- When more than one Android device is connected, inspect `adb devices -l` and set `ANDROID_SERIAL=<device-or-emulator-serial>` so Gradle targets the intended device explicitly.
+- Run approved instrumentation tests with:
+  ```zsh
+  env ANDROID_SERIAL=<serial> ./gradlew connectedDebugAndroidTest
+  ```
 - Keep tests focused on stable contracts:
   - provider request construction
   - cleanup prompt invariants
