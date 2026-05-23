@@ -12,7 +12,6 @@ import com.verbally.app.insertion.AccessibilityPasteTarget
 import com.verbally.app.insertion.AndroidClipboardGateway
 import com.verbally.app.insertion.ClipboardPasteInserter
 import com.verbally.app.overlay.FloatingDictationOverlay
-import com.verbally.app.overlay.OverlayState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -90,12 +89,10 @@ class VerballyAccessibilityService : AccessibilityService() {
         scope.launch {
             runCatching { coordinator.confirmRecording(appLabel) }
                 .onSuccess { result ->
-                    overlay?.setState(if (result.pasted) OverlayState.SUCCESS else OverlayState.ERROR)
-                    overlay?.showMessage(result.message)
+                    overlay?.completeProcessing(result.message)
                 }
                 .onFailure { error ->
-                    overlay?.setState(OverlayState.ERROR)
-                    overlay?.showMessage(error.message ?: "發生錯誤")
+                    overlay?.completeProcessing(error.message ?: "發生錯誤")
                 }
         }
     }

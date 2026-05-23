@@ -1,8 +1,13 @@
 package com.verbally.app.overlay
 
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.provider.Settings
@@ -10,23 +15,18 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewConfiguration
+import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowInsetsAnimation
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import com.verbally.app.R
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
-
-enum class OverlayState {
-    IDLE,
-    RECORDING,
-    PROCESSING,
-    SUCCESS,
-    ERROR,
-}
 
 class FloatingDictationOverlay(
     private val context: Context,
@@ -37,85 +37,225 @@ class FloatingDictationOverlay(
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val preferences = context.getSharedPreferences(POSITION_PREFS, Context.MODE_PRIVATE)
     private val positionMemory = OverlayPositionMemory(loadSavedPosition())
-    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val edgeMargin = OverlayVisualDefaults.EDGE_MARGIN_DP.toPx()
     private val bubbleSize = OverlayVisualDefaults.BUBBLE_SIZE_DP.toPx()
     private val bubbleCornerRadius = OverlayVisualDefaults.BUBBLE_CORNER_RADIUS_DP.toPx().toFloat()
     private val iconSize = OverlayVisualDefaults.ICON_SIZE_DP.toPx()
-    private var bubble: FrameLayout? = null
-    private var iconView: ImageView? = null
+    private val activeButtonSize = OverlayVisualDefaults.ACTIVE_BUTTON_SIZE_DP.toPx()
+    private val activeButtonIconSize = OverlayVisualDefaults.ACTIVE_BUTTON_ICON_SIZE_DP.toPx()
+    private val activeCapsuleWidth = OverlayVisualDefaults.ACTIVE_CAPSULE_WIDTH_DP.toPx()
+    private val activeCapsuleHeight = OverlayVisualDefaults.ACTIVE_CAPSULE_HEIGHT_DP.toPx()
+    private val activeSpacing = OverlayVisualDefaults.ACTIVE_SPACING_DP.toPx()
+    private val activeCapsuleCornerRadius =
+        OverlayVisualDefaults.ACTIVE_CAPSULE_CORNER_RADIUS_DP.toPx().toFloat()
+    private val rootTouchListener = DragTouchListener()
+    private val session = OverlaySessionStateMachine()
+    private var rootView: FrameLayout? = null
     private var currentLayoutParams: WindowManager.LayoutParams? = null
-    private var state = OverlayState.IDLE
+    private var customContentDescription: String? = null
 
     val isShown: Boolean
-        get() = bubble != null
+        get() = rootView != null
 
     fun show() {
-        if (!Settings.canDrawOverlays(context) || bubble != null) return
+        if (!Settings.canDrawOverlays(context) || rootView != null) return
         val view = FrameLayout(context).apply {
-            minimumWidth = bubbleSize
-            minimumHeight = bubbleSize
-            background = bubbleBackground()
-            elevation = 8f
-            isClickable = true
-            contentDescription = contentDescriptionFor(state)
-            setOnClickListener { handleClick() }
-            setOnLongClickListener {
-                if (state == OverlayState.RECORDING) {
-                    onCancel()
-                    setState(OverlayState.IDLE)
-                    true
-                } else {
-                    false
-                }
-            }
-            setOnTouchListener(DragTouchListener())
+            clipChildren = false
+            clipToPadding = false
         }
-        iconView = ImageView(context).apply {
-            setImageResource(iconFor(state))
-            scaleType = ImageView.ScaleType.CENTER
-        }
-        view.addView(
-            iconView,
-            FrameLayout.LayoutParams(iconSize, iconSize, Gravity.CENTER),
-        )
         view.hideWithInputMethodAnimation()
+        renderState(view)
         val params = layoutParams(view)
         currentLayoutParams = params
         windowManager.addView(view, params)
-        bubble = view
+        rootView = view
     }
 
     fun hide() {
-        bubble?.let { runCatching { windowManager.removeViewImmediate(it) } }
-        bubble = null
-        iconView = null
+        rootView?.let { runCatching { windowManager.removeViewImmediate(it) } }
+        rootView = null
         currentLayoutParams = null
-        state = OverlayState.IDLE
+        customContentDescription = null
+        session.forceState(OverlayUiState.READY)
     }
 
-    fun setState(next: OverlayState) {
-        state = next
-        bubble?.contentDescription = contentDescriptionFor(next)
-        iconView?.setImageResource(iconFor(next))
+    fun setState(next: OverlayUiState) {
+        customContentDescription = null
+        session.forceState(next)
+        rootView?.let { renderState(it) }
+    }
+
+    fun completeProcessing(message: String? = null) {
+        session.onProcessingFinished()
+        customContentDescription = message
+        rootView?.let { renderState(it) }
     }
 
     fun showMessage(message: String) {
-        bubble?.contentDescription = message
+        customContentDescription = message
+        rootView?.contentDescription = message
     }
 
-    private fun handleClick() {
-        when (state) {
-            OverlayState.IDLE, OverlayState.SUCCESS, OverlayState.ERROR -> {
-                onStart()
-                setState(OverlayState.RECORDING)
-            }
-            OverlayState.RECORDING -> {
-                setState(OverlayState.PROCESSING)
-                onConfirm()
-            }
-            OverlayState.PROCESSING -> Unit
+    private fun renderState(root: FrameLayout) {
+        root.removeAllViews()
+        when (session.state) {
+            OverlayUiState.READY -> root.addView(createReadyBubble())
+            OverlayUiState.RECORDING -> root.addView(createRecordingControls())
+            OverlayUiState.PROCESSING -> root.addView(createProcessingControls())
         }
+        root.contentDescription = customContentDescription ?: contentDescriptionFor(session.state)
+        root.post { realignToRememberedEdge(root) }
+    }
+
+    private fun createReadyBubble(): View =
+        FrameLayout(context).apply {
+            minimumWidth = bubbleSize
+            minimumHeight = bubbleSize
+            background = roundedBackground(color = "#14233A", cornerRadius = bubbleCornerRadius)
+            elevation = 8f
+            isClickable = true
+            isFocusable = true
+            contentDescription = customContentDescription ?: contentDescriptionFor(OverlayUiState.READY)
+            bindDragAndClick(this) { handleReadyTap() }
+            addView(
+                ImageView(context).apply {
+                    setImageResource(R.drawable.ic_verbally_waveform)
+                    scaleType = ImageView.ScaleType.CENTER
+                },
+                FrameLayout.LayoutParams(iconSize, iconSize, Gravity.CENTER),
+            )
+        }
+
+    private fun createRecordingControls(): View =
+        createActiveControls(
+            centerView = RecordingWaveformView(context),
+            trailingView = iconButton(
+                backgroundColor = "#5F347B",
+                iconRes = R.drawable.ic_verbally_check,
+                iconTint = Color.WHITE,
+            ),
+            onLeadingTap = { handleCancelTap() },
+            onTrailingTap = { handleConfirmTap() },
+            centerContentDescription = "錄音中",
+            trailingContentDescription = "送出錄音",
+        )
+
+    private fun createProcessingControls(): View =
+        createActiveControls(
+            centerView = ProcessingDotsView(context),
+            trailingView = SpinnerRingView(context),
+            onLeadingTap = null,
+            onTrailingTap = null,
+            centerContentDescription = "轉錄處理中",
+            trailingContentDescription = "處理中",
+        )
+
+    private fun createActiveControls(
+        centerView: View,
+        trailingView: View,
+        onLeadingTap: (() -> Unit)?,
+        onTrailingTap: (() -> Unit)?,
+        centerContentDescription: String,
+        trailingContentDescription: String,
+    ): View =
+        LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            isClickable = false
+            isFocusable = false
+
+            addView(
+                iconButton(
+                    backgroundColor = "#D8D1DC",
+                    iconRes = R.drawable.ic_verbally_close,
+                    iconTint = null,
+                ).apply {
+                    contentDescription = "取消錄音"
+                    bindDragAndClick(this, onLeadingTap)
+                },
+            )
+
+            addView(
+                FrameLayout(context).apply {
+                    background = roundedBackground(
+                        color = "#D8D1DC",
+                        cornerRadius = activeCapsuleCornerRadius,
+                    )
+                    contentDescription = centerContentDescription
+                    bindDragOnly(this)
+                    addView(
+                        centerView,
+                        FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            Gravity.CENTER,
+                        ),
+                    )
+                },
+                LinearLayout.LayoutParams(activeCapsuleWidth, activeCapsuleHeight).apply {
+                    marginStart = activeSpacing
+                    marginEnd = activeSpacing
+                },
+            )
+
+            addView(
+                trailingView.apply {
+                    contentDescription = trailingContentDescription
+                    bindDragAndClick(this, onTrailingTap)
+                },
+            )
+        }
+
+    private fun iconButton(
+        backgroundColor: String,
+        iconRes: Int,
+        iconTint: Int?,
+    ): View =
+        FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(activeButtonSize, activeButtonSize)
+            background = roundedBackground(backgroundColor, activeButtonSize / 2f)
+            elevation = 6f
+            isClickable = true
+            isFocusable = true
+            addView(
+                ImageView(context).apply {
+                    setImageResource(iconRes)
+                    iconTint?.let { setColorFilter(it) }
+                    scaleType = ImageView.ScaleType.CENTER
+                },
+                FrameLayout.LayoutParams(activeButtonIconSize, activeButtonIconSize, Gravity.CENTER),
+            )
+        }
+
+    private fun handleReadyTap() {
+        session.onReadyBubbleTapped()
+        customContentDescription = null
+        rootView?.let { renderState(it) }
+        onStart()
+    }
+
+    private fun handleCancelTap() {
+        if (session.state != OverlayUiState.RECORDING) return
+        onCancel()
+        session.onCancelTapped()
+        customContentDescription = null
+        rootView?.let { renderState(it) }
+    }
+
+    private fun handleConfirmTap() {
+        if (session.state != OverlayUiState.RECORDING) return
+        session.onConfirmTapped()
+        customContentDescription = null
+        rootView?.let { renderState(it) }
+        onConfirm()
+    }
+
+    private fun bindDragOnly(target: View) {
+        target.setOnTouchListener(rootTouchListener)
+    }
+
+    private fun bindDragAndClick(target: View, clickAction: (() -> Unit)? = null) {
+        target.setOnTouchListener(DragTouchListener(clickAction))
     }
 
     private fun View.hideWithInputMethodAnimation() {
@@ -129,7 +269,7 @@ class FloatingDictationOverlay(
                     val inputMethodAnimating = runningAnimations.any {
                         it.typeMask and WindowInsets.Type.ime() != 0
                     }
-                    if (bubble === this@hideWithInputMethodAnimation &&
+                    if (rootView === this@hideWithInputMethodAnimation &&
                         inputMethodAnimating &&
                         !insets.isVisible(WindowInsets.Type.ime())
                     ) {
@@ -141,10 +281,10 @@ class FloatingDictationOverlay(
         )
     }
 
-    private fun bubbleBackground() = GradientDrawable().apply {
+    private fun roundedBackground(color: String, cornerRadius: Float) = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
-        cornerRadius = bubbleCornerRadius
-        setColor(Color.parseColor("#14233A"))
+        this.cornerRadius = cornerRadius
+        setColor(Color.parseColor(color))
     }
 
     private fun layoutParams(view: View) = WindowManager.LayoutParams(
@@ -189,6 +329,19 @@ class FloatingDictationOverlay(
             .apply()
     }
 
+    private fun realignToRememberedEdge(view: View) {
+        val params = currentLayoutParams ?: return
+        val position = positionMemory.currentPosition(
+            screenWidth = screenWidth(),
+            bubbleWidth = view.resolvedWidth(),
+            edgeMargin = edgeMargin,
+        )
+        params.gravity = position.gravity
+        params.x = position.x
+        params.y = position.y
+        runCatching { windowManager.updateViewLayout(view, params) }
+    }
+
     private fun loadSavedPosition(): OverlayPosition? {
         if (!preferences.getBoolean(KEY_HAS_POSITION, false)) return null
         val edge = preferences.getString(KEY_EDGE, null)
@@ -226,82 +379,226 @@ class FloatingDictationOverlay(
             context.resources.displayMetrics,
         ).roundToInt()
 
-    private inner class DragTouchListener : View.OnTouchListener {
+    private fun contentDescriptionFor(state: OverlayUiState): String = when (state) {
+        OverlayUiState.READY -> "開始聽寫"
+        OverlayUiState.RECORDING -> "錄音中"
+        OverlayUiState.PROCESSING -> "處理中"
+    }
+
+    private inner class DragTouchListener(
+        private val clickAction: (() -> Unit)? = null,
+    ) : View.OnTouchListener {
         private var downRawX = 0f
         private var downRawY = 0f
         private var startX = 0
         private var startY = 0
         private var dragging = false
-        private var longPressHandled = false
-        private val longPressRunnable = Runnable {
-            longPressHandled = bubble?.performLongClick() == true
-        }
 
         override fun onTouch(view: View, event: MotionEvent): Boolean {
+            val movableRoot = rootView ?: return false
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downRawX = event.rawX
                     downRawY = event.rawY
                     val location = IntArray(2)
-                    view.getLocationOnScreen(location)
+                    movableRoot.getLocationOnScreen(location)
                     startX = location[0]
                     startY = location[1]
                     dragging = false
-                    longPressHandled = false
-                    view.postDelayed(longPressRunnable, ViewConfiguration.getLongPressTimeout().toLong())
                     return true
                 }
+
                 MotionEvent.ACTION_MOVE -> {
                     val deltaX = event.rawX - downRawX
                     val deltaY = event.rawY - downRawY
-                    if (!dragging && (abs(deltaX) > touchSlop || abs(deltaY) > touchSlop)) {
+                    if (!dragging && (abs(deltaX) > touchSlopPx() || abs(deltaY) > touchSlopPx())) {
                         dragging = true
-                        view.removeCallbacks(longPressRunnable)
                     }
                     if (dragging) {
                         updatePosition(
-                            view = view,
+                            view = movableRoot,
                             x = (startX + deltaX).roundToInt(),
                             y = (startY + deltaY).roundToInt(),
                         )
                     }
                     return true
                 }
+
                 MotionEvent.ACTION_UP -> {
-                    view.removeCallbacks(longPressRunnable)
                     if (dragging) {
                         val params = currentLayoutParams
                         if (params != null) {
-                            snapAndRememberPosition(view = view, releasedX = params.x, releasedY = params.y)
+                            snapAndRememberPosition(movableRoot, params.x, params.y)
                         }
-                    } else if (!longPressHandled) {
-                        view.performClick()
+                    } else {
+                        clickAction?.invoke()
                     }
                     return true
                 }
-                MotionEvent.ACTION_CANCEL -> {
-                    view.removeCallbacks(longPressRunnable)
-                    return true
-                }
+
+                MotionEvent.ACTION_CANCEL -> return true
             }
-            return true
+            return false
         }
     }
 
-    private fun iconFor(state: OverlayState): Int = when (state) {
-        OverlayState.IDLE -> R.drawable.ic_verbally_waveform
-        OverlayState.RECORDING -> R.drawable.ic_verbally_check
-        OverlayState.PROCESSING -> R.drawable.ic_verbally_dots
-        OverlayState.SUCCESS -> R.drawable.ic_verbally_check
-        OverlayState.ERROR -> R.drawable.ic_verbally_retry
+    private fun touchSlopPx(): Int =
+        android.view.ViewConfiguration.get(context).scaledTouchSlop
+
+    private class RecordingWaveformView(context: Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#1C1821")
+            style = Paint.Style.FILL
+        }
+        private val amplitudes = floatArrayOf(0.20f, 0.42f, 0.62f, 0.82f, 0.82f, 0.62f, 0.42f, 0.20f)
+        private var phase = 0f
+        private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1_000L
+            repeatCount = ValueAnimator.INFINITE
+            addUpdateListener {
+                phase = it.animatedValue as Float
+                invalidate()
+            }
+        }
+
+        override fun onAttachedToWindow() {
+            super.onAttachedToWindow()
+            if (!animator.isStarted) animator.start()
+        }
+
+        override fun onDetachedFromWindow() {
+            animator.cancel()
+            super.onDetachedFromWindow()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val centerY = height / 2f
+            val horizontalInset = width * 0.12f
+            val contentWidth = width - horizontalInset * 2
+            val spacing = contentWidth / (amplitudes.size + 1f)
+            val barWidth = max(4f, spacing * 0.36f)
+            for (index in amplitudes.indices) {
+                val wave = ((phase * Math.PI * 2) + index * 0.55).toFloat()
+                val animatedScale = 0.82f + 0.18f * kotlin.math.sin(wave).let { (it + 1f) / 2f }
+                val barHeight = min(height * 0.56f, height * amplitudes[index] * animatedScale)
+                val centerX = horizontalInset + spacing * (index + 1)
+                val rect = RectF(
+                    centerX - barWidth / 2f,
+                    centerY - barHeight / 2f,
+                    centerX + barWidth / 2f,
+                    centerY + barHeight / 2f,
+                )
+                canvas.drawRoundRect(rect, barWidth, barWidth, paint)
+            }
+        }
     }
 
-    private fun contentDescriptionFor(state: OverlayState): String = when (state) {
-        OverlayState.IDLE -> "開始聽寫"
-        OverlayState.RECORDING -> "確認聽寫"
-        OverlayState.PROCESSING -> "處理中"
-        OverlayState.SUCCESS -> "聽寫完成"
-        OverlayState.ERROR -> "重試聽寫"
+    private class ProcessingDotsView(context: Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#8E8696")
+            style = Paint.Style.FILL
+        }
+        private var phase = 0f
+        private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1_000L
+            repeatCount = ValueAnimator.INFINITE
+            addUpdateListener {
+                phase = it.animatedValue as Float
+                invalidate()
+            }
+        }
+
+        override fun onAttachedToWindow() {
+            super.onAttachedToWindow()
+            if (!animator.isStarted) animator.start()
+        }
+
+        override fun onDetachedFromWindow() {
+            animator.cancel()
+            super.onDetachedFromWindow()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val count = 9
+            val horizontalInset = width * 0.16f
+            val contentWidth = width - horizontalInset * 2
+            val dotRadius = min(width / 34f, height / 10f)
+            val step = contentWidth / (count - 1).coerceAtLeast(1)
+            for (index in 0 until count) {
+                val wave = ((phase * Math.PI * 2) - index * 0.42).toFloat()
+                val alpha = (0.28f + 0.52f * ((kotlin.math.sin(wave) + 1f) / 2f))
+                paint.alpha = (alpha * 255).roundToInt()
+                canvas.drawCircle(horizontalInset + step * index, height / 2f, dotRadius, paint)
+            }
+            paint.alpha = 255
+        }
+    }
+
+    private class SpinnerRingView(context: Context) : FrameLayout(context) {
+        init {
+            layoutParams = LinearLayout.LayoutParams(
+                OverlayVisualDefaults.ACTIVE_BUTTON_SIZE_DP.dp(context),
+                OverlayVisualDefaults.ACTIVE_BUTTON_SIZE_DP.dp(context),
+            )
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = OverlayVisualDefaults.ACTIVE_BUTTON_SIZE_DP.dp(context) / 2f
+                setColor(Color.parseColor("#D8D1DC"))
+            }
+            elevation = 6f
+            addView(
+                RingView(context),
+                LayoutParams(
+                    OverlayVisualDefaults.ACTIVE_BUTTON_ICON_SIZE_DP.dp(context),
+                    OverlayVisualDefaults.ACTIVE_BUTTON_ICON_SIZE_DP.dp(context),
+                    Gravity.CENTER,
+                ),
+            )
+        }
+    }
+
+    private class RingView(context: Context) : View(context) {
+        private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#B7AFBF")
+            style = Paint.Style.STROKE
+            strokeWidth = 6f
+            strokeCap = Paint.Cap.ROUND
+        }
+        private val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#1C1821")
+            style = Paint.Style.STROKE
+            strokeWidth = 6f
+            strokeCap = Paint.Cap.ROUND
+        }
+        private val arcBounds = RectF()
+        private val animator = ObjectAnimator.ofFloat(this, View.ROTATION, 0f, 360f).apply {
+            duration = 900L
+            repeatCount = ValueAnimator.INFINITE
+        }
+
+        override fun onAttachedToWindow() {
+            super.onAttachedToWindow()
+            if (!animator.isStarted) animator.start()
+        }
+
+        override fun onDetachedFromWindow() {
+            animator.cancel()
+            super.onDetachedFromWindow()
+        }
+
+        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+            super.onSizeChanged(w, h, oldw, oldh)
+            val inset = 7f
+            arcBounds.set(inset, inset, w - inset, h - inset)
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            canvas.drawArc(arcBounds, 0f, 360f, false, trackPaint)
+            canvas.drawArc(arcBounds, -70f, 120f, false, progressPaint)
+        }
     }
 
     companion object {
@@ -309,5 +606,12 @@ class FloatingDictationOverlay(
         private const val KEY_HAS_POSITION = "has_position"
         private const val KEY_EDGE = "edge"
         private const val KEY_Y = "y"
+
+        private fun Int.dp(context: Context): Int =
+            TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                toFloat(),
+                context.resources.displayMetrics,
+            ).roundToInt()
     }
 }
