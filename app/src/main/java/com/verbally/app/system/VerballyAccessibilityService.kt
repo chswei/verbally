@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.verbally.app.DictationCoordinator
 import com.verbally.app.VerballyApplication
 import com.verbally.app.audio.TemporaryAudioRecorder
@@ -53,6 +54,7 @@ class VerballyAccessibilityService : AccessibilityService() {
         event ?: return
         val focused = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
         val source = event.source
+        val defaultInputMethodPackage = defaultInputMethodPackage()
         val decision = visibilityPolicy.decide(
             event = OverlayVisibilityEvent(
                 eventType = event.eventType,
@@ -61,7 +63,8 @@ class VerballyAccessibilityService : AccessibilityService() {
                 sourceEditable = source?.isEditable,
                 sourceFocused = source?.isFocused,
                 focusedEditable = focused?.isEditable,
-                inputMethodEvent = event.packageName?.toString() == defaultInputMethodPackage(),
+                inputMethodEvent = event.packageName?.toString() == defaultInputMethodPackage,
+                inputMethodVisible = isInputMethodVisible(),
             ),
             overlayShown = overlay?.isShown == true,
         )
@@ -100,4 +103,7 @@ class VerballyAccessibilityService : AccessibilityService() {
     private fun defaultInputMethodPackage(): String? =
         Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
             ?.substringBefore("/")
+
+    private fun isInputMethodVisible(): Boolean =
+        windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
 }

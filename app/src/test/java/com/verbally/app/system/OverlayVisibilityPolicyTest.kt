@@ -6,129 +6,17 @@ import org.junit.Test
 
 class OverlayVisibilityPolicyTest {
     @Test
-    fun passiveFocusedEditableEventKeepsBubbleHidden() {
+    fun inputMethodVisibleShowsBubbleWithoutFocusedEditableMetadata() {
         val policy = OverlayVisibilityPolicy()
 
         val decision = policy.decide(
             event = event(
-                type = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
-                packageName = "jp.naver.line.android",
-                focusedEditable = true,
-            ),
-            overlayShown = false,
-        )
-
-        assertEquals(OverlayVisibilityDecision.KEEP, decision)
-    }
-
-    @Test
-    fun editableClickShowsBubbleImmediately() {
-        val policy = OverlayVisibilityPolicy()
-
-        val decision = policy.decide(
-            event = event(
-                type = AccessibilityEvent.TYPE_VIEW_CLICKED,
-                packageName = "jp.naver.line.android",
-                sourceEditable = true,
-                sourceFocused = true,
-                focusedEditable = true,
-            ),
-            overlayShown = false,
-        )
-
-        assertEquals(OverlayVisibilityDecision.SHOW, decision)
-    }
-
-    @Test
-    fun samePackageNonEditableClickDoesNotActivateAutoFocusedInput() {
-        val policy = OverlayVisibilityPolicy()
-
-        policy.decide(
-            event = event(
-                type = AccessibilityEvent.TYPE_VIEW_CLICKED,
-                packageName = "jp.naver.line.android",
-                eventTime = 1_000L,
-                sourceEditable = null,
+                type = AccessibilityEvent.TYPE_WINDOWS_CHANGED,
+                packageName = "com.android.systemui",
+                sourceEditable = false,
+                sourceFocused = false,
                 focusedEditable = null,
-            ),
-            overlayShown = false,
-        )
-
-        val decision = policy.decide(
-            event = event(
-                type = AccessibilityEvent.TYPE_VIEW_FOCUSED,
-                packageName = "jp.naver.line.android",
-                eventTime = 1_300L,
-                sourceEditable = true,
-                sourceFocused = true,
-                focusedEditable = true,
-            ),
-            overlayShown = false,
-        )
-
-        assertEquals(OverlayVisibilityDecision.KEEP, decision)
-    }
-
-    @Test
-    fun launcherClickDoesNotActivateWhatsappAutoFocusedInput() {
-        val policy = OverlayVisibilityPolicy()
-
-        policy.decide(
-            event = event(
-                type = AccessibilityEvent.TYPE_VIEW_CLICKED,
-                packageName = "com.sec.android.app.launcher",
-                eventTime = 1_000L,
-                sourceEditable = null,
-                focusedEditable = true,
-            ),
-            overlayShown = false,
-        )
-
-        val decision = policy.decide(
-            event = event(
-                type = AccessibilityEvent.TYPE_VIEW_FOCUSED,
-                packageName = "com.whatsapp",
-                eventTime = 1_100L,
-                sourceEditable = true,
-                sourceFocused = true,
-                focusedEditable = true,
-            ),
-            overlayShown = false,
-        )
-
-        assertEquals(OverlayVisibilityDecision.KEEP, decision)
-    }
-
-    @Test
-    fun keyboardEventsKeepShownBubbleVisibleWhileInputRemainsFocused() {
-        val policy = OverlayVisibilityPolicy()
-
-        val decision = policy.decide(
-            event = event(
-                type = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
-                packageName = "com.google.android.inputmethod.latin",
-                sourceEditable = false,
-                sourceFocused = false,
-                focusedEditable = true,
-            ),
-            overlayShown = true,
-        )
-
-        assertEquals(OverlayVisibilityDecision.KEEP, decision)
-    }
-
-    @Test
-    fun keyboardEventShowsBubbleWhenFocusedInputIsAlreadyOpen() {
-        val policy = OverlayVisibilityPolicy()
-
-        val decision = policy.decide(
-            event = event(
-                type = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
-                packageName = "com.google.android.inputmethod.latin",
-                sourceEditable = false,
-                sourceFocused = false,
-                focusedEditable = true,
-                inputMethodEvent = true,
+                inputMethodVisible = true,
             ),
             overlayShown = false,
         )
@@ -137,7 +25,7 @@ class OverlayVisibilityPolicyTest {
     }
 
     @Test
-    fun nonKeyboardSystemEventKeepsBubbleHiddenWhenFocusedInputIsStale() {
+    fun inputMethodVisibleKeepsShownBubbleVisible() {
         val policy = OverlayVisibilityPolicy()
 
         val decision = policy.decide(
@@ -146,8 +34,46 @@ class OverlayVisibilityPolicyTest {
                 packageName = "com.android.systemui",
                 sourceEditable = false,
                 sourceFocused = false,
+                focusedEditable = false,
+                inputMethodVisible = true,
+            ),
+            overlayShown = true,
+        )
+
+        assertEquals(OverlayVisibilityDecision.KEEP, decision)
+    }
+
+    @Test
+    fun inputMethodHiddenHidesBubbleEvenWhenEditableFocusIsRetained() {
+        val policy = OverlayVisibilityPolicy()
+
+        val decision = policy.decide(
+            event = event(
+                type = AccessibilityEvent.TYPE_WINDOWS_CHANGED,
+                packageName = "com.android.systemui",
+                sourceEditable = false,
+                sourceFocused = false,
                 focusedEditable = true,
-                inputMethodEvent = false,
+                inputMethodVisible = false,
+            ),
+            overlayShown = true,
+        )
+
+        assertEquals(OverlayVisibilityDecision.HIDE, decision)
+    }
+
+    @Test
+    fun editableClickBeforeInputMethodOpensKeepsBubbleHidden() {
+        val policy = OverlayVisibilityPolicy()
+
+        val decision = policy.decide(
+            event = event(
+                type = AccessibilityEvent.TYPE_VIEW_CLICKED,
+                packageName = "jp.naver.line.android",
+                sourceEditable = true,
+                sourceFocused = true,
+                focusedEditable = true,
+                inputMethodVisible = false,
             ),
             overlayShown = false,
         )
@@ -156,21 +82,22 @@ class OverlayVisibilityPolicyTest {
     }
 
     @Test
-    fun nonEditableWindowHidesBubble() {
+    fun passiveFocusedEditableWithoutInputMethodKeepsBubbleHidden() {
         val policy = OverlayVisibilityPolicy()
 
         val decision = policy.decide(
             event = event(
-                type = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
-                packageName = "com.sec.android.app.launcher",
+                type = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                packageName = "jp.naver.line.android",
                 sourceEditable = false,
                 sourceFocused = false,
-                focusedEditable = false,
+                focusedEditable = true,
+                inputMethodVisible = false,
             ),
-            overlayShown = true,
+            overlayShown = false,
         )
 
-        assertEquals(OverlayVisibilityDecision.HIDE, decision)
+        assertEquals(OverlayVisibilityDecision.KEEP, decision)
     }
 
     private fun event(
@@ -181,6 +108,7 @@ class OverlayVisibilityPolicyTest {
         sourceFocused: Boolean? = false,
         focusedEditable: Boolean? = false,
         inputMethodEvent: Boolean = false,
+        inputMethodVisible: Boolean = false,
     ) = OverlayVisibilityEvent(
         eventType = type,
         packageName = packageName,
@@ -189,5 +117,6 @@ class OverlayVisibilityPolicyTest {
         sourceFocused = sourceFocused,
         focusedEditable = focusedEditable,
         inputMethodEvent = inputMethodEvent,
+        inputMethodVisible = inputMethodVisible,
     )
 }

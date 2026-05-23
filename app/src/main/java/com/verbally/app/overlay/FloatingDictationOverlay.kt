@@ -2,8 +2,11 @@ package com.verbally.app.overlay
 
 import android.content.Context
 import android.graphics.PixelFormat
+import android.os.Build
 import android.provider.Settings
 import android.view.Gravity
+import android.view.WindowInsets
+import android.view.WindowInsetsAnimation
 import android.view.WindowManager
 import android.widget.Button
 
@@ -45,12 +48,13 @@ class FloatingDictationOverlay(
                 }
             }
         }
+        view.hideWithInputMethodAnimation()
         windowManager.addView(view, layoutParams())
         button = view
     }
 
     fun hide() {
-        button?.let { runCatching { windowManager.removeView(it) } }
+        button?.let { runCatching { windowManager.removeViewImmediate(it) } }
         button = null
         state = OverlayState.IDLE
     }
@@ -78,6 +82,29 @@ class FloatingDictationOverlay(
         }
     }
 
+    private fun Button.hideWithInputMethodAnimation() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        setWindowInsetsAnimationCallback(
+            object : WindowInsetsAnimation.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+                override fun onProgress(
+                    insets: WindowInsets,
+                    runningAnimations: MutableList<WindowInsetsAnimation>,
+                ): WindowInsets {
+                    val inputMethodAnimating = runningAnimations.any {
+                        it.typeMask and WindowInsets.Type.ime() != 0
+                    }
+                    if (button === this@hideWithInputMethodAnimation &&
+                        inputMethodAnimating &&
+                        !insets.isVisible(WindowInsets.Type.ime())
+                    ) {
+                        hide()
+                    }
+                    return insets
+                }
+            },
+        )
+    }
+
     private fun layoutParams() = WindowManager.LayoutParams(
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.WRAP_CONTENT,
@@ -88,6 +115,7 @@ class FloatingDictationOverlay(
         gravity = Gravity.END or Gravity.CENTER_VERTICAL
         x = 24
         y = 0
+        windowAnimations = 0
     }
 
     private fun labelFor(state: OverlayState): String = when (state) {

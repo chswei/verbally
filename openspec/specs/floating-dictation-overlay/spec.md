@@ -4,28 +4,39 @@
 TBD - created by archiving change add-android-floating-dictation. Update Purpose after archive.
 ## Requirements
 ### Requirement: Bubble appears for editable fields
-The system SHALL show a floating dictation bubble only when text entry is user-initiated for an editable field and the required overlay and accessibility permissions are enabled.
+The system SHALL show the floating dictation bubble only while the input method window is visible and the required overlay and accessibility permissions are enabled.
 
-#### Scenario: Editable field clicked
+#### Scenario: Input method opens
+- **WHEN** the accessibility service observes that the input method window is visible
+- **THEN** the system shows the idle floating dictation bubble
+
+#### Scenario: Input method opens without focused editable metadata
+- **WHEN** the accessibility service observes that the input method window is visible
+- **AND** the currently focused editable field is unavailable, delayed, or stale
+- **THEN** the system shows the idle floating dictation bubble
+
+#### Scenario: Editable field clicked before input method opens
 - **WHEN** the accessibility service reports a click event whose source is a focused editable text field
-- **THEN** the system shows the idle floating dictation bubble
-
-#### Scenario: Input method opens for focused editable field
-- **WHEN** the active default input method emits an accessibility event while an editable text field is focused
-- **THEN** the system shows the idle floating dictation bubble
-
-#### Scenario: Passive editable focus without text-entry activation
-- **WHEN** an app reports editable focus without an editable field click or active input-method event
+- **AND** the input method window is not visible
 - **THEN** the system keeps the floating dictation bubble hidden
 
-#### Scenario: Non-input events while editable field remains focused
-- **WHEN** System UI, launcher, gesture, or unrelated app events occur while an editable field remains focused
-- **THEN** those events do not show the bubble if it is hidden
-- **THEN** those events do not hide the bubble if it is already shown and the editable field remains focused
+#### Scenario: Passive editable focus without input method
+- **WHEN** an app reports editable focus
+- **AND** the input method window is not visible
+- **THEN** the system keeps the floating dictation bubble hidden
 
-#### Scenario: No editable field focused
-- **WHEN** focus leaves editable text fields
+#### Scenario: Non-input events while input method remains visible
+- **WHEN** System UI, launcher, gesture, or unrelated app events occur
+- **AND** the input method window remains visible
+- **THEN** the system keeps the floating dictation bubble visible
+
+#### Scenario: Input method closes while editable focus is retained
+- **WHEN** the input method window closes while an editable text field remains focused
 - **THEN** the system hides the floating dictation bubble
+
+#### Scenario: No input method window
+- **WHEN** the input method window is not visible
+- **THEN** the system hides the floating dictation bubble if it is visible
 
 ### Requirement: Bubble controls recording lifecycle
 The system SHALL let the user start recording from the bubble, cancel recording, or confirm recording with a checkmark before transcription begins.
