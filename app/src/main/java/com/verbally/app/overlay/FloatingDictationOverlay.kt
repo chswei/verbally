@@ -1,9 +1,12 @@
 package com.verbally.app.overlay
 
 import android.content.Context
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.provider.Settings
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -11,7 +14,9 @@ import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowInsetsAnimation
 import android.view.WindowManager
-import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.ImageView
+import com.verbally.app.R
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -33,19 +38,27 @@ class FloatingDictationOverlay(
     private val preferences = context.getSharedPreferences(POSITION_PREFS, Context.MODE_PRIVATE)
     private val positionMemory = OverlayPositionMemory(loadSavedPosition())
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
-    private var button: Button? = null
+    private val edgeMargin = OverlayVisualDefaults.EDGE_MARGIN_DP.toPx()
+    private val bubbleSize = OverlayVisualDefaults.BUBBLE_SIZE_DP.toPx()
+    private val bubbleCornerRadius = OverlayVisualDefaults.BUBBLE_CORNER_RADIUS_DP.toPx().toFloat()
+    private val iconSize = OverlayVisualDefaults.ICON_SIZE_DP.toPx()
+    private var bubble: FrameLayout? = null
+    private var iconView: ImageView? = null
     private var currentLayoutParams: WindowManager.LayoutParams? = null
     private var state = OverlayState.IDLE
 
     val isShown: Boolean
-        get() = button != null
+        get() = bubble != null
 
     fun show() {
-        if (!Settings.canDrawOverlays(context) || button != null) return
-        val view = Button(context).apply {
-            minWidth = 56
-            minHeight = 56
-            text = labelFor(state)
+        if (!Settings.canDrawOverlays(context) || bubble != null) return
+        val view = FrameLayout(context).apply {
+            minimumWidth = bubbleSize
+            minimumHeight = bubbleSize
+            background = bubbleBackground()
+            elevation = 8f
+            isClickable = true
+            contentDescription = contentDescriptionFor(state)
             setOnClickListener { handleClick() }
             setOnLongClickListener {
                 if (state == OverlayState.RECORDING) {
@@ -58,27 +71,37 @@ class FloatingDictationOverlay(
             }
             setOnTouchListener(DragTouchListener())
         }
+        iconView = ImageView(context).apply {
+            setImageResource(iconFor(state))
+            scaleType = ImageView.ScaleType.CENTER
+        }
+        view.addView(
+            iconView,
+            FrameLayout.LayoutParams(iconSize, iconSize, Gravity.CENTER),
+        )
         view.hideWithInputMethodAnimation()
-        val params = layoutParams()
+        val params = layoutParams(view)
         currentLayoutParams = params
         windowManager.addView(view, params)
-        button = view
+        bubble = view
     }
 
     fun hide() {
-        button?.let { runCatching { windowManager.removeViewImmediate(it) } }
-        button = null
+        bubble?.let { runCatching { windowManager.removeViewImmediate(it) } }
+        bubble = null
+        iconView = null
         currentLayoutParams = null
         state = OverlayState.IDLE
     }
 
     fun setState(next: OverlayState) {
         state = next
-        button?.text = labelFor(next)
+        bubble?.contentDescription = contentDescriptionFor(next)
+        iconView?.setImageResource(iconFor(next))
     }
 
     fun showMessage(message: String) {
-        button?.text = message.take(10)
+        bubble?.contentDescription = message
     }
 
     private fun handleClick() {
@@ -95,7 +118,7 @@ class FloatingDictationOverlay(
         }
     }
 
-    private fun Button.hideWithInputMethodAnimation() {
+    private fun View.hideWithInputMethodAnimation() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         setWindowInsetsAnimationCallback(
             object : WindowInsetsAnimation.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
@@ -106,7 +129,7 @@ class FloatingDictationOverlay(
                     val inputMethodAnimating = runningAnimations.any {
                         it.typeMask and WindowInsets.Type.ime() != 0
                     }
-                    if (button === this@hideWithInputMethodAnimation &&
+                    if (bubble === this@hideWithInputMethodAnimation &&
                         inputMethodAnimating &&
                         !insets.isVisible(WindowInsets.Type.ime())
                     ) {
@@ -118,14 +141,24 @@ class FloatingDictationOverlay(
         )
     }
 
-    private fun layoutParams() = WindowManager.LayoutParams(
+    private fun bubbleBackground() = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = bubbleCornerRadius
+        setColor(Color.parseColor("#14233A"))
+    }
+
+    private fun layoutParams(view: View) = WindowManager.LayoutParams(
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
         PixelFormat.TRANSLUCENT,
     ).apply {
-        val position = positionMemory.currentPosition()
+        val position = positionMemory.currentPosition(
+            screenWidth = screenWidth(),
+            bubbleWidth = view.resolvedWidth(),
+            edgeMargin = edgeMargin,
+        )
         gravity = position.gravity
         x = position.x
         y = position.y
@@ -140,23 +173,58 @@ class FloatingDictationOverlay(
         runCatching { windowManager.updateViewLayout(view, params) }
     }
 
-    private fun rememberPosition(x: Int, y: Int) {
-        positionMemory.rememberMovedPosition(x = x, y = y)
+    private fun snapAndRememberPosition(view: View, releasedX: Int, releasedY: Int) {
+        val position = positionMemory.rememberSnappedPosition(
+            releasedX = releasedX,
+            releasedY = releasedY,
+            bubbleWidth = view.resolvedWidth(),
+            screenWidth = screenWidth(),
+            edgeMargin = edgeMargin,
+        )
+        updatePosition(view = view, x = position.x, y = position.y)
         preferences.edit()
             .putBoolean(KEY_HAS_POSITION, true)
-            .putInt(KEY_X, x)
-            .putInt(KEY_Y, y)
+            .putString(KEY_EDGE, position.edge?.name)
+            .putInt(KEY_Y, position.y)
             .apply()
     }
 
     private fun loadSavedPosition(): OverlayPosition? {
         if (!preferences.getBoolean(KEY_HAS_POSITION, false)) return null
+        val edge = preferences.getString(KEY_EDGE, null)
+            ?.let { runCatching { OverlayEdge.valueOf(it) }.getOrNull() }
+            ?: return null
         return OverlayPosition(
+            edge = edge,
             gravity = Gravity.TOP or Gravity.START,
-            x = preferences.getInt(KEY_X, 24),
+            x = 0,
             y = preferences.getInt(KEY_Y, 0),
         )
     }
+
+    private fun screenWidth(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            windowManager.currentWindowMetrics.bounds.width()
+        } else {
+            @Suppress("DEPRECATION")
+            context.resources.displayMetrics.widthPixels
+        }
+
+    private fun View.resolvedWidth(): Int {
+        if (width > 0) return width
+        measure(
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        return measuredWidth.coerceAtLeast(minimumWidth)
+    }
+
+    private fun Int.toPx(): Int =
+        TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            toFloat(),
+            context.resources.displayMetrics,
+        ).roundToInt()
 
     private inner class DragTouchListener : View.OnTouchListener {
         private var downRawX = 0f
@@ -166,7 +234,7 @@ class FloatingDictationOverlay(
         private var dragging = false
         private var longPressHandled = false
         private val longPressRunnable = Runnable {
-            longPressHandled = button?.performLongClick() == true
+            longPressHandled = bubble?.performLongClick() == true
         }
 
         override fun onTouch(view: View, event: MotionEvent): Boolean {
@@ -204,7 +272,7 @@ class FloatingDictationOverlay(
                     if (dragging) {
                         val params = currentLayoutParams
                         if (params != null) {
-                            rememberPosition(x = params.x, y = params.y)
+                            snapAndRememberPosition(view = view, releasedX = params.x, releasedY = params.y)
                         }
                     } else if (!longPressHandled) {
                         view.performClick()
@@ -220,18 +288,26 @@ class FloatingDictationOverlay(
         }
     }
 
-    private fun labelFor(state: OverlayState): String = when (state) {
-        OverlayState.IDLE -> "聽寫"
-        OverlayState.RECORDING -> "✓"
-        OverlayState.PROCESSING -> "..."
-        OverlayState.SUCCESS -> "完成"
-        OverlayState.ERROR -> "重試"
+    private fun iconFor(state: OverlayState): Int = when (state) {
+        OverlayState.IDLE -> R.drawable.ic_verbally_waveform
+        OverlayState.RECORDING -> R.drawable.ic_verbally_check
+        OverlayState.PROCESSING -> R.drawable.ic_verbally_dots
+        OverlayState.SUCCESS -> R.drawable.ic_verbally_check
+        OverlayState.ERROR -> R.drawable.ic_verbally_retry
+    }
+
+    private fun contentDescriptionFor(state: OverlayState): String = when (state) {
+        OverlayState.IDLE -> "開始聽寫"
+        OverlayState.RECORDING -> "確認聽寫"
+        OverlayState.PROCESSING -> "處理中"
+        OverlayState.SUCCESS -> "聽寫完成"
+        OverlayState.ERROR -> "重試聽寫"
     }
 
     companion object {
         private const val POSITION_PREFS = "floating_dictation_overlay_position"
         private const val KEY_HAS_POSITION = "has_position"
-        private const val KEY_X = "x"
+        private const val KEY_EDGE = "edge"
         private const val KEY_Y = "y"
     }
 }

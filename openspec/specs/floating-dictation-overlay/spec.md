@@ -53,6 +53,38 @@ The system SHALL let the user start recording from the bubble, cancel recording,
 - **WHEN** the user taps cancel while recording
 - **THEN** the system stops recording, deletes temporary audio, and returns to idle
 
+### Requirement: Bubble snaps to a screen edge after dragging
+The system SHALL allow the user to drag the floating dictation bubble and SHALL snap it to the nearest left or right screen edge when the drag ends.
+
+#### Scenario: Drag releases closer to the left edge
+- **WHEN** the user drags the bubble and releases it with the bubble center closer to the left half of the screen
+- **THEN** the system positions the bubble at the left edge with an approximately 20dp margin
+- **THEN** the system preserves the release height
+
+#### Scenario: Drag releases closer to the right edge
+- **WHEN** the user drags the bubble and releases it with the bubble center closer to the right half of the screen
+- **THEN** the system positions the bubble at the right edge with an approximately 20dp margin
+- **THEN** the system preserves the release height
+
+#### Scenario: Snapped position is reused
+- **WHEN** the user has previously dragged and released the bubble
+- **THEN** future bubble displays use the saved edge and height until the user drags the bubble again
+
+### Requirement: Bubble uses icon-based rounded-square styling
+The system SHALL display the floating dictation bubble as a compact rounded square with state symbols instead of text labels.
+
+#### Scenario: Idle bubble appears
+- **WHEN** the floating dictation bubble is idle
+- **THEN** the bubble displays the app reference-style waveform mark inside a rounded-square surface
+
+#### Scenario: Recording lifecycle states appear
+- **WHEN** the bubble is recording, processing, successful, or in error state
+- **THEN** the bubble displays a white symbolic icon for the current state instead of a text label
+
+#### Scenario: Launcher and bubble share the mark
+- **WHEN** the app launcher icon and idle floating bubble are shown
+- **THEN** both use the same modern reference-style waveform mark
+
 ### Requirement: Cleaned text is pasted at the active cursor
 The system SHALL insert cleaned dictation text by temporarily placing it on the clipboard and invoking paste on the currently focused editable field.
 
@@ -72,4 +104,3 @@ The system SHALL guide the user through microphone, overlay, and accessibility p
 #### Scenario: Missing required permission
 - **WHEN** a required permission is not granted
 - **THEN** the onboarding screen shows the missing permission and a button to open the relevant Android settings screen
-
