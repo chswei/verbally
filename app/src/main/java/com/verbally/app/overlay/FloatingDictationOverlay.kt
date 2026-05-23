@@ -5,10 +5,15 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.provider.Settings
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowInsetsAnimation
 import android.view.WindowManager
 import android.widget.Button
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 enum class OverlayState {
     IDLE,
@@ -25,7 +30,11 @@ class FloatingDictationOverlay(
     private val onConfirm: () -> Unit,
 ) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private val preferences = context.getSharedPreferences(POSITION_PREFS, Context.MODE_PRIVATE)
+    private val positionMemory = OverlayPositionMemory(loadSavedPosition())
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private var button: Button? = null
+    private var currentLayoutParams: WindowManager.LayoutParams? = null
     private var state = OverlayState.IDLE
 
     val isShown: Boolean
@@ -47,15 +56,19 @@ class FloatingDictationOverlay(
                     false
                 }
             }
+            setOnTouchListener(DragTouchListener())
         }
         view.hideWithInputMethodAnimation()
-        windowManager.addView(view, layoutParams())
+        val params = layoutParams()
+        currentLayoutParams = params
+        windowManager.addView(view, params)
         button = view
     }
 
     fun hide() {
         button?.let { runCatching { windowManager.removeViewImmediate(it) } }
         button = null
+        currentLayoutParams = null
         state = OverlayState.IDLE
     }
 
@@ -112,10 +125,99 @@ class FloatingDictationOverlay(
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
         PixelFormat.TRANSLUCENT,
     ).apply {
-        gravity = Gravity.END or Gravity.CENTER_VERTICAL
-        x = 24
-        y = 0
+        val position = positionMemory.currentPosition()
+        gravity = position.gravity
+        x = position.x
+        y = position.y
         windowAnimations = 0
+    }
+
+    private fun updatePosition(view: View, x: Int, y: Int) {
+        val params = currentLayoutParams ?: return
+        params.gravity = Gravity.TOP or Gravity.START
+        params.x = x.coerceAtLeast(0)
+        params.y = y.coerceAtLeast(0)
+        runCatching { windowManager.updateViewLayout(view, params) }
+    }
+
+    private fun rememberPosition(x: Int, y: Int) {
+        positionMemory.rememberMovedPosition(x = x, y = y)
+        preferences.edit()
+            .putBoolean(KEY_HAS_POSITION, true)
+            .putInt(KEY_X, x)
+            .putInt(KEY_Y, y)
+            .apply()
+    }
+
+    private fun loadSavedPosition(): OverlayPosition? {
+        if (!preferences.getBoolean(KEY_HAS_POSITION, false)) return null
+        return OverlayPosition(
+            gravity = Gravity.TOP or Gravity.START,
+            x = preferences.getInt(KEY_X, 24),
+            y = preferences.getInt(KEY_Y, 0),
+        )
+    }
+
+    private inner class DragTouchListener : View.OnTouchListener {
+        private var downRawX = 0f
+        private var downRawY = 0f
+        private var startX = 0
+        private var startY = 0
+        private var dragging = false
+        private var longPressHandled = false
+        private val longPressRunnable = Runnable {
+            longPressHandled = button?.performLongClick() == true
+        }
+
+        override fun onTouch(view: View, event: MotionEvent): Boolean {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    val location = IntArray(2)
+                    view.getLocationOnScreen(location)
+                    startX = location[0]
+                    startY = location[1]
+                    dragging = false
+                    longPressHandled = false
+                    view.postDelayed(longPressRunnable, ViewConfiguration.getLongPressTimeout().toLong())
+                    return true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = event.rawX - downRawX
+                    val deltaY = event.rawY - downRawY
+                    if (!dragging && (abs(deltaX) > touchSlop || abs(deltaY) > touchSlop)) {
+                        dragging = true
+                        view.removeCallbacks(longPressRunnable)
+                    }
+                    if (dragging) {
+                        updatePosition(
+                            view = view,
+                            x = (startX + deltaX).roundToInt(),
+                            y = (startY + deltaY).roundToInt(),
+                        )
+                    }
+                    return true
+                }
+                MotionEvent.ACTION_UP -> {
+                    view.removeCallbacks(longPressRunnable)
+                    if (dragging) {
+                        val params = currentLayoutParams
+                        if (params != null) {
+                            rememberPosition(x = params.x, y = params.y)
+                        }
+                    } else if (!longPressHandled) {
+                        view.performClick()
+                    }
+                    return true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    view.removeCallbacks(longPressRunnable)
+                    return true
+                }
+            }
+            return true
+        }
     }
 
     private fun labelFor(state: OverlayState): String = when (state) {
@@ -124,5 +226,12 @@ class FloatingDictationOverlay(
         OverlayState.PROCESSING -> "..."
         OverlayState.SUCCESS -> "完成"
         OverlayState.ERROR -> "重試"
+    }
+
+    companion object {
+        private const val POSITION_PREFS = "floating_dictation_overlay_position"
+        private const val KEY_HAS_POSITION = "has_position"
+        private const val KEY_X = "x"
+        private const val KEY_Y = "y"
     }
 }
