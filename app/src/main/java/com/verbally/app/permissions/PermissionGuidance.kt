@@ -6,6 +6,13 @@ enum class PermissionAction {
     OPEN_APP_DETAILS,
 }
 
+enum class PermissionSetupStep {
+    MICROPHONE,
+    OVERLAY,
+    ACCESSIBILITY,
+    COMPLETE,
+}
+
 object PermissionGuidance {
     val restrictedSettingsExplanation: String =
         "如果 Verbally 浮動聽寫在輔助使用清單顯示「由受限制的設定控管」，" +
@@ -19,5 +26,23 @@ object PermissionGuidance {
         isGranted -> PermissionAction.ALREADY_GRANTED
         hasRequestedBefore -> PermissionAction.OPEN_APP_DETAILS
         else -> PermissionAction.REQUEST_RUNTIME_PERMISSION
+    }
+
+    fun nextSetupStep(
+        microphoneGranted: Boolean,
+        overlayGranted: Boolean,
+        accessibilityGranted: Boolean,
+    ): PermissionSetupStep = when {
+        !microphoneGranted -> PermissionSetupStep.MICROPHONE
+        !overlayGranted -> PermissionSetupStep.OVERLAY
+        !accessibilityGranted -> PermissionSetupStep.ACCESSIBILITY
+        else -> PermissionSetupStep.COMPLETE
+    }
+
+    fun actionLabel(step: PermissionSetupStep): String = when (step) {
+        PermissionSetupStep.MICROPHONE -> "開啟權限"
+        PermissionSetupStep.OVERLAY -> "開啟設定"
+        PermissionSetupStep.ACCESSIBILITY -> "開啟設定"
+        PermissionSetupStep.COMPLETE -> "完成設定"
     }
 }

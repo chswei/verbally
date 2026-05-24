@@ -33,4 +33,56 @@ class PermissionGuidanceTest {
         assertTrue(text.contains("允許受限制的設定"))
         assertTrue(text.contains("輔助使用"))
     }
+
+    @Test
+    fun nextSetupStepStartsWithMicrophone() {
+        val step = PermissionGuidance.nextSetupStep(
+            microphoneGranted = false,
+            overlayGranted = false,
+            accessibilityGranted = false,
+        )
+
+        assertEquals(PermissionSetupStep.MICROPHONE, step)
+    }
+
+    @Test
+    fun nextSetupStepMovesToOverlayAfterMicrophone() {
+        val step = PermissionGuidance.nextSetupStep(
+            microphoneGranted = true,
+            overlayGranted = false,
+            accessibilityGranted = false,
+        )
+
+        assertEquals(PermissionSetupStep.OVERLAY, step)
+    }
+
+    @Test
+    fun nextSetupStepMovesToAccessibilityAfterOverlay() {
+        val step = PermissionGuidance.nextSetupStep(
+            microphoneGranted = true,
+            overlayGranted = true,
+            accessibilityGranted = false,
+        )
+
+        assertEquals(PermissionSetupStep.ACCESSIBILITY, step)
+    }
+
+    @Test
+    fun nextSetupStepCompletesWhenAllPermissionsAreGranted() {
+        val step = PermissionGuidance.nextSetupStep(
+            microphoneGranted = true,
+            overlayGranted = true,
+            accessibilityGranted = true,
+        )
+
+        assertEquals(PermissionSetupStep.COMPLETE, step)
+    }
+
+    @Test
+    fun setupStepActionLabelsDescribeCurrentPermission() {
+        assertEquals("開啟權限", PermissionGuidance.actionLabel(PermissionSetupStep.MICROPHONE))
+        assertEquals("開啟設定", PermissionGuidance.actionLabel(PermissionSetupStep.OVERLAY))
+        assertEquals("開啟設定", PermissionGuidance.actionLabel(PermissionSetupStep.ACCESSIBILITY))
+        assertEquals("完成設定", PermissionGuidance.actionLabel(PermissionSetupStep.COMPLETE))
+    }
 }
