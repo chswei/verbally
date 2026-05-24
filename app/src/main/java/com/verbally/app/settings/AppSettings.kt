@@ -10,8 +10,8 @@ data class AppSettings(
     val geminiApiKey: String = "",
     val cleanupProvider: CleanupProvider = CleanupProvider.OPENAI,
     val transcriptionModel: String = "gpt-4o-transcribe",
-    val openAiCleanupModel: String = "gpt-5.4-mini",
-    val geminiCleanupModel: String = "gemini-3.5-flash",
+    val openAiCleanupModel: String = "gpt-5.4-nano",
+    val geminiCleanupModel: String = "gemini-3.1-flash-lite",
 )
 
 interface SettingsRepository {

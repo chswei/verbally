@@ -17,8 +17,8 @@ class EncryptedSettingsRepository(
             CleanupProvider.valueOf(prefs.getString(KEY_PROVIDER, CleanupProvider.OPENAI.name).orEmpty())
         }.getOrDefault(CleanupProvider.OPENAI),
         transcriptionModel = prefs.getString(KEY_TRANSCRIPTION_MODEL, "gpt-4o-transcribe").orEmpty(),
-        openAiCleanupModel = prefs.getString(KEY_OPENAI_MODEL, "gpt-5.4-mini").orEmpty(),
-        geminiCleanupModel = prefs.getString(KEY_GEMINI_MODEL, "gemini-3.5-flash").orEmpty(),
+        openAiCleanupModel = prefs.getString(KEY_OPENAI_MODEL, "gpt-5.4-nano").orEmpty(),
+        geminiCleanupModel = prefs.getString(KEY_GEMINI_MODEL, "gemini-3.1-flash-lite").orEmpty(),
     )
 
     override fun save(settings: AppSettings) {

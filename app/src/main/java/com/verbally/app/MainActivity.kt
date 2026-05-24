@@ -19,6 +19,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,40 +27,52 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -72,10 +85,28 @@ import com.verbally.app.permissions.PermissionGuidance
 import com.verbally.app.permissions.PermissionSetupStep
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
+import kotlinx.coroutines.launch
 
 private val VerballyBrandBlue = Color(0xFF14233A)
 private val VerballySoftBlue = Color(0xFFE6EDF6)
 private val VerballyPageBackground = Color(0xFFF7F9FC)
+private val ScreenHorizontalPadding = 24.dp
+private val ScreenVerticalPadding = 20.dp
+private val FormFieldHeight = 56.dp
+private val PrimaryActionHeight = 52.dp
+private val TranscriptionModelOptions = listOf(
+    "gpt-4o-transcribe",
+    "gpt-4o-mini-transcribe",
+)
+private val OpenAiCleanupModelOptions = listOf(
+    "gpt-5.4-nano",
+    "gpt-5.4-mini",
+)
+private val GeminiCleanupModelOptions = listOf(
+    "gemini-3.1-flash-lite",
+)
+private val CleanupModelOptions = OpenAiCleanupModelOptions.map { "OpenAI: $it" } +
+    GeminiCleanupModelOptions.map { "Gemini: $it" }
 
 private val VerballyColorScheme = lightColorScheme(
     primary = VerballyBrandBlue,
@@ -117,8 +148,7 @@ private fun VerballyTheme(content: @Composable () -> Unit) {
 @Composable
 fun VerballyApp(container: VerballyContainer) {
     val context = LocalContext.current
-    var selectedDestination by remember { mutableStateOf(AppDestination.HISTORY) }
-    var settingsPage by remember { mutableStateOf(SettingsPage.OVERVIEW) }
+    var selectedDestination by remember { mutableStateOf(AppDestination.HOME) }
     var permissionsReady by remember { mutableStateOf(hasRequiredPermissions(context)) }
     var showingPermissions by remember { mutableStateOf(!permissionsReady) }
 
@@ -141,20 +171,30 @@ fun VerballyApp(container: VerballyContainer) {
         onDestinationSelected = {
             refreshPermissions()
             selectedDestination = it
-            if (it != AppDestination.SETTINGS) settingsPage = SettingsPage.OVERVIEW
+        },
+        onOpenSettings = {
+            selectedDestination = AppDestination.HOME
         },
         onOpenPermissions = { showingPermissions = true },
-        historyContent = {
-            HistoryScreen(
+        homeContent = {
+            SettingsScreen(
                 container = container,
                 modifier = Modifier.fillMaxSize(),
             )
         },
-        settingsContent = {
-            SettingsScreen(
+        dictionaryContent = {
+            DictionaryScreen(
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        snippetsContent = {
+            SnippetsScreen(
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        historyContent = {
+            HistoryScreen(
                 container = container,
-                page = settingsPage,
-                onPageChange = { settingsPage = it },
                 modifier = Modifier.fillMaxSize(),
             )
         },
@@ -162,14 +202,10 @@ fun VerballyApp(container: VerballyContainer) {
 }
 
 enum class AppDestination(val label: String, val marker: String) {
-    HISTORY("歷史", "歷"),
-    SETTINGS("設定", "設"),
-}
-
-private enum class SettingsPage {
-    OVERVIEW,
-    TRANSCRIPTION,
-    CLEANUP,
+    HOME("Home", "⌂"),
+    DICTIONARY("Dictionary", "D"),
+    SNIPPETS("Snippets", "S"),
+    HISTORY("History", "H"),
 }
 
 @Composable
@@ -177,49 +213,152 @@ fun VerballyAppScaffold(
     permissionsReady: Boolean,
     selectedDestination: AppDestination,
     onDestinationSelected: (AppDestination) -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenPermissions: () -> Unit,
+    homeContent: @Composable () -> Unit,
+    dictionaryContent: @Composable () -> Unit,
+    snippetsContent: @Composable () -> Unit,
     historyContent: @Composable () -> Unit,
-    settingsContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                AppDestination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = selectedDestination == destination,
-                        onClick = { onDestinationSelected(destination) },
-                        icon = { Text(destination.marker, fontWeight = FontWeight.SemiBold) },
-                        label = { Text(destination.label) },
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    fun closeDrawer() {
+        scope.launch { drawerState.close() }
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            VerballyDrawerContent(
+                onOpenSettings = {
+                    onOpenSettings()
+                    closeDrawer()
+                },
+            )
+        },
+    ) {
+        Scaffold(
+            modifier = modifier,
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                VerballyTopBar(
+                    onOpenMenu = { scope.launch { drawerState.open() } },
+                )
+            },
+            bottomBar = {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                    AppDestination.entries.forEach { destination ->
+                        NavigationBarItem(
+                            selected = selectedDestination == destination,
+                            onClick = { onDestinationSelected(destination) },
+                            icon = { Text(destination.marker, fontWeight = FontWeight.SemiBold) },
+                            label = { Text(destination.label) },
+                        )
+                    }
+                }
+            },
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) {
+                if (!permissionsReady) {
+                    PermissionBanner(
+                        onOpenPermissions = onOpenPermissions,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                 }
-            }
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            if (!permissionsReady) {
-                PermissionBanner(
-                    onOpenPermissions = onOpenPermissions,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                )
-            }
-            Box(modifier = Modifier.weight(1f)) {
-                when (selectedDestination) {
-                    AppDestination.HISTORY -> historyContent()
-                    AppDestination.SETTINGS -> settingsContent()
+                Box(modifier = Modifier.weight(1f)) {
+                    when (selectedDestination) {
+                        AppDestination.HOME -> homeContent()
+                        AppDestination.DICTIONARY -> dictionaryContent()
+                        AppDestination.SNIPPETS -> snippetsContent()
+                        AppDestination.HISTORY -> historyContent()
+                    }
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VerballyTopBar(
+    onOpenMenu: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.statusBarsPadding(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+                .padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(34.dp)
+                    .height(44.dp)
+                    .clickable(onClick = onOpenMenu),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    "☰",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Text(
+                text = "Verbally",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black,
+            )
+        }
+    }
+}
+
+@Composable
+private fun VerballyDrawerContent(
+    onOpenSettings: () -> Unit,
+) {
+    ModalDrawerSheet(
+        modifier = Modifier.width(260.dp),
+        drawerContainerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(horizontal = 18.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "選單",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = "App 設定",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            NavigationDrawerItem(
+                label = { Text("Settings") },
+                selected = false,
+                onClick = onOpenSettings,
+            )
+        }
+    }
+}
+
 @Composable
 private fun PermissionScreen(
     onPermissionsChanged: () -> Unit,
@@ -324,13 +463,7 @@ private fun PermissionScreen(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("權限設定") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
+            PlainPageTopBar("權限設定")
         },
     ) { padding ->
         PermissionSetupContent(
@@ -367,15 +500,15 @@ fun PermissionSetupContent(
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         if (step != PermissionSetupStep.COMPLETE) {
             PermissionStepCard(details = details)
         } else {
             Text(
                 text = details.title,
-                style = MaterialTheme.typography.headlineLarge,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -391,7 +524,9 @@ fun PermissionSetupContent(
         }
         Button(
             onClick = onContinue,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PrimaryActionHeight),
         ) {
             Text(primaryActionLabel)
         }
@@ -459,7 +594,7 @@ private fun TroubleshootingCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
@@ -475,7 +610,9 @@ private fun TroubleshootingCard(
             )
             OutlinedButton(
                 onClick = onOpenAppDetails,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(PrimaryActionHeight),
             ) {
                 Text("開啟 App 資訊")
             }
@@ -490,8 +627,8 @@ private fun ShortcutHintCard() {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = "捷徑不用開",
@@ -515,7 +652,7 @@ private fun PermissionStepCard(details: PermissionStepDetails) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
@@ -537,7 +674,7 @@ private fun PermissionStepCard(details: PermissionStepDetails) {
             }
             Text(
                 text = details.title,
-                style = MaterialTheme.typography.headlineLarge,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -550,6 +687,29 @@ private fun PermissionStepCard(details: PermissionStepDetails) {
                 text = details.description,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlainPageTopBar(title: String) {
+    Surface(
+        modifier = Modifier.statusBarsPadding(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+                .padding(horizontal = ScreenHorizontalPadding),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }
@@ -610,45 +770,21 @@ private fun StatusPill(text: String, positive: Boolean) {
 @Composable
 private fun SettingsScreen(
     container: VerballyContainer,
-    page: SettingsPage,
-    onPageChange: (SettingsPage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var settings by remember { mutableStateOf(container.settingsRepository.load()) }
+    var settings by remember { mutableStateOf(container.settingsRepository.load().normalizedModelChoices()) }
     val context = LocalContext.current
     val saveSettings = {
         container.settingsRepository.save(settings)
         Toast.makeText(context, "設定已儲存", Toast.LENGTH_SHORT).show()
     }
 
-    when (page) {
-        SettingsPage.OVERVIEW -> SettingsScreenContent(
-            settings = settings,
-            onSettingsChange = { settings = it },
-            onSave = saveSettings,
-            onClearHistory = {
-                container.historyRepository.clear()
-                Toast.makeText(context, "歷史已清空", Toast.LENGTH_SHORT).show()
-            },
-            onOpenTranscriptionSettings = { onPageChange(SettingsPage.TRANSCRIPTION) },
-            onOpenCleanupSettings = { onPageChange(SettingsPage.CLEANUP) },
-            modifier = modifier,
-        )
-        SettingsPage.TRANSCRIPTION -> TranscriptionSettingsScreenContent(
-            settings = settings,
-            onSettingsChange = { settings = it },
-            onSave = saveSettings,
-            onBack = { onPageChange(SettingsPage.OVERVIEW) },
-            modifier = modifier,
-        )
-        SettingsPage.CLEANUP -> CleanupSettingsScreenContent(
-            settings = settings,
-            onSettingsChange = { settings = it },
-            onSave = saveSettings,
-            onBack = { onPageChange(SettingsPage.OVERVIEW) },
-            modifier = modifier,
-        )
-    }
+    SettingsScreenContent(
+        settings = settings,
+        onSettingsChange = { settings = it },
+        onSave = saveSettings,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -656,35 +792,50 @@ fun SettingsScreenContent(
     settings: AppSettings,
     onSettingsChange: (AppSettings) -> Unit,
     onSave: () -> Unit,
-    onClearHistory: () -> Unit,
-    onOpenTranscriptionSettings: () -> Unit,
-    onOpenCleanupSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        ScreenHeader(title = "設定", subtitle = "調整轉錄、第二層處理與本機資料。")
-        SectionLabel("API")
-        SettingsListItem(
-            title = "Transcribe",
-            subtitle = "OpenAI API Key、轉錄模型",
-            onClick = onOpenTranscriptionSettings,
+        ScreenHeader(
+            title = "API 設定",
+            subtitle = "說明：Verbally 會使用語音轉錄模型進行語音辨識，並將文字結果進行處理後再輸出。請至 OpenAI 或 Gemini 取得 API Key 後貼入格子，並選擇模型。",
         )
-        SettingsListItem(
-            title = "第二層處理",
-            subtitle = "${settings.cleanupProvider.label}、整理模型與對應 API Key",
-            onClick = onOpenCleanupSettings,
-        )
-        SectionLabel("資料")
-        SettingsListItem(
-            title = "清空歷史",
-            subtitle = "刪除本機儲存的聽寫紀錄",
-            onClick = onClearHistory,
-        )
+        ApiSettingsBlock(
+            title = "語音轉錄",
+        ) {
+            TranscriptionSettingsFields(
+                settings = settings,
+                onSettingsChange = onSettingsChange,
+            )
+            Button(
+                onClick = onSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(PrimaryActionHeight),
+            ) {
+                Text("儲存語音轉錄 API Key")
+            }
+        }
+        ApiSettingsBlock(
+            title = "文字處理",
+        ) {
+            CleanupSettingsFields(
+                settings = settings,
+                onSettingsChange = onSettingsChange,
+            )
+            Button(
+                onClick = onSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(PrimaryActionHeight),
+            ) {
+                Text("儲存文字處理 API Key")
+            }
+        }
         Spacer(modifier = Modifier.height(64.dp))
     }
 }
@@ -700,25 +851,20 @@ fun TranscriptionSettingsScreenContent(
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        ScreenHeader(
-            title = "Transcribe",
-            subtitle = "OpenAI 語音轉文字設定。",
-            onBack = onBack,
+        ScreenHeader(title = "語音轉錄", onBack = onBack)
+        TranscriptionSettingsFields(
+            settings = settings,
+            onSettingsChange = onSettingsChange,
         )
-        SecretField("OpenAI API Key", settings.openAiApiKey) {
-            onSettingsChange(settings.copy(openAiApiKey = it))
-        }
-        OutlinedTextField(
-            value = settings.transcriptionModel,
-            onValueChange = { onSettingsChange(settings.copy(transcriptionModel = it)) },
-            label = { Text("OpenAI 轉錄模型") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = onSave,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PrimaryActionHeight),
+        ) {
             Text("儲存設定")
         }
     }
@@ -735,42 +881,86 @@ fun CleanupSettingsScreenContent(
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        ScreenHeader(
-            title = "第二層處理",
-            subtitle = "選擇文字整理服務與模型。",
-            onBack = onBack,
+        ScreenHeader(title = "文字處理", onBack = onBack)
+        CleanupSettingsFields(
+            settings = settings,
+            onSettingsChange = onSettingsChange,
         )
-        SectionLabel("整理 Provider")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ProviderButton("OpenAI", settings.cleanupProvider == CleanupProvider.OPENAI) {
-                onSettingsChange(settings.copy(cleanupProvider = CleanupProvider.OPENAI))
-            }
-            ProviderButton("Gemini", settings.cleanupProvider == CleanupProvider.GEMINI) {
-                onSettingsChange(settings.copy(cleanupProvider = CleanupProvider.GEMINI))
-            }
-        }
-        OutlinedTextField(
-            value = settings.openAiCleanupModel,
-            onValueChange = { onSettingsChange(settings.copy(openAiCleanupModel = it)) },
-            label = { Text("OpenAI 整理模型") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        SecretField("Gemini API Key", settings.geminiApiKey) {
-            onSettingsChange(settings.copy(geminiApiKey = it))
-        }
-        OutlinedTextField(
-            value = settings.geminiCleanupModel,
-            onValueChange = { onSettingsChange(settings.copy(geminiCleanupModel = it)) },
-            label = { Text("Gemini 整理模型") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = onSave,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PrimaryActionHeight),
+        ) {
             Text("儲存設定")
+        }
+    }
+}
+
+@Composable
+private fun ApiSettingsBlock(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun TranscriptionSettingsFields(
+    settings: AppSettings,
+    onSettingsChange: (AppSettings) -> Unit,
+) {
+    DropdownField(
+        label = "語音轉錄模型",
+        selectedValue = settings.transcriptionModel,
+        options = TranscriptionModelOptions,
+        onSelected = { onSettingsChange(settings.copy(transcriptionModel = it)) },
+    )
+    SecretField("API Key", settings.openAiApiKey) {
+        onSettingsChange(settings.copy(openAiApiKey = it))
+    }
+}
+
+@Composable
+private fun CleanupSettingsFields(
+    settings: AppSettings,
+    onSettingsChange: (AppSettings) -> Unit,
+) {
+    DropdownField(
+        label = "文字處理模型",
+        selectedValue = settings.cleanupModelOptionLabel,
+        options = CleanupModelOptions,
+        onSelected = { onSettingsChange(settings.withCleanupModelOption(it)) },
+    )
+    when (settings.cleanupProvider) {
+        CleanupProvider.OPENAI -> {
+            SecretField("API Key", settings.openAiApiKey) {
+                onSettingsChange(settings.copy(openAiApiKey = it))
+            }
+        }
+        CleanupProvider.GEMINI -> {
+            SecretField("API Key", settings.geminiApiKey) {
+                onSettingsChange(settings.copy(geminiApiKey = it))
+            }
         }
     }
 }
@@ -781,29 +971,43 @@ private fun ScreenHeader(
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (onBack != null) {
-                TextButton(onClick = onBack, contentPadding = PaddingValues(horizontal = 4.dp)) {
-                    Text("‹")
+                TextButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(40.dp),
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Text(
+                        "←",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        if (subtitle != null) {
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(
+                modifier = Modifier.padding(top = if (onBack != null) 2.dp else 0.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
@@ -820,52 +1024,220 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun SettingsListItem(
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
+private fun SecretField(label: String, value: String, onChange: (String) -> Unit) {
+    LabeledTextField(
+        label = label,
+        value = value,
+        onChange = onChange,
+        visualTransformation = PasswordVisualTransformation(),
+    )
+}
+
+@Composable
+private fun LabeledTextField(
+    label: String,
+    value: String,
+    onChange: (String) -> Unit,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        ListItem(
-            headlineContent = {
-                Text(title, fontWeight = FontWeight.SemiBold)
-            },
-            supportingContent = {
-                Text(subtitle)
-            },
-            trailingContent = {
-                Text("›", style = MaterialTheme.typography.titleLarge)
-            },
-            colors = androidx.compose.material3.ListItemDefaults.colors(
-                containerColor = Color.Transparent,
-            ),
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            visualTransformation = visualTransformation,
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(FormFieldHeight),
         )
     }
 }
 
 @Composable
-private fun SecretField(label: String, value: String, onChange: (String) -> Unit) {
+private fun DropdownField(
+    label: String,
+    selectedValue: String,
+    options: List<String>,
+    onSelected: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val displayValue = selectedValue.takeIf { it in options } ?: options.firstOrNull().orEmpty()
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Box {
+            OutlinedButton(
+                onClick = { expanded = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(FormFieldHeight)
+                    .semantics { contentDescription = "選擇 $label" },
+                contentPadding = PaddingValues(horizontal = 16.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = displayValue,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "⌄",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            onSelected(option)
+                            expanded = false
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchField(
+    value: String,
+    onChange: (String) -> Unit,
+    placeholder: String = "Search",
+) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text(label) },
-        visualTransformation = PasswordVisualTransformation(),
+        placeholder = { Text(placeholder) },
         singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(FormFieldHeight),
     )
 }
 
 @Composable
-private fun ProviderButton(label: String, selected: Boolean, onClick: () -> Unit) {
-    if (selected) {
-        Button(onClick = onClick) { Text(label) }
-    } else {
-        TextButton(onClick = onClick) { Text(label) }
+private fun DictionaryScreen(modifier: Modifier = Modifier) {
+    var query by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    DictionaryScreenContent(
+        query = query,
+        onQueryChange = { query = it },
+        onAdd = {
+            Toast.makeText(context, "字典功能即將推出", Toast.LENGTH_SHORT).show()
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun DictionaryScreenContent(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    PlaceholderDataScreen(
+        query = query,
+        onQueryChange = onQueryChange,
+        emptyText = "你的字典詞彙會出現在這裡。",
+        onAdd = onAdd,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun SnippetsScreen(modifier: Modifier = Modifier) {
+    var query by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    SnippetsScreenContent(
+        query = query,
+        onQueryChange = { query = it },
+        onAdd = {
+            Toast.makeText(context, "Snippets 功能即將推出", Toast.LENGTH_SHORT).show()
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun SnippetsScreenContent(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    PlaceholderDataScreen(
+        query = query,
+        onQueryChange = onQueryChange,
+        emptyText = "你的 Snippets 會出現在這裡。",
+        onAdd = onAdd,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun PlaceholderDataScreen(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    emptyText: String,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            SearchField(value = query, onChange = onQueryChange)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = emptyText,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        FloatingActionButton(
+            onClick = onAdd,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 24.dp),
+            containerColor = Color.Black,
+            contentColor = Color.White,
+        ) {
+            Text("+", style = MaterialTheme.typography.headlineMedium)
+        }
     }
 }
 
@@ -875,21 +1247,79 @@ private fun HistoryScreen(container: VerballyContainer, modifier: Modifier = Mod
     var entries by remember { mutableStateOf(container.historyRepository.list()) }
     val context = LocalContext.current
 
-    Column(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        ScreenHeader(title = "歷史", subtitle = "最近 100 筆聽寫結果只保存在這台裝置。")
-        OutlinedTextField(
-            value = query,
-            onValueChange = {
-                query = it
-                entries = container.historyRepository.search(it)
+    HistoryScreenContent(
+        query = query,
+        entries = entries,
+        onQueryChange = {
+            query = it
+            entries = container.historyRepository.search(it)
+        },
+        onClearHistory = {
+            container.historyRepository.clear()
+            entries = container.historyRepository.search(query)
+            Toast.makeText(context, "歷史已清空", Toast.LENGTH_SHORT).show()
+        },
+        onCopy = { entry ->
+            copyText(context, entry.cleanedText)
+            Toast.makeText(context, "已複製", Toast.LENGTH_SHORT).show()
+        },
+        onDelete = { entry ->
+            container.historyRepository.delete(entry.id)
+            entries = container.historyRepository.search(query)
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun HistoryScreenContent(
+    query: String,
+    entries: List<DictationHistoryEntry>,
+    onQueryChange: (String) -> Unit,
+    onClearHistory: () -> Unit,
+    onCopy: (DictationHistoryEntry) -> Unit,
+    onDelete: (DictationHistoryEntry) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var showClearConfirmation by remember { mutableStateOf(false) }
+
+    if (showClearConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmation = false },
+            title = { Text("確定刪除歷史？") },
+            text = { Text("這會刪除所有保存在這台裝置上的轉錄歷史，刪除後無法復原。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearConfirmation = false
+                        onClearHistory()
+                    },
+                ) {
+                    Text("確定刪除")
+                }
             },
-            label = { Text("搜尋歷史") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmation = false }) {
+                    Text("取消")
+                }
+            },
         )
+    }
+
+    Column(
+        modifier = modifier.padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        ScreenHeader(title = "歷史", subtitle = "只保存最近 100 筆轉錄結果")
+        SearchField(value = query, onChange = onQueryChange, placeholder = "搜尋歷史")
+        OutlinedButton(
+            onClick = { showClearConfirmation = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PrimaryActionHeight),
+        ) {
+            Text("清空歷史")
+        }
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -897,14 +1327,8 @@ private fun HistoryScreen(container: VerballyContainer, modifier: Modifier = Mod
             items(entries, key = { it.id }) { entry ->
                 HistoryItem(
                     entry = entry,
-                    onCopy = {
-                        copyText(context, entry.cleanedText)
-                        Toast.makeText(context, "已複製", Toast.LENGTH_SHORT).show()
-                    },
-                    onDelete = {
-                        container.historyRepository.delete(entry.id)
-                        entries = container.historyRepository.search(query)
-                    },
+                    onCopy = { onCopy(entry) },
+                    onDelete = { onDelete(entry) },
                 )
             }
         }
@@ -945,6 +1369,37 @@ private val CleanupProvider.label: String
         CleanupProvider.OPENAI -> "OpenAI"
         CleanupProvider.GEMINI -> "Gemini"
     }
+
+private fun AppSettings.normalizedModelChoices(): AppSettings = copy(
+    transcriptionModel = transcriptionModel.takeIf { it in TranscriptionModelOptions }
+        ?: TranscriptionModelOptions.first(),
+    openAiCleanupModel = openAiCleanupModel.takeIf { it in OpenAiCleanupModelOptions }
+        ?: OpenAiCleanupModelOptions.first(),
+    geminiCleanupModel = geminiCleanupModel.takeIf { it in GeminiCleanupModelOptions }
+        ?: GeminiCleanupModelOptions.first(),
+)
+
+private val AppSettings.cleanupModelOptionLabel: String
+    get() = when (cleanupProvider) {
+        CleanupProvider.OPENAI -> "OpenAI: $openAiCleanupModel"
+        CleanupProvider.GEMINI -> "Gemini: $geminiCleanupModel"
+    }.takeIf { it in CleanupModelOptions } ?: CleanupModelOptions.first()
+
+private fun AppSettings.withCleanupModelOption(option: String): AppSettings {
+    val parts = option.split(": ", limit = 2)
+    if (parts.size != 2) return this
+    return when (parts[0]) {
+        CleanupProvider.OPENAI.label -> copy(
+            cleanupProvider = CleanupProvider.OPENAI,
+            openAiCleanupModel = parts[1],
+        )
+        CleanupProvider.GEMINI.label -> copy(
+            cleanupProvider = CleanupProvider.GEMINI,
+            geminiCleanupModel = parts[1],
+        )
+        else -> this
+    }
+}
 
 private fun copyText(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
