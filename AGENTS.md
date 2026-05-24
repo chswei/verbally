@@ -75,6 +75,8 @@
 - For UI, Compose, permission-flow, overlay, accessibility, or device-facing behavior changes, run instrumentation checks on an Android target before reporting completion. Prefer the available emulator for automated instrumentation.
 - Treat the user's USB debugging phone as a personal device, not a disposable test target. Do not run `connectedDebugAndroidTest`, `adb install`, `adb uninstall`, or other commands that install, replace, clear, or remove apps on the USB device unless the user explicitly asks for that exact device run and acknowledges the app/data impact for that run.
 - If the user explicitly approves a USB device run, warn that instrumentation may install/replace the debug app and test APK, and may remove or reset app data depending on Gradle/Android behavior.
+- If the user asks to install the fixed build onto the currently connected device, treat that as install-only by default: install the updated debug APK to the connected device, do not run tests on the device, and do not clear app data unless the user explicitly asks.
+- After APK-affecting code or resource changes in this repo, prefer installing the latest debug APK to the currently connected approved device by default unless the user explicitly says not to install. Keep this as install-only: do not run on-device tests and do not clear app data unless the user asks.
 - When more than one Android device is connected, inspect `adb devices -l` and set `ANDROID_SERIAL=<device-or-emulator-serial>` so Gradle targets the intended device explicitly.
 - Run approved instrumentation tests with:
   ```zsh

@@ -39,19 +39,19 @@ The system SHALL show the floating dictation bubble only while the input method 
 - **THEN** the system hides the floating dictation bubble if it is visible
 
 ### Requirement: Bubble controls recording lifecycle
-The system SHALL let the user start recording from the bubble, cancel recording, or confirm recording with a checkmark before transcription begins.
+The system SHALL provide noticeable vibration feedback for overlay taps and drag milestones so the floating bubble feels responsive on-device.
 
-#### Scenario: Start recording
-- **WHEN** the user taps the idle bubble
-- **THEN** the system starts recording audio and shows recording controls
+#### Scenario: Overlay tap occurs
+- **WHEN** the user taps the ready bubble, cancel control, or confirm control without dragging
+- **THEN** the system emits a short noticeable vibration
 
-#### Scenario: Confirm recording
-- **WHEN** the user taps the checkmark while recording
-- **THEN** the system stops recording and starts dictation processing
+#### Scenario: Drag begins
+- **WHEN** the user moves the floating bubble far enough to begin dragging
+- **THEN** the system emits a short vibration once for that drag gesture
 
-#### Scenario: Cancel recording
-- **WHEN** the user taps cancel while recording
-- **THEN** the system stops recording, deletes temporary audio, and returns to idle
+#### Scenario: Drag snaps to edge
+- **WHEN** the user releases a dragged bubble and it snaps to its saved edge
+- **THEN** the system emits a snap-completion vibration once
 
 ### Requirement: Bubble snaps to a screen edge after dragging
 The system SHALL allow the user to drag the floating dictation bubble and SHALL snap it to the nearest left or right screen edge when the drag ends.
@@ -71,21 +71,15 @@ The system SHALL allow the user to drag the floating dictation bubble and SHALL 
 - **THEN** future bubble displays use the saved edge and height until the user drags the bubble again
 
 ### Requirement: Bubble uses icon-based rounded-square styling
-The system SHALL display the floating dictation overlay with compact, refined controls whose proportions, spacing, and icon weight align with the Whispr Flow-style reference rather than a heavy or chunky control row.
+The system SHALL preserve translucent overlay surfaces in the floating dictation bubble so the refreshed white-and-blue palette still feels like a lightweight floating layer above the underlying app.
 
-#### Scenario: Idle bubble appears
-- **WHEN** the floating dictation bubble is idle
-- **THEN** the bubble displays a compact rounded-square surface with restrained icon sizing and spacing
+#### Scenario: Ready and secondary controls appear
+- **WHEN** the idle bubble, cancel button, center capsule, or processing button backgrounds are shown
+- **THEN** those surfaces use translucent white styling instead of fully opaque white fills
 
-#### Scenario: Recording controls appear
-- **WHEN** the bubble is recording
-- **THEN** the overlay displays a three-part control row with compact circular side buttons and a slim rounded center capsule
-- **THEN** the side icons and center marks use thinner visual weight than the earlier heavier style
-
-#### Scenario: Processing controls appear
-- **WHEN** the bubble is processing
-- **THEN** the overlay keeps the same compact three-part silhouette
-- **THEN** the motion and spacing remain visually restrained and consistent with the recording state
+#### Scenario: Primary confirm control appears
+- **WHEN** the confirm control is shown during recording
+- **THEN** it uses a translucent Verbally brand-blue fill with a white checkmark
 
 ### Requirement: Cleaned text is pasted at the active cursor
 The system SHALL insert cleaned dictation text by temporarily placing it on the clipboard and invoking paste on the currently focused editable field.

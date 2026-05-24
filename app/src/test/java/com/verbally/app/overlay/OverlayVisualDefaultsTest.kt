@@ -13,5 +13,6 @@ class OverlayVisualDefaultsTest {
         assertEquals(50, OverlayVisualDefaults.ACTIVE_BUTTON_SIZE_DP)
         assertEquals(98, OverlayVisualDefaults.ACTIVE_CAPSULE_WIDTH_DP)
         assertEquals(50, OverlayVisualDefaults.ACTIVE_CAPSULE_HEIGHT_DP)
+        assertEquals(5, OverlayVisualDefaults.ACTIVE_SPACING_DP)
     }
 }

@@ -9,6 +9,6 @@ object OverlayVisualDefaults {
     const val ACTIVE_BUTTON_ICON_SIZE_DP = 25
     const val ACTIVE_CAPSULE_WIDTH_DP = 98
     const val ACTIVE_CAPSULE_HEIGHT_DP = 50
-    const val ACTIVE_SPACING_DP = 12
+    const val ACTIVE_SPACING_DP = 5
     const val ACTIVE_CAPSULE_CORNER_RADIUS_DP = 25
 }

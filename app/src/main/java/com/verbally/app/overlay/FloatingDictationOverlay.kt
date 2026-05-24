@@ -22,6 +22,8 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import androidx.annotation.ColorInt
+import androidx.annotation.ColorRes
 import com.verbally.app.R
 import kotlin.math.abs
 import kotlin.math.max
@@ -35,6 +37,7 @@ class FloatingDictationOverlay(
     private val onConfirm: () -> Unit,
 ) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private val haptics = OverlayHaptics(context)
     private val preferences = context.getSharedPreferences(POSITION_PREFS, Context.MODE_PRIVATE)
     private val positionMemory = OverlayPositionMemory(loadSavedPosition())
     private val edgeMargin = OverlayVisualDefaults.EDGE_MARGIN_DP.toPx()
@@ -118,7 +121,10 @@ class FloatingDictationOverlay(
         FrameLayout(context).apply {
             minimumWidth = bubbleSize
             minimumHeight = bubbleSize
-            background = roundedBackground(color = "#14233A", cornerRadius = bubbleCornerRadius)
+            background = roundedBackground(
+                color = color(OverlayColorDefaults.READY_BUBBLE_BACKGROUND_RES),
+                cornerRadius = bubbleCornerRadius,
+            )
             elevation = 8f
             isClickable = true
             isFocusable = true
@@ -127,6 +133,7 @@ class FloatingDictationOverlay(
             addView(
                 ImageView(context).apply {
                     setImageResource(R.drawable.ic_verbally_waveform)
+                    setColorFilter(color(OverlayColorDefaults.READY_ICON_COLOR_RES))
                     scaleType = ImageView.ScaleType.CENTER
                 },
                 FrameLayout.LayoutParams(iconSize, iconSize, Gravity.CENTER),
@@ -140,9 +147,9 @@ class FloatingDictationOverlay(
                 it.setLiveLevel(waveformLevel)
             },
             trailingView = iconButton(
-                backgroundColor = "#ED60377F",
+                backgroundColor = color(OverlayColorDefaults.ACTIVE_CONFIRM_BACKGROUND_RES),
                 iconRes = R.drawable.ic_verbally_check,
-                iconTint = Color.WHITE,
+                iconTint = color(OverlayColorDefaults.ACTIVE_CONFIRM_ICON_COLOR_RES),
             ),
             onLeadingTap = { handleCancelTap() },
             onTrailingTap = { handleConfirmTap() },
@@ -152,8 +159,16 @@ class FloatingDictationOverlay(
 
     private fun createProcessingControls(): View =
         createActiveControls(
-            centerView = ProcessingDotsView(context),
-            trailingView = SpinnerRingView(context),
+            centerView = ProcessingDotsView(
+                context,
+                dotColor = color(OverlayColorDefaults.PROCESSING_ACCENT_COLOR_RES),
+            ),
+            trailingView = SpinnerRingView(
+                context,
+                backgroundColor = color(OverlayColorDefaults.PROCESSING_BACKGROUND_RES),
+                trackColor = color(OverlayColorDefaults.PROCESSING_TRACK_COLOR_RES),
+                progressColor = color(OverlayColorDefaults.PROCESSING_ACCENT_COLOR_RES),
+            ),
             onLeadingTap = null,
             onTrailingTap = null,
             centerContentDescription = "轉錄處理中",
@@ -176,9 +191,9 @@ class FloatingDictationOverlay(
 
             addView(
                 iconButton(
-                    backgroundColor = "#E2DADFE6",
+                    backgroundColor = color(OverlayColorDefaults.ACTIVE_CANCEL_BACKGROUND_RES),
                     iconRes = R.drawable.ic_verbally_close,
-                    iconTint = null,
+                    iconTint = color(OverlayColorDefaults.ACTIVE_CANCEL_ICON_COLOR_RES),
                 ).apply {
                     contentDescription = "取消錄音"
                     bindDragAndClick(this, onLeadingTap)
@@ -188,7 +203,7 @@ class FloatingDictationOverlay(
             addView(
                 FrameLayout(context).apply {
                     background = roundedBackground(
-                        color = "#E2DADFE6",
+                        color = color(OverlayColorDefaults.ACTIVE_CENTER_BACKGROUND_RES),
                         cornerRadius = activeCapsuleCornerRadius,
                     )
                     contentDescription = centerContentDescription
@@ -217,9 +232,9 @@ class FloatingDictationOverlay(
         }
 
     private fun iconButton(
-        backgroundColor: String,
+        @ColorInt backgroundColor: Int,
         iconRes: Int,
-        iconTint: Int?,
+        @ColorInt iconTint: Int?,
     ): View =
         FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(activeButtonSize, activeButtonSize)
@@ -292,11 +307,14 @@ class FloatingDictationOverlay(
         )
     }
 
-    private fun roundedBackground(color: String, cornerRadius: Float) = GradientDrawable().apply {
+    private fun roundedBackground(@ColorInt color: Int, cornerRadius: Float) = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         this.cornerRadius = cornerRadius
-        setColor(Color.parseColor(color))
+        setColor(color)
     }
+
+    @ColorInt
+    private fun color(@ColorRes colorRes: Int): Int = context.getColor(colorRes)
 
     private fun layoutParams(view: View) = WindowManager.LayoutParams(
         WindowManager.LayoutParams.WRAP_CONTENT,
@@ -424,6 +442,7 @@ class FloatingDictationOverlay(
                     val deltaY = event.rawY - downRawY
                     if (!dragging && (abs(deltaX) > touchSlopPx() || abs(deltaY) > touchSlopPx())) {
                         dragging = true
+                        haptics.dragStart()
                     }
                     if (dragging) {
                         updatePosition(
@@ -440,8 +459,10 @@ class FloatingDictationOverlay(
                         val params = currentLayoutParams
                         if (params != null) {
                             snapAndRememberPosition(movableRoot, params.x, params.y)
+                            haptics.snap()
                         }
                     } else {
+                        haptics.tap()
                         clickAction?.invoke()
                     }
                     return true
@@ -458,7 +479,7 @@ class FloatingDictationOverlay(
 
     private class RecordingWaveformView(context: Context) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#1C1821")
+            color = context.getColor(OverlayColorDefaults.ACTIVE_WAVEFORM_COLOR_RES)
             style = Paint.Style.FILL
         }
         private val amplitudes = floatArrayOf(0.14f, 0.34f, 0.56f, 0.78f, 0.78f, 0.56f, 0.34f, 0.14f)
@@ -518,9 +539,12 @@ class FloatingDictationOverlay(
         }
     }
 
-    private class ProcessingDotsView(context: Context) : View(context) {
+    private class ProcessingDotsView(
+        context: Context,
+        @ColorInt dotColor: Int,
+    ) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#938B9A")
+            color = dotColor
             style = Paint.Style.FILL
         }
         private var phase = 0f
@@ -560,7 +584,12 @@ class FloatingDictationOverlay(
         }
     }
 
-    private class SpinnerRingView(context: Context) : FrameLayout(context) {
+    private class SpinnerRingView(
+        context: Context,
+        @ColorInt backgroundColor: Int,
+        @ColorInt trackColor: Int,
+        @ColorInt progressColor: Int,
+    ) : FrameLayout(context) {
         init {
             layoutParams = LinearLayout.LayoutParams(
                 OverlayVisualDefaults.ACTIVE_BUTTON_SIZE_DP.dp(context),
@@ -569,11 +598,11 @@ class FloatingDictationOverlay(
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = OverlayVisualDefaults.ACTIVE_BUTTON_SIZE_DP.dp(context) / 2f
-                setColor(Color.parseColor("#E2DADFE6"))
+                setColor(backgroundColor)
             }
             elevation = 4f
             addView(
-                RingView(context),
+                RingView(context, trackColor, progressColor),
                 LayoutParams(
                     OverlayVisualDefaults.ACTIVE_BUTTON_ICON_SIZE_DP.dp(context),
                     OverlayVisualDefaults.ACTIVE_BUTTON_ICON_SIZE_DP.dp(context),
@@ -583,15 +612,19 @@ class FloatingDictationOverlay(
         }
     }
 
-    private class RingView(context: Context) : View(context) {
+    private class RingView(
+        context: Context,
+        @ColorInt trackColor: Int,
+        @ColorInt progressColor: Int,
+    ) : View(context) {
         private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#B9B1C0")
+            color = trackColor
             style = Paint.Style.STROKE
             strokeWidth = 5f
             strokeCap = Paint.Cap.ROUND
         }
         private val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#1C1821")
+            color = progressColor
             style = Paint.Style.STROKE
             strokeWidth = 5f
             strokeCap = Paint.Cap.ROUND
