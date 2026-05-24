@@ -64,16 +64,7 @@ class FloatingDictationOverlay(
 
     fun show() {
         if (!Settings.canDrawOverlays(context) || rootView != null) return
-        val view = FrameLayout(context).apply {
-            clipChildren = false
-            clipToPadding = false
-        }
-        view.hideWithInputMethodAnimation()
-        renderState(view)
-        val params = layoutParams(view)
-        currentLayoutParams = params
-        windowManager.addView(view, params)
-        rootView = view
+        attachFreshRoot()
     }
 
     fun hide() {
@@ -87,13 +78,17 @@ class FloatingDictationOverlay(
     fun setState(next: OverlayUiState) {
         customContentDescription = null
         session.forceState(next)
-        rootView?.let { renderState(it) }
+        if (rootView != null) {
+            replaceAttachedRoot()
+        }
     }
 
     fun completeProcessing(message: String? = null) {
         session.onProcessingFinished()
         customContentDescription = message
-        rootView?.let { renderState(it) }
+        if (rootView != null) {
+            replaceAttachedRoot()
+        }
     }
 
     fun showMessage(message: String) {
@@ -108,13 +103,15 @@ class FloatingDictationOverlay(
 
     private fun renderState(root: FrameLayout) {
         root.removeAllViews()
-        when (session.state) {
-            OverlayUiState.READY -> root.addView(createReadyBubble())
-            OverlayUiState.RECORDING -> root.addView(createRecordingControls())
-            OverlayUiState.PROCESSING -> root.addView(createProcessingControls())
+        val content = when (session.state) {
+            OverlayUiState.READY -> createReadyBubble()
+            OverlayUiState.RECORDING -> createRecordingControls()
+            OverlayUiState.PROCESSING -> createProcessingControls()
         }
+        root.addView(content)
         root.contentDescription = customContentDescription ?: contentDescriptionFor(session.state)
-        root.post { realignToRememberedEdge(root) }
+        // Re-anchor immediately so right-edge bubbles do not shift under a new touch.
+        realignToRememberedEdge(root)
     }
 
     private fun createReadyBubble(): View =
@@ -188,47 +185,44 @@ class FloatingDictationOverlay(
             gravity = Gravity.CENTER_VERTICAL
             isClickable = false
             isFocusable = false
+            val cancelButton = iconButton(
+                backgroundColor = color(OverlayColorDefaults.ACTIVE_CANCEL_BACKGROUND_RES),
+                iconRes = R.drawable.ic_verbally_close,
+                iconTint = color(OverlayColorDefaults.ACTIVE_CANCEL_ICON_COLOR_RES),
+            ).apply {
+                contentDescription = "取消錄音"
+                bindDragAndClick(this, onLeadingTap)
+            }
+            val centerCapsule = FrameLayout(context).apply {
+                background = roundedBackground(
+                    color = color(OverlayColorDefaults.ACTIVE_CENTER_BACKGROUND_RES),
+                    cornerRadius = activeCapsuleCornerRadius,
+                )
+                contentDescription = centerContentDescription
+                bindDragOnly(this)
+                addView(
+                    centerView,
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        Gravity.CENTER,
+                    ),
+                )
+            }
+            val actionButton = trailingView.apply {
+                contentDescription = trailingContentDescription
+                bindDragAndClick(this, onTrailingTap)
+            }
 
-            addView(
-                iconButton(
-                    backgroundColor = color(OverlayColorDefaults.ACTIVE_CANCEL_BACKGROUND_RES),
-                    iconRes = R.drawable.ic_verbally_close,
-                    iconTint = color(OverlayColorDefaults.ACTIVE_CANCEL_ICON_COLOR_RES),
-                ).apply {
-                    contentDescription = "取消錄音"
-                    bindDragAndClick(this, onLeadingTap)
-                },
-            )
+            addView(cancelButton)
+            addView(centerCapsule, activeCenterLayoutParams())
+            addView(actionButton)
+        }
 
-            addView(
-                FrameLayout(context).apply {
-                    background = roundedBackground(
-                        color = color(OverlayColorDefaults.ACTIVE_CENTER_BACKGROUND_RES),
-                        cornerRadius = activeCapsuleCornerRadius,
-                    )
-                    contentDescription = centerContentDescription
-                    bindDragOnly(this)
-                    addView(
-                        centerView,
-                        FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            Gravity.CENTER,
-                        ),
-                    )
-                },
-                LinearLayout.LayoutParams(activeCapsuleWidth, activeCapsuleHeight).apply {
-                    marginStart = activeSpacing
-                    marginEnd = activeSpacing
-                },
-            )
-
-            addView(
-                trailingView.apply {
-                    contentDescription = trailingContentDescription
-                    bindDragAndClick(this, onTrailingTap)
-                },
-            )
+    private fun activeCenterLayoutParams() =
+        LinearLayout.LayoutParams(activeCapsuleWidth, activeCapsuleHeight).apply {
+            marginStart = activeSpacing
+            marginEnd = activeSpacing
         }
 
     private fun iconButton(
@@ -255,7 +249,7 @@ class FloatingDictationOverlay(
     private fun handleReadyTap() {
         session.onReadyBubbleTapped()
         customContentDescription = null
-        rootView?.let { renderState(it) }
+        replaceAttachedRoot()
         onStart()
     }
 
@@ -265,16 +259,38 @@ class FloatingDictationOverlay(
         session.onCancelTapped()
         waveformLevel = 0f
         customContentDescription = null
-        rootView?.let { renderState(it) }
+        replaceAttachedRoot()
     }
 
     private fun handleConfirmTap() {
         if (session.state != OverlayUiState.RECORDING) return
         session.onConfirmTapped()
         customContentDescription = null
-        rootView?.let { renderState(it) }
+        replaceAttachedRoot()
         onConfirm()
     }
+
+    private fun attachFreshRoot() {
+        val view = buildRootView()
+        val params = layoutParams(view)
+        currentLayoutParams = params
+        windowManager.addView(view, params)
+        rootView = view
+    }
+
+    private fun replaceAttachedRoot() {
+        val existing = rootView ?: return
+        runCatching { windowManager.removeViewImmediate(existing) }
+        attachFreshRoot()
+    }
+
+    private fun buildRootView(): FrameLayout =
+        FrameLayout(context).apply {
+            clipChildren = false
+            clipToPadding = false
+            hideWithInputMethodAnimation()
+            renderState(this)
+        }
 
     private fun bindDragOnly(target: View) {
         target.setOnTouchListener(rootTouchListener)
@@ -317,8 +333,8 @@ class FloatingDictationOverlay(
     private fun color(@ColorRes colorRes: Int): Int = context.getColor(colorRes)
 
     private fun layoutParams(view: View) = WindowManager.LayoutParams(
-        WindowManager.LayoutParams.WRAP_CONTENT,
-        WindowManager.LayoutParams.WRAP_CONTENT,
+        view.resolvedWidth(),
+        view.resolvedHeight(),
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
         PixelFormat.TRANSLUCENT,
@@ -342,6 +358,16 @@ class FloatingDictationOverlay(
         runCatching { windowManager.updateViewLayout(view, params) }
     }
 
+    private fun applyAnchoredPosition(view: View, position: OverlayPosition) {
+        val params = currentLayoutParams ?: return
+        params.width = view.resolvedWidth()
+        params.height = view.resolvedHeight()
+        params.gravity = position.gravity
+        params.x = position.x
+        params.y = position.y
+        runCatching { windowManager.updateViewLayout(view, params) }
+    }
+
     private fun snapAndRememberPosition(view: View, releasedX: Int, releasedY: Int) {
         val position = positionMemory.rememberSnappedPosition(
             releasedX = releasedX,
@@ -350,7 +376,7 @@ class FloatingDictationOverlay(
             screenWidth = screenWidth(),
             edgeMargin = edgeMargin,
         )
-        updatePosition(view = view, x = position.x, y = position.y)
+        applyAnchoredPosition(view, position)
         preferences.edit()
             .putBoolean(KEY_HAS_POSITION, true)
             .putString(KEY_EDGE, position.edge?.name)
@@ -365,6 +391,8 @@ class FloatingDictationOverlay(
             bubbleWidth = view.resolvedWidth(),
             edgeMargin = edgeMargin,
         )
+        params.width = view.resolvedWidth()
+        params.height = view.resolvedHeight()
         params.gravity = position.gravity
         params.x = position.x
         params.y = position.y
@@ -393,12 +421,19 @@ class FloatingDictationOverlay(
         }
 
     private fun View.resolvedWidth(): Int {
-        if (width > 0) return width
         measure(
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
         )
         return measuredWidth.coerceAtLeast(minimumWidth)
+    }
+
+    private fun View.resolvedHeight(): Int {
+        measure(
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        return measuredHeight.coerceAtLeast(minimumHeight)
     }
 
     private fun Int.toPx(): Int =

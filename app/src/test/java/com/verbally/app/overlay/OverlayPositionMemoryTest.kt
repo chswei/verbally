@@ -68,6 +68,7 @@ class OverlayPositionMemoryTest {
         val position = memory.currentPosition(screenWidth = 800, bubbleWidth = 72, edgeMargin = 20)
 
         assertEquals(OverlayEdge.RIGHT, position.edge)
+        assertEquals(Gravity.TOP or Gravity.START, position.gravity)
         assertEquals(708, position.x)
         assertEquals(96, position.y)
     }

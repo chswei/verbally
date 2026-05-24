@@ -25,7 +25,10 @@ class OverlayPositionMemory(
     fun currentPosition(screenWidth: Int, bubbleWidth: Int, edgeMargin: Int): OverlayPosition {
         val position = currentPosition()
         val edge = position.edge ?: return position
-        return position.copy(x = xForEdge(edge, screenWidth, bubbleWidth, edgeMargin))
+        return position.copy(
+            gravity = Gravity.TOP or Gravity.START,
+            x = xForEdge(edge, screenWidth, bubbleWidth, edgeMargin),
+        )
     }
 
     fun rememberSnappedPosition(
