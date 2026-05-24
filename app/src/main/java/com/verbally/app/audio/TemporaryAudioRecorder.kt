@@ -44,6 +44,9 @@ class TemporaryAudioRecorder(
         file?.delete()
     }
 
+    fun currentAmplitude(): Int =
+        runCatching { recorder?.maxAmplitude ?: 0 }.getOrDefault(0)
+
     fun delete(file: File?) {
         file?.delete()
     }

@@ -71,19 +71,21 @@ The system SHALL allow the user to drag the floating dictation bubble and SHALL 
 - **THEN** future bubble displays use the saved edge and height until the user drags the bubble again
 
 ### Requirement: Bubble uses icon-based rounded-square styling
-The system SHALL display the floating dictation bubble as a compact rounded square with state symbols instead of text labels.
+The system SHALL display the floating dictation overlay with compact, refined controls whose proportions, spacing, and icon weight align with the Whispr Flow-style reference rather than a heavy or chunky control row.
 
 #### Scenario: Idle bubble appears
 - **WHEN** the floating dictation bubble is idle
-- **THEN** the bubble displays the app reference-style waveform mark inside a rounded-square surface
+- **THEN** the bubble displays a compact rounded-square surface with restrained icon sizing and spacing
 
-#### Scenario: Recording lifecycle states appear
-- **WHEN** the bubble is recording, processing, successful, or in error state
-- **THEN** the bubble displays a white symbolic icon for the current state instead of a text label
+#### Scenario: Recording controls appear
+- **WHEN** the bubble is recording
+- **THEN** the overlay displays a three-part control row with compact circular side buttons and a slim rounded center capsule
+- **THEN** the side icons and center marks use thinner visual weight than the earlier heavier style
 
-#### Scenario: Launcher and bubble share the mark
-- **WHEN** the app launcher icon and idle floating bubble are shown
-- **THEN** both use the same modern reference-style waveform mark
+#### Scenario: Processing controls appear
+- **WHEN** the bubble is processing
+- **THEN** the overlay keeps the same compact three-part silhouette
+- **THEN** the motion and spacing remain visually restrained and consistent with the recording state
 
 ### Requirement: Cleaned text is pasted at the active cursor
 The system SHALL insert cleaned dictation text by temporarily placing it on the clipboard and invoking paste on the currently focused editable field.
@@ -104,3 +106,15 @@ The system SHALL guide the user through microphone, overlay, and accessibility p
 #### Scenario: Missing required permission
 - **WHEN** a required permission is not granted
 - **THEN** the onboarding screen shows the missing permission and a button to open the relevant Android settings screen
+
+### Requirement: Recording waveform responds to live voice amplitude
+The system SHALL animate the recording waveform from live microphone amplitude so louder speech visibly produces larger waveform bars while quieter speech produces smaller bars.
+
+#### Scenario: Louder speech increases bar height
+- **WHEN** the user speaks louder while recording
+- **THEN** the waveform displays visibly larger bar amplitudes than during quieter speech
+
+#### Scenario: Quiet input keeps waveform controlled
+- **WHEN** the microphone input is quiet or near silence while recording
+- **THEN** the waveform remains animated but with smaller restrained amplitudes
+

@@ -50,9 +50,11 @@ class FloatingDictationOverlay(
         OverlayVisualDefaults.ACTIVE_CAPSULE_CORNER_RADIUS_DP.toPx().toFloat()
     private val rootTouchListener = DragTouchListener()
     private val session = OverlaySessionStateMachine()
+    private var waveformLevel = 0f
     private var rootView: FrameLayout? = null
     private var currentLayoutParams: WindowManager.LayoutParams? = null
     private var customContentDescription: String? = null
+    private var recordingWaveformView: RecordingWaveformView? = null
 
     val isShown: Boolean
         get() = rootView != null
@@ -96,6 +98,11 @@ class FloatingDictationOverlay(
         rootView?.contentDescription = message
     }
 
+    fun setWaveformLevel(level: Float) {
+        waveformLevel = level.coerceIn(0f, 1f)
+        recordingWaveformView?.setLiveLevel(waveformLevel)
+    }
+
     private fun renderState(root: FrameLayout) {
         root.removeAllViews()
         when (session.state) {
@@ -128,9 +135,12 @@ class FloatingDictationOverlay(
 
     private fun createRecordingControls(): View =
         createActiveControls(
-            centerView = RecordingWaveformView(context),
+            centerView = RecordingWaveformView(context).also {
+                recordingWaveformView = it
+                it.setLiveLevel(waveformLevel)
+            },
             trailingView = iconButton(
-                backgroundColor = "#5F347B",
+                backgroundColor = "#ED60377F",
                 iconRes = R.drawable.ic_verbally_check,
                 iconTint = Color.WHITE,
             ),
@@ -166,7 +176,7 @@ class FloatingDictationOverlay(
 
             addView(
                 iconButton(
-                    backgroundColor = "#D8D1DC",
+                    backgroundColor = "#E2DADFE6",
                     iconRes = R.drawable.ic_verbally_close,
                     iconTint = null,
                 ).apply {
@@ -178,7 +188,7 @@ class FloatingDictationOverlay(
             addView(
                 FrameLayout(context).apply {
                     background = roundedBackground(
-                        color = "#D8D1DC",
+                        color = "#E2DADFE6",
                         cornerRadius = activeCapsuleCornerRadius,
                     )
                     contentDescription = centerContentDescription
@@ -214,7 +224,7 @@ class FloatingDictationOverlay(
         FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(activeButtonSize, activeButtonSize)
             background = roundedBackground(backgroundColor, activeButtonSize / 2f)
-            elevation = 6f
+            elevation = 4f
             isClickable = true
             isFocusable = true
             addView(
@@ -238,6 +248,7 @@ class FloatingDictationOverlay(
         if (session.state != OverlayUiState.RECORDING) return
         onCancel()
         session.onCancelTapped()
+        waveformLevel = 0f
         customContentDescription = null
         rootView?.let { renderState(it) }
     }
@@ -450,7 +461,7 @@ class FloatingDictationOverlay(
             color = Color.parseColor("#1C1821")
             style = Paint.Style.FILL
         }
-        private val amplitudes = floatArrayOf(0.20f, 0.42f, 0.62f, 0.82f, 0.82f, 0.62f, 0.42f, 0.20f)
+        private val amplitudes = floatArrayOf(0.14f, 0.34f, 0.56f, 0.78f, 0.78f, 0.56f, 0.34f, 0.14f)
         private var phase = 0f
         private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 1_000L
@@ -474,14 +485,20 @@ class FloatingDictationOverlay(
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val centerY = height / 2f
-            val horizontalInset = width * 0.12f
+            val horizontalInset = width * 0.16f
             val contentWidth = width - horizontalInset * 2
             val spacing = contentWidth / (amplitudes.size + 1f)
-            val barWidth = max(4f, spacing * 0.36f)
+            val barWidth = max(3f, spacing * 0.28f)
+            val silenceThreshold = 0.05f
             for (index in amplitudes.indices) {
-                val wave = ((phase * Math.PI * 2) + index * 0.55).toFloat()
-                val animatedScale = 0.82f + 0.18f * kotlin.math.sin(wave).let { (it + 1f) / 2f }
-                val barHeight = min(height * 0.56f, height * amplitudes[index] * animatedScale)
+                val wave = ((phase * Math.PI * 2) + index * 0.42).toFloat()
+                val animatedScale = 0.9f + 0.1f * kotlin.math.sin(wave).let { (it + 1f) / 2f }
+                val barHeight = if (currentLevel <= silenceThreshold) {
+                    barWidth
+                } else {
+                    val liveScale = 0.14f + currentLevel * 0.86f
+                    min(height * 0.6f, height * amplitudes[index] * animatedScale * liveScale)
+                }
                 val centerX = horizontalInset + spacing * (index + 1)
                 val rect = RectF(
                     centerX - barWidth / 2f,
@@ -492,11 +509,18 @@ class FloatingDictationOverlay(
                 canvas.drawRoundRect(rect, barWidth, barWidth, paint)
             }
         }
+
+        private var currentLevel = 0f
+
+        fun setLiveLevel(level: Float) {
+            currentLevel = level.coerceIn(0f, 1f)
+            invalidate()
+        }
     }
 
     private class ProcessingDotsView(context: Context) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#8E8696")
+            color = Color.parseColor("#938B9A")
             style = Paint.Style.FILL
         }
         private var phase = 0f
@@ -522,13 +546,13 @@ class FloatingDictationOverlay(
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val count = 9
-            val horizontalInset = width * 0.16f
+            val horizontalInset = width * 0.18f
             val contentWidth = width - horizontalInset * 2
-            val dotRadius = min(width / 34f, height / 10f)
+            val dotRadius = min(width / 38f, height / 11f)
             val step = contentWidth / (count - 1).coerceAtLeast(1)
             for (index in 0 until count) {
                 val wave = ((phase * Math.PI * 2) - index * 0.42).toFloat()
-                val alpha = (0.28f + 0.52f * ((kotlin.math.sin(wave) + 1f) / 2f))
+                val alpha = (0.22f + 0.46f * ((kotlin.math.sin(wave) + 1f) / 2f))
                 paint.alpha = (alpha * 255).roundToInt()
                 canvas.drawCircle(horizontalInset + step * index, height / 2f, dotRadius, paint)
             }
@@ -545,9 +569,9 @@ class FloatingDictationOverlay(
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = OverlayVisualDefaults.ACTIVE_BUTTON_SIZE_DP.dp(context) / 2f
-                setColor(Color.parseColor("#D8D1DC"))
+                setColor(Color.parseColor("#E2DADFE6"))
             }
-            elevation = 6f
+            elevation = 4f
             addView(
                 RingView(context),
                 LayoutParams(
@@ -561,15 +585,15 @@ class FloatingDictationOverlay(
 
     private class RingView(context: Context) : View(context) {
         private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#B7AFBF")
+            color = Color.parseColor("#B9B1C0")
             style = Paint.Style.STROKE
-            strokeWidth = 6f
+            strokeWidth = 5f
             strokeCap = Paint.Cap.ROUND
         }
         private val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#1C1821")
             style = Paint.Style.STROKE
-            strokeWidth = 6f
+            strokeWidth = 5f
             strokeCap = Paint.Cap.ROUND
         }
         private val arcBounds = RectF()
@@ -590,7 +614,7 @@ class FloatingDictationOverlay(
 
         override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
             super.onSizeChanged(w, h, oldw, oldh)
-            val inset = 7f
+            val inset = 6.5f
             arcBounds.set(inset, inset, w - inset, h - inset)
         }
 

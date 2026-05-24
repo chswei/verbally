@@ -12,16 +12,22 @@ import com.verbally.app.insertion.AccessibilityPasteTarget
 import com.verbally.app.insertion.AndroidClipboardGateway
 import com.verbally.app.insertion.ClipboardPasteInserter
 import com.verbally.app.overlay.FloatingDictationOverlay
+import com.verbally.app.overlay.LiveWaveformLevelSmoother
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class VerballyAccessibilityService : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val visibilityPolicy = OverlayVisibilityPolicy()
+    private val waveformSmoother = LiveWaveformLevelSmoother()
     private var overlay: FloatingDictationOverlay? = null
     private var appLabel: String? = null
+    private var waveformJob: Job? = null
     private val coordinator: DictationCoordinator by lazy {
         val container = (application as VerballyApplication).container
         DictationCoordinator(
@@ -43,9 +49,18 @@ class VerballyAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         overlay = FloatingDictationOverlay(
             context = this,
-            onStart = { coordinator.startRecording() },
-            onCancel = { coordinator.cancelRecording() },
-            onConfirm = { processRecording() },
+            onStart = {
+                coordinator.startRecording()
+                startWaveformUpdates()
+            },
+            onCancel = {
+                stopWaveformUpdates()
+                coordinator.cancelRecording()
+            },
+            onConfirm = {
+                stopWaveformUpdates()
+                processRecording()
+            },
         )
     }
 
@@ -81,6 +96,7 @@ class VerballyAccessibilityService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
+        stopWaveformUpdates()
         overlay?.hide()
         super.onDestroy()
     }
@@ -95,6 +111,25 @@ class VerballyAccessibilityService : AccessibilityService() {
                     overlay?.completeProcessing(error.message ?: "發生錯誤")
                 }
         }
+    }
+
+    private fun startWaveformUpdates() {
+        waveformJob?.cancel()
+        waveformSmoother.reset()
+        overlay?.setWaveformLevel(0f)
+        waveformJob = scope.launch {
+            while (isActive) {
+                val level = waveformSmoother.update(coordinator.currentAmplitude())
+                overlay?.setWaveformLevel(level)
+                delay(50)
+            }
+        }
+    }
+
+    private fun stopWaveformUpdates() {
+        waveformJob?.cancel()
+        waveformJob = null
+        overlay?.setWaveformLevel(waveformSmoother.reset())
     }
 
     private fun defaultInputMethodPackage(): String? =

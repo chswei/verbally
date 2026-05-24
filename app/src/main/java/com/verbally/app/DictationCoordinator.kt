@@ -32,6 +32,8 @@ class DictationCoordinator(
         currentRecording = null
     }
 
+    fun currentAmplitude(): Int = audioRecorder.currentAmplitude()
+
     suspend fun confirmRecording(appLabel: String?): InsertResult {
         val audioFile = audioRecorder.stop() ?: currentRecording
         currentRecording = null
