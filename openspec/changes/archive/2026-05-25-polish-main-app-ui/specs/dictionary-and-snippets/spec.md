@@ -1,8 +1,5 @@
-# dictionary-and-snippets Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change redesign-main-navigation. Update Purpose after archive.
-## Requirements
 ### Requirement: Dictionary destination is searchable and addable
 The system SHALL provide a Dictionary destination with a Traditional Chinese search field, honest empty state, and accessible add action.
 
@@ -20,19 +17,3 @@ The system SHALL provide a Snippets destination with a Traditional Chinese searc
 - **THEN** the screen shows a search field with Traditional Chinese placeholder copy
 - **THEN** the screen explains in Traditional Chinese that snippets will show there
 - **THEN** the screen shows an add action with a Traditional Chinese accessibility label
-
-### Requirement: Placeholder destinations explain their purpose
-The system SHALL present Dictionary and Snippets placeholders with clear Material-style hierarchy, aligned controls, and obvious add actions.
-
-#### Scenario: User opens Dictionary placeholder
-- **WHEN** Dictionary has no entries
-- **THEN** the screen shows a page title for `字典`
-- **THEN** the screen explains that dictionary entries are for common terms and proper nouns
-- **THEN** the search field, empty state, and add action are visually aligned
-
-#### Scenario: User opens Snippets placeholder
-- **WHEN** Snippets has no entries
-- **THEN** the screen shows a page title for `片段`
-- **THEN** the screen explains that snippets are for common phrases or templates
-- **THEN** the search field, empty state, and add action are visually aligned
-

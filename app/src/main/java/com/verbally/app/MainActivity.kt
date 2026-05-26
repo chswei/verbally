@@ -11,11 +11,12 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.TextUtils
 import android.widget.Toast
+import androidx.annotation.DrawableRes
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -43,18 +45,23 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -67,13 +74,17 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -89,9 +100,14 @@ import kotlinx.coroutines.launch
 
 private val VerballyBrandBlue = Color(0xFF14233A)
 private val VerballySoftBlue = Color(0xFFE6EDF6)
+private val VerballyAccentTeal = Color(0xFF2F6F68)
+private val VerballyAccentMint = Color(0xFFD9EEE9)
+private val VerballyAccentLavender = Color(0xFFECE7F8)
 private val VerballyPageBackground = Color(0xFFF7F9FC)
+private val VerballySurface = Color(0xFFFFFFFF)
+private val VerballyOutline = Color(0xFFD1D9E4)
 private val ScreenHorizontalPadding = 24.dp
-private val ScreenVerticalPadding = 20.dp
+private val ScreenVerticalPadding = 12.dp
 private val FormFieldHeight = 56.dp
 private val PrimaryActionHeight = 52.dp
 private val TranscriptionModelOptions = listOf(
@@ -113,16 +129,83 @@ private val VerballyColorScheme = lightColorScheme(
     onPrimary = Color.White,
     primaryContainer = VerballySoftBlue,
     onPrimaryContainer = VerballyBrandBlue,
-    secondary = Color(0xFF526275),
+    secondary = VerballyAccentTeal,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE6ECF3),
-    onSecondaryContainer = Color(0xFF111C2B),
+    secondaryContainer = VerballyAccentMint,
+    onSecondaryContainer = Color(0xFF123532),
+    tertiary = Color(0xFF6A5CA8),
+    onTertiary = Color.White,
+    tertiaryContainer = VerballyAccentLavender,
+    onTertiaryContainer = Color(0xFF2B2456),
     background = VerballyPageBackground,
     onBackground = Color(0xFF171C22),
-    surface = Color(0xFFFEFBFF),
+    surface = VerballySurface,
     onSurface = Color(0xFF171C22),
-    surfaceVariant = Color(0xFFE7ECF3),
+    surfaceVariant = Color(0xFFE8EDF4),
     onSurfaceVariant = Color(0xFF465464),
+    outline = VerballyOutline,
+    error = Color(0xFFBA1A1A),
+    onError = Color.White,
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002),
+)
+
+private val VerballyTypography = Typography(
+    headlineMedium = TextStyle(
+        fontWeight = FontWeight.Bold,
+        fontSize = 30.sp,
+        lineHeight = 38.sp,
+    ),
+    headlineSmall = TextStyle(
+        fontWeight = FontWeight.Bold,
+        fontSize = 24.sp,
+        lineHeight = 32.sp,
+    ),
+    titleLarge = TextStyle(
+        fontWeight = FontWeight.Bold,
+        fontSize = 22.sp,
+        lineHeight = 30.sp,
+    ),
+    titleMedium = TextStyle(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 18.sp,
+        lineHeight = 26.sp,
+    ),
+    titleSmall = TextStyle(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+    ),
+    bodyLarge = TextStyle(
+        fontSize = 16.sp,
+        lineHeight = 25.sp,
+    ),
+    bodyMedium = TextStyle(
+        fontSize = 15.sp,
+        lineHeight = 23.sp,
+    ),
+    bodySmall = TextStyle(
+        fontSize = 13.sp,
+        lineHeight = 20.sp,
+    ),
+    labelLarge = TextStyle(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+    ),
+    labelMedium = TextStyle(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 12.sp,
+        lineHeight = 18.sp,
+    ),
+)
+
+private val VerballyShapes = Shapes(
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(8.dp),
+    large = RoundedCornerShape(8.dp),
+    extraLarge = RoundedCornerShape(8.dp),
 )
 
 class MainActivity : ComponentActivity() {
@@ -141,6 +224,8 @@ class MainActivity : ComponentActivity() {
 private fun VerballyTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = VerballyColorScheme,
+        typography = VerballyTypography,
+        shapes = VerballyShapes,
         content = content,
     )
 }
@@ -201,11 +286,11 @@ fun VerballyApp(container: VerballyContainer) {
     )
 }
 
-enum class AppDestination(val label: String, val marker: String) {
-    HOME("Home", "⌂"),
-    DICTIONARY("Dictionary", "D"),
-    SNIPPETS("Snippets", "S"),
-    HISTORY("History", "H"),
+enum class AppDestination(val label: String, @param:DrawableRes val iconRes: Int) {
+    HOME("首頁", R.drawable.ic_app_home_24),
+    DICTIONARY("字典", R.drawable.ic_app_dictionary_24),
+    SNIPPETS("片段", R.drawable.ic_app_snippets_24),
+    HISTORY("歷史", R.drawable.ic_app_history_24),
 }
 
 @Composable
@@ -253,7 +338,19 @@ fun VerballyAppScaffold(
                         NavigationBarItem(
                             selected = selectedDestination == destination,
                             onClick = { onDestinationSelected(destination) },
-                            icon = { Text(destination.marker, fontWeight = FontWeight.SemiBold) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                            icon = {
+                                Icon(
+                                    painter = painterResource(destination.iconRes),
+                                    contentDescription = null,
+                                )
+                            },
                             label = { Text(destination.label) },
                         )
                     }
@@ -295,30 +392,25 @@ private fun VerballyTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.dp)
-                .padding(horizontal = 24.dp),
+                .height(56.dp)
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .width(34.dp)
-                    .height(44.dp)
-                    .clickable(onClick = onOpenMenu),
-                contentAlignment = Alignment.CenterStart,
+            IconButton(
+                onClick = onOpenMenu,
+                modifier = Modifier.size(48.dp),
             ) {
-                Text(
-                    "☰",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
+                Icon(
+                    painter = painterResource(R.drawable.ic_app_menu_24),
+                    contentDescription = "開啟選單",
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
             Text(
                 text = "Verbally",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }
@@ -345,13 +437,13 @@ private fun VerballyDrawerContent(
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = "App 設定",
+                text = "應用程式設定",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(12.dp))
             NavigationDrawerItem(
-                label = { Text("Settings") },
+                label = { Text("設定") },
                 selected = false,
                 onClick = onOpenSettings,
             )
@@ -802,10 +894,16 @@ fun SettingsScreenContent(
     ) {
         ScreenHeader(
             title = "API 設定",
-            subtitle = "說明：Verbally 會使用語音轉錄模型進行語音辨識，並將文字結果進行處理後再輸出。請至 OpenAI 或 Gemini 取得 API Key 後貼入格子，並選擇模型。",
+            subtitle = "先完成語音轉錄，再完成文字處理；兩個都儲存後就能用浮動按鈕聽寫。",
+        )
+        Text(
+            text = "設定順序：語音轉錄 → 文字處理 → 開始聽寫",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ApiSettingsBlock(
             title = "語音轉錄",
+            subtitle = "選擇語音辨識模型，貼上 OpenAI API Key 後儲存。",
         ) {
             TranscriptionSettingsFields(
                 settings = settings,
@@ -822,6 +920,7 @@ fun SettingsScreenContent(
         }
         ApiSettingsBlock(
             title = "文字處理",
+            subtitle = "選擇整理文字的模型；切換服務時只會顯示對應的 API Key。",
         ) {
             CleanupSettingsFields(
                 settings = settings,
@@ -903,22 +1002,30 @@ fun CleanupSettingsScreenContent(
 @Composable
 private fun ApiSettingsBlock(
     title: String,
+    subtitle: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
             )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             content()
         }
     }
@@ -1124,7 +1231,7 @@ private fun DropdownField(
 private fun SearchField(
     value: String,
     onChange: (String) -> Unit,
-    placeholder: String = "Search",
+    placeholder: String = "搜尋",
 ) {
     OutlinedTextField(
         value = value,
@@ -1160,9 +1267,14 @@ fun DictionaryScreenContent(
     modifier: Modifier = Modifier,
 ) {
     PlaceholderDataScreen(
+        title = "字典",
+        subtitle = "保存常用詞、專有名詞與偏好的寫法，讓之後整理文字時更好找。",
         query = query,
         onQueryChange = onQueryChange,
-        emptyText = "你的字典詞彙會出現在這裡。",
+        searchPlaceholder = "搜尋字典",
+        emptyTitle = "尚未建立字典詞彙",
+        emptyDescription = "新增常用詞或專有名詞後，之後可以在這裡快速查找。",
+        addContentDescription = "新增字典詞彙",
         onAdd = onAdd,
         modifier = modifier,
     )
@@ -1191,9 +1303,14 @@ fun SnippetsScreenContent(
     modifier: Modifier = Modifier,
 ) {
     PlaceholderDataScreen(
+        title = "片段",
+        subtitle = "保存常用句、模板或固定回覆，之後可以快速查找。",
         query = query,
         onQueryChange = onQueryChange,
-        emptyText = "你的 Snippets 會出現在這裡。",
+        searchPlaceholder = "搜尋片段",
+        emptyTitle = "尚未建立常用片段",
+        emptyDescription = "新增常用句或模板後，之後可以在這裡快速查找。",
+        addContentDescription = "新增常用片段",
         onAdd = onAdd,
         modifier = modifier,
     )
@@ -1201,9 +1318,14 @@ fun SnippetsScreenContent(
 
 @Composable
 private fun PlaceholderDataScreen(
+    title: String,
+    subtitle: String,
     query: String,
     onQueryChange: (String) -> Unit,
-    emptyText: String,
+    searchPlaceholder: String,
+    emptyTitle: String,
+    emptyDescription: String,
+    addContentDescription: String,
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1214,17 +1336,17 @@ private fun PlaceholderDataScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            SearchField(value = query, onChange = onQueryChange)
+            ScreenHeader(title = title, subtitle = subtitle)
+            SearchField(value = query, onChange = onQueryChange, placeholder = searchPlaceholder)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = emptyText,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                EmptyStateBlock(
+                    title = emptyTitle,
+                    description = emptyDescription,
                 )
             }
         }
@@ -1232,12 +1354,39 @@ private fun PlaceholderDataScreen(
             onClick = onAdd,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 24.dp),
-            containerColor = Color.Black,
-            contentColor = Color.White,
+                .padding(bottom = 24.dp)
+                .semantics { contentDescription = addContentDescription },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
         ) {
             Text("+", style = MaterialTheme.typography.headlineMedium)
         }
+    }
+}
+
+@Composable
+private fun EmptyStateBlock(
+    title: String,
+    description: String,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = description,
+            modifier = Modifier.padding(horizontal = 12.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -1310,26 +1459,46 @@ fun HistoryScreenContent(
         modifier = modifier.padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        ScreenHeader(title = "歷史", subtitle = "只保存最近 100 筆轉錄結果")
+        ScreenHeader(
+            title = "歷史",
+            subtitle = "只保留最近 100 筆轉錄紀錄",
+        )
         SearchField(value = query, onChange = onQueryChange, placeholder = "搜尋歷史")
         OutlinedButton(
             onClick = { showClearConfirmation = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(PrimaryActionHeight),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
         ) {
-            Text("清空歷史")
+            Text("清空歷史", color = MaterialTheme.colorScheme.error)
         }
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(entries, key = { it.id }) { entry ->
-                HistoryItem(
-                    entry = entry,
-                    onCopy = { onCopy(entry) },
-                    onDelete = { onDelete(entry) },
-                )
+            if (entries.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 56.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        EmptyStateBlock(
+                            title = "尚無轉錄歷史",
+                            description = "完成聽寫後，整理好的文字會保存在這裡，最多保留最近 100 筆。",
+                        )
+                    }
+                }
+            } else {
+                items(entries, key = { it.id }) { entry ->
+                    HistoryItem(
+                        entry = entry,
+                        onCopy = { onCopy(entry) },
+                        onDelete = { onDelete(entry) },
+                    )
+                }
             }
         }
     }
@@ -1350,11 +1519,6 @@ private fun HistoryItem(
             modifier = Modifier.padding(14.dp),
         ) {
             Text(entry.cleanedText, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = "${entry.provider} / ${entry.cleanupModel}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             HorizontalDivider()
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onCopy) { Text("複製") }

@@ -65,3 +65,38 @@ The system SHALL present onboarding, settings, status, error, and history UI tex
 - **WHEN** a required permission is missing
 - **THEN** the setup screen describes only the current missing permission in Traditional Chinese
 - **THEN** the action label matches whether the app is requesting a runtime permission or opening Android settings
+
+### Requirement: Home and history use polished Traditional Chinese presentation
+The system SHALL present Home API setup and History as polished Traditional Chinese utility screens while preserving existing settings and history behavior.
+
+#### Scenario: User opens Home
+- **WHEN** the user opens the Home destination
+- **THEN** the system shows a Traditional Chinese page header
+- **THEN** the system shows transcription and text-processing setup as distinct operation panels
+- **THEN** primary save actions remain reachable after long API key input
+
+#### Scenario: User opens History
+- **WHEN** the user selects History from bottom navigation
+- **THEN** the system shows a Traditional Chinese page header
+- **THEN** the system shows a Traditional Chinese search field
+- **THEN** the system explains that only the latest 100 transcription results are saved
+- **THEN** history entries remain copyable and deletable
+
+### Requirement: Home setup explains the setup order
+The system SHALL make the Home API setup screen clearly explain the order and purpose of setup while preserving local-only key storage.
+
+#### Scenario: User opens Home setup
+- **WHEN** the user opens the Home destination
+- **THEN** the screen explains that the user should set transcription first, then text processing
+- **THEN** transcription and text-processing panels use distinct visual roles
+- **THEN** each panel shows concise usage copy before its controls
+- **THEN** save actions remain visible and aligned with their panel controls
+
+### Requirement: History screen is scannable and understandable
+The system SHALL present History with clear Material-style hierarchy for search, destructive clear action, and empty state.
+
+#### Scenario: User opens empty History
+- **WHEN** the user opens History before entries exist
+- **THEN** the screen shows the retention rule near the page title
+- **THEN** the search field and clear action are aligned with the page content
+- **THEN** the empty state explains what will appear after dictation

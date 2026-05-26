@@ -1,8 +1,5 @@
-# main-navigation-shell Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change redesign-main-navigation. Update Purpose after archive.
-## Requirements
 ### Requirement: Main shell uses a branded top header
 The system SHALL show a polished top app header in the main app shell with an accessible hamburger menu action and the Verbally app name.
 
@@ -41,13 +38,3 @@ The system SHALL open a compact left-side drawer from the hamburger action and e
 - **THEN** the drawer shows a Traditional Chinese menu heading
 - **THEN** the menu shows `設定`
 - **THEN** the menu does not show other app destinations or Permission Setup
-
-### Requirement: Main shell follows Material visual hierarchy
-The system SHALL present the main app shell with Material-style navigation, readable Traditional Chinese typography, and aligned spacing.
-
-#### Scenario: User views the main shell
-- **WHEN** the main shell is visible
-- **THEN** the top header, page content, and bottom navigation use consistent horizontal alignment
-- **THEN** navigation labels remain short Traditional Chinese labels
-- **THEN** selected bottom navigation state is visually distinct from unselected destinations
-

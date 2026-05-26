@@ -48,7 +48,13 @@ class MainActivitySettingsScreenTest {
 
         composeRule.onNodeWithText("API 設定")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("說明：Verbally 會使用語音轉錄模型進行語音辨識，並將文字結果進行處理後再輸出。請至 OpenAI 或 Gemini 取得 API Key 後貼入格子，並選擇模型。")
+        composeRule.onNodeWithText("先完成語音轉錄，再完成文字處理；兩個都儲存後就能用浮動按鈕聽寫。")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("設定順序：語音轉錄 → 文字處理 → 開始聽寫")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("選擇語音辨識模型，貼上 OpenAI API Key 後儲存。")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("選擇整理文字的模型；切換服務時只會顯示對應的 API Key。")
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("API")
             .assertCountEquals(0)
@@ -142,12 +148,41 @@ class MainActivitySettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("只保存最近 100 筆轉錄結果")
+        composeRule.onNodeWithText("只保留最近 100 筆轉錄紀錄")
             .assertIsDisplayed()
+        composeRule.onAllNodesWithText("OpenAI / gpt-test")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("Gemini / gemini-test")
+            .assertCountEquals(0)
         composeRule.onAllNodesWithText("複製")
             .assertCountEquals(2)
         composeRule.onAllNodesWithText("刪除")
             .assertCountEquals(2)
+    }
+
+    @Test
+    fun historyScreenShowsEmptyStateWhenNoEntriesExist() {
+        composeRule.setContent {
+            MaterialTheme {
+                HistoryScreenContent(
+                    query = "",
+                    entries = emptyList(),
+                    onQueryChange = {},
+                    onClearHistory = {},
+                    onCopy = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("搜尋歷史")
+            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("搜尋、複製或刪除之前的轉錄結果。")
+            .assertCountEquals(0)
+        composeRule.onNodeWithText("尚無轉錄歷史")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("完成聽寫後，整理好的文字會保存在這裡，最多保留最近 100 筆。")
+            .assertIsDisplayed()
     }
 
     @Test
@@ -359,23 +394,33 @@ class MainActivitySettingsScreenTest {
 
         composeRule.onNodeWithText("Verbally")
             .assertIsDisplayed()
+        composeRule.onAllNodesWithText("首頁")
+            .assertCountEquals(1)
+        composeRule.onAllNodesWithText("字典")
+            .assertCountEquals(1)
+        composeRule.onAllNodesWithText("片段")
+            .assertCountEquals(1)
+        composeRule.onAllNodesWithText("歷史")
+            .assertCountEquals(1)
         composeRule.onAllNodesWithText("Home")
-            .assertCountEquals(1)
-        composeRule.onAllNodesWithText("Dictionary")
-            .assertCountEquals(1)
-        composeRule.onAllNodesWithText("Snippets")
-            .assertCountEquals(1)
-        composeRule.onAllNodesWithText("History")
-            .assertCountEquals(1)
-        composeRule.onAllNodesWithText("設定")
             .assertCountEquals(0)
-        composeRule.onNodeWithText("☰")
+        composeRule.onAllNodesWithText("Dictionary")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("Snippets")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("History")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("☰")
+            .assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("開啟選單")
             .performClick()
         composeRule.onNodeWithText("選單")
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("Permission Setup")
             .assertCountEquals(0)
-        composeRule.onNodeWithText("Settings")
+        composeRule.onAllNodesWithText("Settings")
+            .assertCountEquals(0)
+        composeRule.onNodeWithText("設定")
             .assertIsDisplayed()
             .performClick()
 
@@ -416,11 +461,17 @@ class MainActivitySettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Search")
+        composeRule.onNodeWithText("搜尋字典")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("你的字典詞彙會出現在這裡。")
+        composeRule.onNodeWithText("字典")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("+")
+        composeRule.onNodeWithText("保存常用詞、專有名詞與偏好的寫法，讓之後整理文字時更好找。")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("尚未建立字典詞彙")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("新增常用詞或專有名詞後，之後可以在這裡快速查找。")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("新增字典詞彙")
             .assertIsDisplayed()
     }
 
@@ -432,11 +483,17 @@ class MainActivitySettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Search")
+        composeRule.onNodeWithText("搜尋片段")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("你的 Snippets 會出現在這裡。")
+        composeRule.onNodeWithText("片段")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("+")
+        composeRule.onNodeWithText("保存常用句、模板或固定回覆，之後可以快速查找。")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("尚未建立常用片段")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("新增常用句或模板後，之後可以在這裡快速查找。")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("新增常用片段")
             .assertIsDisplayed()
     }
 
