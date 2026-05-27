@@ -1,8 +1,5 @@
-# dictionary-and-snippets Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change redesign-main-navigation. Update Purpose after archive.
-## Requirements
 ### Requirement: Dictionary destination is searchable and addable
 The system SHALL provide a Dictionary destination with a Traditional Chinese search field, searchable local dictionary entries, and accessible add action.
 
@@ -21,15 +18,6 @@ The system SHALL provide a Dictionary destination with a Traditional Chinese sea
 - **WHEN** the user searches for text that matches a saved term or note
 - **THEN** the Dictionary list shows matching entries
 - **THEN** non-matching entries are hidden
-
-### Requirement: Snippets destination is searchable and addable
-The system SHALL provide a Snippets destination with a Traditional Chinese search field, honest empty state, and accessible add action.
-
-#### Scenario: Snippets has no entries
-- **WHEN** the user opens Snippets before entries exist
-- **THEN** the screen shows a search field with Traditional Chinese placeholder copy
-- **THEN** the screen explains in Traditional Chinese that snippets will show there
-- **THEN** the screen shows an add action with a Traditional Chinese accessibility label
 
 ### Requirement: Placeholder destinations explain their purpose
 The system SHALL present Dictionary and Snippets destinations with clear Material-style hierarchy, aligned controls, and obvious add actions. Dictionary SHALL explain and manage real local entries, while Snippets SHALL remain an honest placeholder.
@@ -52,6 +40,8 @@ The system SHALL present Dictionary and Snippets destinations with clear Materia
 - **THEN** the screen explains that snippets are for common phrases or templates
 - **THEN** the search field, empty state, and add action are visually aligned
 
+## ADDED Requirements
+
 ### Requirement: Dictionary entries can be edited and deleted
 The system SHALL allow users to edit and delete local dictionary entries from the Dictionary destination.
 
@@ -71,4 +61,3 @@ The system SHALL store dictionary entries locally on device and SHALL NOT requir
 #### Scenario: Dictionary is used offline
 - **WHEN** the user adds, searches, edits, or deletes dictionary entries without network connectivity
 - **THEN** the Dictionary operation succeeds using local storage
-

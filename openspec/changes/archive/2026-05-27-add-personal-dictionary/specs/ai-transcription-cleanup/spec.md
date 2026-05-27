@@ -1,19 +1,4 @@
-# ai-transcription-cleanup Specification
-
-## Purpose
-TBD - created by archiving change add-android-floating-dictation. Update Purpose after archive.
-## Requirements
-### Requirement: Audio is transcribed with OpenAI BYOK
-The system SHALL transcribe confirmed recordings by sending temporary audio directly to OpenAI `audio/transcriptions` using the user's stored OpenAI API key.
-
-#### Scenario: OpenAI transcription succeeds
-- **WHEN** the user confirms a recording and a valid OpenAI key is configured
-- **THEN** the system calls OpenAI transcription with the configured transcription model
-- **THEN** the system receives raw transcript text for cleanup
-
-#### Scenario: OpenAI key is missing
-- **WHEN** the user confirms a recording without an OpenAI API key configured
-- **THEN** the system stops processing and shows a Traditional Chinese settings error
+## MODIFIED Requirements
 
 ### Requirement: Transcript cleanup supports OpenAI and Gemini
 The system SHALL clean raw transcript text with either OpenAI or Gemini according to the selected cleanup provider, and SHALL include local dictionary vocabulary as cleanup context.
@@ -40,13 +25,6 @@ The built-in default cleanup prompt SHALL preserve the user's original language 
 - **THEN** cleanup instructions tell the model to prefer the saved dictionary spelling or wording
 - **THEN** cleanup instructions do not ask the model to invent content that is not supported by the transcript
 
-### Requirement: Temporary audio is not retained
-The system SHALL delete temporary audio files after transcription succeeds, fails, or is cancelled.
-
-#### Scenario: Processing finishes
-- **WHEN** dictation processing reaches success or failure
-- **THEN** the system deletes the temporary recording file
-
 ### Requirement: Cleanup prompt can be customized
 The system SHALL provide a user-editable cleanup prompt setting, SHALL default it to the built-in natural cleanup prompt, and SHALL use the configured prompt plus local dictionary context when cleaning transcript text with OpenAI or Gemini.
 
@@ -64,4 +42,3 @@ The system SHALL provide a user-editable cleanup prompt setting, SHALL default i
 - **WHEN** the user chooses to restore the default cleanup prompt
 - **THEN** the cleanup prompt setting returns to the built-in natural cleanup prompt
 - **THEN** provider, API key, model, and dictionary entries remain unchanged
-

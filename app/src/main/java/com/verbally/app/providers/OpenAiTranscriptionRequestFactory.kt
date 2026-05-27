@@ -1,5 +1,6 @@
 package com.verbally.app.providers
 
+import com.verbally.app.dictionary.DictionaryEntry
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.Request
@@ -42,11 +43,12 @@ class OpenAiCleanupRequestFactory(
         model: String,
         rawTranscript: String,
         cleanupPrompt: String = CleanupPromptFactory.defaultCleanupPrompt,
+        dictionaryEntries: List<DictionaryEntry> = emptyList(),
     ): Request {
         val json = """
             {
               "model": "${escapeJson(model)}",
-              "input": ${jsonString(CleanupPromptFactory.cleanupPrompt(cleanupPrompt, rawTranscript))}
+              "input": ${jsonString(CleanupPromptFactory.cleanupPrompt(cleanupPrompt, rawTranscript, dictionaryEntries))}
             }
         """.trimIndent()
 

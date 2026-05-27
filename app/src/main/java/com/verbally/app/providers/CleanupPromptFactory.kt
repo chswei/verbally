@@ -1,7 +1,10 @@
 package com.verbally.app.providers
 
+import com.verbally.app.dictionary.DictionaryEntry
+
 object CleanupPromptFactory {
     const val TranscriptPlaceholder = "{{transcript}}"
+    private const val DictionaryContextLimit = 100
 
     val defaultCleanupPrompt: String = """
         請將以下語音轉錄整理成可以直接貼到目前文字框的自然文字。
@@ -21,9 +24,13 @@ object CleanupPromptFactory {
     fun naturalCleanupPrompt(rawTranscript: String): String =
         cleanupPrompt(defaultCleanupPrompt, rawTranscript)
 
-    fun cleanupPrompt(promptTemplate: String, rawTranscript: String): String {
+    fun cleanupPrompt(
+        promptTemplate: String,
+        rawTranscript: String,
+        dictionaryEntries: List<DictionaryEntry> = emptyList(),
+    ): String {
         val template = promptTemplate.trim().ifBlank { defaultCleanupPrompt }
-        return if (template.contains(TranscriptPlaceholder)) {
+        val prompt = if (template.contains(TranscriptPlaceholder)) {
             template.replace(TranscriptPlaceholder, rawTranscript)
         } else {
             """
@@ -33,5 +40,45 @@ object CleanupPromptFactory {
                 $rawTranscript
             """.trimIndent()
         }
+        val dictionaryContext = dictionaryContext(dictionaryEntries)
+        if (dictionaryContext.isBlank()) return prompt
+
+        val transcriptLabelIndex = prompt.indexOf("原始轉錄：")
+        return if (transcriptLabelIndex >= 0) {
+            buildString {
+                append(prompt.substring(0, transcriptLabelIndex).trimEnd())
+                append("\n\n")
+                append(dictionaryContext)
+                append("\n\n")
+                append(prompt.substring(transcriptLabelIndex))
+            }
+        } else {
+            """
+                $prompt
+
+                $dictionaryContext
+            """.trimIndent()
+        }
+    }
+
+    private fun dictionaryContext(entries: List<DictionaryEntry>): String {
+        val lines = entries
+            .mapNotNull { entry ->
+                val term = entry.term.trim()
+                if (term.isBlank()) {
+                    null
+                } else {
+                    val note = entry.note?.trim().orEmpty()
+                    if (note.isBlank()) "- $term" else "- $term：$note"
+                }
+            }
+            .take(DictionaryContextLimit)
+
+        if (lines.isEmpty()) return ""
+        return buildString {
+            appendLine("使用者字典：")
+            appendLine("優先保留以下詞彙的寫法；只有在原始轉錄語意相關時使用，不要新增原文沒有的內容。")
+            lines.forEach { appendLine(it) }
+        }.trimEnd()
     }
 }

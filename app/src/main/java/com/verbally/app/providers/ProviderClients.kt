@@ -1,5 +1,6 @@
 package com.verbally.app.providers
 
+import com.verbally.app.dictionary.DictionaryEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -19,11 +20,15 @@ data class CleanedTranscript(
 
 class ProviderException(message: String) : RuntimeException(message)
 
+interface TranscriptionClient {
+    suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript
+}
+
 class OpenAiTranscriptionClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val requestFactory: OpenAiTranscriptionRequestFactory = OpenAiTranscriptionRequestFactory(),
-) {
-    suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript =
+) : TranscriptionClient {
+    override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 OpenAI API Key。")
             val response = httpClient.newCall(requestFactory.create(apiKey, model, audioFile)).execute()
@@ -43,6 +48,7 @@ interface TextCleanupClient {
         model: String,
         rawTranscript: String,
         cleanupPrompt: String,
+        dictionaryEntries: List<DictionaryEntry> = emptyList(),
     ): CleanedTranscript
 }
 
@@ -55,11 +61,12 @@ class OpenAiTextCleanupClient(
         model: String,
         rawTranscript: String,
         cleanupPrompt: String,
+        dictionaryEntries: List<DictionaryEntry>,
     ): CleanedTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 OpenAI API Key。")
             val response = httpClient.newCall(
-                requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt),
+                requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt, dictionaryEntries),
             ).execute()
             response.use {
                 val body = it.body.string()
@@ -88,11 +95,12 @@ class GeminiTextCleanupClient(
         model: String,
         rawTranscript: String,
         cleanupPrompt: String,
+        dictionaryEntries: List<DictionaryEntry>,
     ): CleanedTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 Gemini API Key。")
             val response = httpClient.newCall(
-                requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt),
+                requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt, dictionaryEntries),
             ).execute()
             response.use {
                 val body = it.body.string()

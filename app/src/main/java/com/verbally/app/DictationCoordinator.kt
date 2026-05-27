@@ -1,13 +1,13 @@
 package com.verbally.app
 
-import com.verbally.app.audio.TemporaryAudioRecorder
+import com.verbally.app.audio.AudioRecorder
+import com.verbally.app.dictionary.DictionaryRepository
 import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.history.DictationHistoryRepository
 import com.verbally.app.insertion.ClipboardPasteInserter
 import com.verbally.app.insertion.InsertResult
-import com.verbally.app.providers.GeminiTextCleanupClient
-import com.verbally.app.providers.OpenAiTextCleanupClient
-import com.verbally.app.providers.OpenAiTranscriptionClient
+import com.verbally.app.providers.TextCleanupClient
+import com.verbally.app.providers.TranscriptionClient
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.SettingsRepository
 import java.io.File
@@ -15,10 +15,11 @@ import java.io.File
 class DictationCoordinator(
     private val settingsRepository: SettingsRepository,
     private val historyRepository: DictationHistoryRepository,
-    private val audioRecorder: TemporaryAudioRecorder,
-    private val transcriptionClient: OpenAiTranscriptionClient,
-    private val openAiCleanupClient: OpenAiTextCleanupClient,
-    private val geminiCleanupClient: GeminiTextCleanupClient,
+    private val dictionaryRepository: DictionaryRepository,
+    private val audioRecorder: AudioRecorder,
+    private val transcriptionClient: TranscriptionClient,
+    private val openAiCleanupClient: TextCleanupClient,
+    private val geminiCleanupClient: TextCleanupClient,
     private val insertionFactory: () -> ClipboardPasteInserter,
 ) {
     private var currentRecording: File? = null
@@ -41,6 +42,7 @@ class DictationCoordinator(
 
         return try {
             val settings = settingsRepository.load()
+            val dictionaryEntries = dictionaryRepository.list()
             val raw = transcriptionClient.transcribe(
                 apiKey = settings.openAiApiKey,
                 model = settings.transcriptionModel,
@@ -52,12 +54,14 @@ class DictationCoordinator(
                     model = settings.openAiCleanupModel,
                     rawTranscript = raw.text,
                     cleanupPrompt = settings.cleanupPrompt,
+                    dictionaryEntries = dictionaryEntries,
                 )
                 CleanupProvider.GEMINI -> geminiCleanupClient.clean(
                     apiKey = settings.geminiApiKey,
                     model = settings.geminiCleanupModel,
                     rawTranscript = raw.text,
                     cleanupPrompt = settings.cleanupPrompt,
+                    dictionaryEntries = dictionaryEntries,
                 )
             }
             val insertResult = insertionFactory().insert(cleaned.text)

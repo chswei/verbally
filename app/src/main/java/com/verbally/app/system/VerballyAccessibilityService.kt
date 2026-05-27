@@ -33,6 +33,7 @@ class VerballyAccessibilityService : AccessibilityService() {
         DictationCoordinator(
             settingsRepository = container.settingsRepository,
             historyRepository = container.historyRepository,
+            dictionaryRepository = container.dictionaryRepository,
             audioRecorder = TemporaryAudioRecorder(this),
             transcriptionClient = container.transcriptionClient,
             openAiCleanupClient = container.openAiCleanupClient,

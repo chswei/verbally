@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import com.verbally.app.dictionary.DictionaryEntry
 import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
@@ -516,7 +517,13 @@ class MainActivitySettingsScreenTest {
     fun dictionaryShowsSearchEmptyStateAndAddAction() {
         composeRule.setContent {
             MaterialTheme {
-                DictionaryScreenContent(query = "", onQueryChange = {}, onAdd = {})
+                DictionaryScreenContent(
+                    query = "",
+                    entries = emptyList(),
+                    onQueryChange = {},
+                    onSave = {},
+                    onDelete = {},
+                )
             }
         }
 
@@ -531,6 +538,81 @@ class MainActivitySettingsScreenTest {
         composeRule.onNodeWithText("新增常用詞或專有名詞後，之後可以在這裡快速查找。")
             .assertIsDisplayed()
         composeRule.onNodeWithContentDescription("新增字典詞彙")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun dictionaryCanAddEditDeleteAndSearchEntries() {
+        var entries by mutableStateOf(emptyList<DictionaryEntry>())
+        var query by mutableStateOf("")
+        fun saveEntry(entry: DictionaryEntry) {
+            entries = listOf(entry) + entries.filterNot { it.id == entry.id }
+        }
+
+        composeRule.setContent {
+            MaterialTheme {
+                DictionaryScreenContent(
+                    query = query,
+                    entries = entries.filter {
+                        query.isBlank() ||
+                            it.term.contains(query, ignoreCase = true) ||
+                            it.note.orEmpty().contains(query, ignoreCase = true)
+                    },
+                    onQueryChange = { query = it },
+                    onSave = ::saveEntry,
+                    onDelete = { entry -> entries = entries.filterNot { it.id == entry.id } },
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("新增字典詞彙")
+            .performClick()
+        composeRule.onNodeWithText("新增字典詞彙")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("字典詞彙輸入")
+            .performTextInput("OpenAI")
+        composeRule.onNodeWithContentDescription("字典備註輸入")
+            .performTextInput("品牌名，不要加空白")
+        composeRule.onNodeWithText("儲存")
+            .performClick()
+
+        composeRule.onNodeWithText("OpenAI")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("品牌名，不要加空白")
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription("編輯 OpenAI")
+            .performClick()
+        composeRule.onNodeWithContentDescription("字典詞彙輸入")
+            .performTextClearance()
+        composeRule.onNodeWithContentDescription("字典詞彙輸入")
+            .performTextInput("OpenAI API")
+        composeRule.onNodeWithText("儲存")
+            .performClick()
+
+        composeRule.onNodeWithText("OpenAI API")
+            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("OpenAI")
+            .assertCountEquals(0)
+
+        composeRule.onNodeWithContentDescription("搜尋字典輸入")
+            .performTextInput("API")
+        composeRule.onNodeWithText("OpenAI API")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("搜尋字典輸入")
+            .performTextClearance()
+        composeRule.onNodeWithContentDescription("搜尋字典輸入")
+            .performTextInput("不存在")
+        composeRule.onNodeWithText("找不到符合的字典詞彙")
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription("搜尋字典輸入")
+            .performTextClearance()
+        composeRule.onNodeWithContentDescription("刪除 OpenAI API")
+            .performClick()
+        composeRule.onAllNodesWithText("OpenAI API")
+            .assertCountEquals(0)
+        composeRule.onNodeWithText("尚未建立字典詞彙")
             .assertIsDisplayed()
     }
 

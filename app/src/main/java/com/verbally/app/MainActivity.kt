@@ -91,6 +91,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.verbally.app.history.DictationHistoryEntry
+import com.verbally.app.dictionary.DictionaryEntry
 import com.verbally.app.permissions.PermissionAction
 import com.verbally.app.permissions.PermissionGuidance
 import com.verbally.app.permissions.PermissionSetupStep
@@ -270,6 +271,7 @@ fun VerballyApp(container: VerballyContainer) {
         },
         dictionaryContent = {
             DictionaryScreen(
+                container = container,
                 modifier = Modifier.fillMaxSize(),
             )
         },
@@ -1274,28 +1276,54 @@ private fun SearchField(
     value: String,
     onChange: (String) -> Unit,
     placeholder: String = "搜尋",
+    contentDescription: String? = null,
 ) {
+    val fieldModifier = Modifier
+        .fillMaxWidth()
+        .height(FormFieldHeight)
+        .let { modifier ->
+            if (contentDescription == null) {
+                modifier
+            } else {
+                modifier.semantics { this.contentDescription = contentDescription }
+            }
+        }
+
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         placeholder = { Text(placeholder) },
         singleLine = true,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(FormFieldHeight),
+        modifier = fieldModifier,
     )
 }
 
 @Composable
-private fun DictionaryScreen(modifier: Modifier = Modifier) {
+private fun DictionaryScreen(container: VerballyContainer, modifier: Modifier = Modifier) {
     var query by remember { mutableStateOf("") }
+    var entries by remember { mutableStateOf(container.dictionaryRepository.list()) }
     val context = LocalContext.current
+
+    fun refresh(nextQuery: String = query) {
+        entries = container.dictionaryRepository.search(nextQuery)
+    }
 
     DictionaryScreenContent(
         query = query,
-        onQueryChange = { query = it },
-        onAdd = {
-            Toast.makeText(context, "字典功能即將推出", Toast.LENGTH_SHORT).show()
+        entries = entries,
+        onQueryChange = {
+            query = it
+            refresh(it)
+        },
+        onSave = { entry ->
+            container.dictionaryRepository.save(entry)
+            refresh()
+            Toast.makeText(context, "字典已儲存", Toast.LENGTH_SHORT).show()
+        },
+        onDelete = { entry ->
+            container.dictionaryRepository.delete(entry.id)
+            refresh()
+            Toast.makeText(context, "字典詞彙已刪除", Toast.LENGTH_SHORT).show()
         },
         modifier = modifier,
     )
@@ -1304,21 +1332,209 @@ private fun DictionaryScreen(modifier: Modifier = Modifier) {
 @Composable
 fun DictionaryScreenContent(
     query: String,
+    entries: List<DictionaryEntry>,
     onQueryChange: (String) -> Unit,
-    onAdd: () -> Unit,
+    onSave: (DictionaryEntry) -> Unit,
+    onDelete: (DictionaryEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PlaceholderDataScreen(
-        title = "字典",
-        subtitle = "保存常用詞、專有名詞與偏好的寫法，讓之後整理文字時更好找。",
-        query = query,
-        onQueryChange = onQueryChange,
-        searchPlaceholder = "搜尋字典",
-        emptyTitle = "尚未建立字典詞彙",
-        emptyDescription = "新增常用詞或專有名詞後，之後可以在這裡快速查找。",
-        addContentDescription = "新增字典詞彙",
-        onAdd = onAdd,
-        modifier = modifier,
+    var editingEntry by remember { mutableStateOf<DictionaryEntry?>(null) }
+    var showEditor by remember { mutableStateOf(false) }
+
+    if (showEditor) {
+        DictionaryEntryDialog(
+            entry = editingEntry,
+            onDismiss = {
+                showEditor = false
+                editingEntry = null
+            },
+            onSave = { entry ->
+                onSave(entry)
+                showEditor = false
+                editingEntry = null
+            },
+        )
+    }
+
+    Box(
+        modifier = modifier.padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            ScreenHeader(
+                title = "字典",
+                subtitle = "保存常用詞、專有名詞與偏好的寫法，讓之後整理文字時更好找。",
+            )
+            SearchField(
+                value = query,
+                onChange = onQueryChange,
+                placeholder = "搜尋字典",
+                contentDescription = "搜尋字典輸入",
+            )
+            if (entries.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    EmptyStateBlock(
+                        title = if (query.isBlank()) "尚未建立字典詞彙" else "找不到符合的字典詞彙",
+                        description = if (query.isBlank()) {
+                            "新增常用詞或專有名詞後，之後可以在這裡快速查找。"
+                        } else {
+                            "換個關鍵字，或新增這個詞彙讓之後整理文字時使用。"
+                        },
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 96.dp),
+                ) {
+                    items(entries, key = { it.id }) { entry ->
+                        DictionaryEntryCard(
+                            entry = entry,
+                            onEdit = {
+                                editingEntry = entry
+                                showEditor = true
+                            },
+                            onDelete = { onDelete(entry) },
+                        )
+                    }
+                }
+            }
+        }
+        FloatingActionButton(
+            onClick = {
+                editingEntry = null
+                showEditor = true
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 24.dp)
+                .semantics { contentDescription = "新增字典詞彙" },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ) {
+            Text("+", style = MaterialTheme.typography.headlineMedium)
+        }
+    }
+}
+
+@Composable
+private fun DictionaryEntryCard(
+    entry: DictionaryEntry,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = VerballySurface),
+        border = BorderStroke(1.dp, VerballyOutline),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = entry.term,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            entry.note?.takeIf { it.isNotBlank() }?.let { note ->
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = onEdit,
+                    modifier = Modifier.semantics { contentDescription = "編輯 ${entry.term}" },
+                ) {
+                    Text("編輯")
+                }
+                TextButton(
+                    onClick = onDelete,
+                    modifier = Modifier.semantics { contentDescription = "刪除 ${entry.term}" },
+                ) {
+                    Text("刪除")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DictionaryEntryDialog(
+    entry: DictionaryEntry?,
+    onDismiss: () -> Unit,
+    onSave: (DictionaryEntry) -> Unit,
+) {
+    var term by remember(entry?.id) { mutableStateOf(entry?.term.orEmpty()) }
+    var note by remember(entry?.id) { mutableStateOf(entry?.note.orEmpty()) }
+    val title = if (entry == null) "新增字典詞彙" else "編輯字典詞彙"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = term,
+                    onValueChange = { term = it },
+                    label = { Text("詞彙") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = "字典詞彙輸入" },
+                )
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("備註") },
+                    placeholder = { Text("例如：品牌名、姓名、偏好大小寫") },
+                    minLines = 2,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = "字典備註輸入" },
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSave(
+                        DictionaryEntry(
+                            id = entry?.id ?: System.currentTimeMillis(),
+                            term = term,
+                            note = note,
+                        ),
+                    )
+                },
+                enabled = term.trim().isNotEmpty(),
+            ) {
+                Text("儲存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        },
     )
 }
 
