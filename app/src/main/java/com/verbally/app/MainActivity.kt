@@ -98,6 +98,7 @@ import com.verbally.app.permissions.PermissionSetupStep
 import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
+import com.verbally.app.snippets.SnippetEntry
 import kotlinx.coroutines.launch
 
 private val VerballyBrandBlue = Color(0xFF14233A)
@@ -277,6 +278,7 @@ fun VerballyApp(container: VerballyContainer) {
         },
         snippetsContent = {
             SnippetsScreen(
+                container = container,
                 modifier = Modifier.fillMaxSize(),
             )
         },
@@ -1539,15 +1541,31 @@ private fun DictionaryEntryDialog(
 }
 
 @Composable
-private fun SnippetsScreen(modifier: Modifier = Modifier) {
+private fun SnippetsScreen(container: VerballyContainer, modifier: Modifier = Modifier) {
     var query by remember { mutableStateOf("") }
+    var entries by remember { mutableStateOf(container.snippetRepository.list()) }
     val context = LocalContext.current
+
+    fun refresh(nextQuery: String = query) {
+        entries = container.snippetRepository.search(nextQuery)
+    }
 
     SnippetsScreenContent(
         query = query,
-        onQueryChange = { query = it },
-        onAdd = {
-            Toast.makeText(context, "Snippets 功能即將推出", Toast.LENGTH_SHORT).show()
+        entries = entries,
+        onQueryChange = {
+            query = it
+            refresh(it)
+        },
+        onSave = { entry ->
+            container.snippetRepository.save(entry)
+            refresh()
+            Toast.makeText(context, "片段已儲存", Toast.LENGTH_SHORT).show()
+        },
+        onDelete = { entry ->
+            container.snippetRepository.delete(entry.id)
+            refresh()
+            Toast.makeText(context, "片段已刪除", Toast.LENGTH_SHORT).show()
         },
         modifier = modifier,
     )
@@ -1556,21 +1574,208 @@ private fun SnippetsScreen(modifier: Modifier = Modifier) {
 @Composable
 fun SnippetsScreenContent(
     query: String,
+    entries: List<SnippetEntry>,
     onQueryChange: (String) -> Unit,
-    onAdd: () -> Unit,
+    onSave: (SnippetEntry) -> Unit,
+    onDelete: (SnippetEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PlaceholderDataScreen(
-        title = "片段",
-        subtitle = "保存常用句、模板或固定回覆，之後可以快速查找。",
-        query = query,
-        onQueryChange = onQueryChange,
-        searchPlaceholder = "搜尋片段",
-        emptyTitle = "尚未建立常用片段",
-        emptyDescription = "新增常用句或模板後，之後可以在這裡快速查找。",
-        addContentDescription = "新增常用片段",
-        onAdd = onAdd,
-        modifier = modifier,
+    var editingEntry by remember { mutableStateOf<SnippetEntry?>(null) }
+    var showEditor by remember { mutableStateOf(false) }
+
+    if (showEditor) {
+        SnippetEntryDialog(
+            entry = editingEntry,
+            onDismiss = {
+                showEditor = false
+                editingEntry = null
+            },
+            onSave = { entry ->
+                onSave(entry)
+                showEditor = false
+                editingEntry = null
+            },
+        )
+    }
+
+    Box(
+        modifier = modifier.padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            ScreenHeader(
+                title = "片段",
+                subtitle = "保存觸發詞與展開文字；聽寫時說出觸發詞，就會插入完整內容。",
+            )
+            SearchField(
+                value = query,
+                onChange = onQueryChange,
+                placeholder = "搜尋片段",
+                contentDescription = "搜尋片段輸入",
+            )
+            if (entries.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    EmptyStateBlock(
+                        title = if (query.isBlank()) "尚未建立常用片段" else "找不到符合的常用片段",
+                        description = if (query.isBlank()) {
+                            "新增像「我的地址」或「放射科報告模板」這類觸發詞，之後聽寫會展開成完整文字。"
+                        } else {
+                            "換個關鍵字，或新增這個觸發詞讓之後聽寫時展開。"
+                        },
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 96.dp),
+                ) {
+                    items(entries, key = { it.id }) { entry ->
+                        SnippetEntryCard(
+                            entry = entry,
+                            onEdit = {
+                                editingEntry = entry
+                                showEditor = true
+                            },
+                            onDelete = { onDelete(entry) },
+                        )
+                    }
+                }
+            }
+        }
+        FloatingActionButton(
+            onClick = {
+                editingEntry = null
+                showEditor = true
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 24.dp)
+                .semantics { contentDescription = "新增常用片段" },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ) {
+            Text("+", style = MaterialTheme.typography.headlineMedium)
+        }
+    }
+}
+
+@Composable
+private fun SnippetEntryCard(
+    entry: SnippetEntry,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = VerballySurface),
+        border = BorderStroke(1.dp, VerballyOutline),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = entry.trigger,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = entry.expansion,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = onEdit,
+                    modifier = Modifier.semantics { contentDescription = "編輯 ${entry.trigger}" },
+                ) {
+                    Text("編輯")
+                }
+                TextButton(
+                    onClick = onDelete,
+                    modifier = Modifier.semantics { contentDescription = "刪除 ${entry.trigger}" },
+                ) {
+                    Text("刪除")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SnippetEntryDialog(
+    entry: SnippetEntry?,
+    onDismiss: () -> Unit,
+    onSave: (SnippetEntry) -> Unit,
+) {
+    var trigger by remember(entry?.id) { mutableStateOf(entry?.trigger.orEmpty()) }
+    var expansion by remember(entry?.id) { mutableStateOf(entry?.expansion.orEmpty()) }
+    val title = if (entry == null) "新增常用片段" else "編輯常用片段"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = trigger,
+                    onValueChange = { trigger = it },
+                    label = { Text("觸發詞") },
+                    placeholder = { Text("例如：我的地址") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = "片段觸發詞輸入" },
+                )
+                OutlinedTextField(
+                    value = expansion,
+                    onValueChange = { expansion = it },
+                    label = { Text("展開內容") },
+                    placeholder = { Text("輸入要插入的完整文字或模板") },
+                    minLines = 4,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = "片段展開內容輸入" },
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSave(
+                        SnippetEntry(
+                            id = entry?.id ?: System.currentTimeMillis(),
+                            trigger = trigger,
+                            expansion = expansion,
+                        ),
+                    )
+                },
+                enabled = trigger.trim().isNotEmpty() && expansion.trim().isNotEmpty(),
+            ) {
+                Text("儲存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        },
     )
 }
 

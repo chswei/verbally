@@ -22,6 +22,7 @@ import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
+import com.verbally.app.snippets.SnippetEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -620,7 +621,13 @@ class MainActivitySettingsScreenTest {
     fun snippetsShowsSearchEmptyStateAndAddAction() {
         composeRule.setContent {
             MaterialTheme {
-                SnippetsScreenContent(query = "", onQueryChange = {}, onAdd = {})
+                SnippetsScreenContent(
+                    query = "",
+                    entries = emptyList(),
+                    onQueryChange = {},
+                    onSave = {},
+                    onDelete = {},
+                )
             }
         }
 
@@ -628,13 +635,90 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("片段")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("保存常用句、模板或固定回覆，之後可以快速查找。")
+        composeRule.onNodeWithText("保存觸發詞與展開文字；聽寫時說出觸發詞，就會插入完整內容。")
             .assertIsDisplayed()
         composeRule.onNodeWithText("尚未建立常用片段")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("新增常用句或模板後，之後可以在這裡快速查找。")
+        composeRule.onNodeWithText("新增像「我的地址」或「放射科報告模板」這類觸發詞，之後聽寫會展開成完整文字。")
             .assertIsDisplayed()
         composeRule.onNodeWithContentDescription("新增常用片段")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun snippetsCanAddEditDeleteAndSearchEntries() {
+        var entries by mutableStateOf(emptyList<SnippetEntry>())
+        var query by mutableStateOf("")
+        fun saveEntry(entry: SnippetEntry) {
+            entries = listOf(entry) + entries.filterNot {
+                it.id == entry.id || it.trigger.equals(entry.trigger, ignoreCase = true)
+            }
+        }
+
+        composeRule.setContent {
+            MaterialTheme {
+                SnippetsScreenContent(
+                    query = query,
+                    entries = entries.filter {
+                        query.isBlank() ||
+                            it.trigger.contains(query, ignoreCase = true) ||
+                            it.expansion.contains(query, ignoreCase = true)
+                    },
+                    onQueryChange = { query = it },
+                    onSave = ::saveEntry,
+                    onDelete = { entry -> entries = entries.filterNot { it.id == entry.id } },
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("新增常用片段")
+            .performClick()
+        composeRule.onNodeWithText("新增常用片段")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("片段觸發詞輸入")
+            .performTextInput("我的地址")
+        composeRule.onNodeWithContentDescription("片段展開內容輸入")
+            .performTextInput("台北市信義區一號")
+        composeRule.onNodeWithText("儲存")
+            .performClick()
+
+        composeRule.onNodeWithText("我的地址")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("台北市信義區一號")
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription("編輯 我的地址")
+            .performClick()
+        composeRule.onNodeWithContentDescription("片段觸發詞輸入")
+            .performTextClearance()
+        composeRule.onNodeWithContentDescription("片段觸發詞輸入")
+            .performTextInput("住家地址")
+        composeRule.onNodeWithText("儲存")
+            .performClick()
+
+        composeRule.onNodeWithText("住家地址")
+            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("我的地址")
+            .assertCountEquals(0)
+
+        composeRule.onNodeWithContentDescription("搜尋片段輸入")
+            .performTextInput("信義")
+        composeRule.onNodeWithText("住家地址")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("搜尋片段輸入")
+            .performTextClearance()
+        composeRule.onNodeWithContentDescription("搜尋片段輸入")
+            .performTextInput("不存在")
+        composeRule.onNodeWithText("找不到符合的常用片段")
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription("搜尋片段輸入")
+            .performTextClearance()
+        composeRule.onNodeWithContentDescription("刪除 住家地址")
+            .performClick()
+        composeRule.onAllNodesWithText("住家地址")
+            .assertCountEquals(0)
+        composeRule.onNodeWithText("尚未建立常用片段")
             .assertIsDisplayed()
     }
 

@@ -10,12 +10,15 @@ import com.verbally.app.providers.TextCleanupClient
 import com.verbally.app.providers.TranscriptionClient
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.SettingsRepository
+import com.verbally.app.snippets.SnippetExpander
+import com.verbally.app.snippets.SnippetRepository
 import java.io.File
 
 class DictationCoordinator(
     private val settingsRepository: SettingsRepository,
     private val historyRepository: DictationHistoryRepository,
     private val dictionaryRepository: DictionaryRepository,
+    private val snippetRepository: SnippetRepository,
     private val audioRecorder: AudioRecorder,
     private val transcriptionClient: TranscriptionClient,
     private val openAiCleanupClient: TextCleanupClient,
@@ -43,6 +46,7 @@ class DictationCoordinator(
         return try {
             val settings = settingsRepository.load()
             val dictionaryEntries = dictionaryRepository.list()
+            val snippetEntries = snippetRepository.list()
             val raw = transcriptionClient.transcribe(
                 apiKey = settings.openAiApiKey,
                 model = settings.transcriptionModel,
@@ -64,11 +68,12 @@ class DictationCoordinator(
                     dictionaryEntries = dictionaryEntries,
                 )
             }
-            val insertResult = insertionFactory().insert(cleaned.text)
+            val expandedText = SnippetExpander.expand(cleaned.text, snippetEntries)
+            val insertResult = insertionFactory().insert(expandedText)
             historyRepository.save(
                 DictationHistoryEntry(
                     rawTranscript = raw.text,
-                    cleanedText = cleaned.text,
+                    cleanedText = expandedText,
                     createdAtMillis = System.currentTimeMillis(),
                     provider = cleaned.provider,
                     transcriptionModel = raw.model,

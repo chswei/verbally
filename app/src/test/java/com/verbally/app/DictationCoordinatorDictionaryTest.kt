@@ -14,6 +14,7 @@ import com.verbally.app.providers.TranscriptionClient
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.SettingsRepository
+import com.verbally.app.snippets.InMemorySnippetRepository
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -70,6 +71,7 @@ class DictationCoordinatorDictionaryTest {
         settingsRepository = FakeSettingsRepository(settings),
         historyRepository = InMemoryDictationHistoryRepository(),
         dictionaryRepository = dictionaryRepository,
+        snippetRepository = InMemorySnippetRepository(),
         audioRecorder = audioRecorder,
         transcriptionClient = FakeTranscriptionClient(),
         openAiCleanupClient = openAiCleanupClient,
