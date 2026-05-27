@@ -5,7 +5,7 @@ import com.verbally.app.dictionary.InMemoryDictionaryRepository
 import com.verbally.app.history.InMemoryDictationHistoryRepository
 import com.verbally.app.insertion.ClipboardGateway
 import com.verbally.app.insertion.ClipboardPasteInserter
-import com.verbally.app.insertion.PasteTarget
+import com.verbally.app.insertion.DirectTextTarget
 import com.verbally.app.providers.CleanedTranscript
 import com.verbally.app.providers.RawTranscript
 import com.verbally.app.providers.TextCleanupClient
@@ -26,7 +26,7 @@ class DictationCoordinatorSnippetsTest {
         val snippets = InMemorySnippetRepository()
         snippets.save(SnippetEntry(trigger = "我的地址", expansion = "台北市信義區一號", id = 1L))
         val history = InMemoryDictationHistoryRepository()
-        val insertion = CapturingPasteTarget()
+        val insertion = CapturingDirectTextTarget()
         val coordinator = DictationCoordinator(
             settingsRepository = FakeSettingsRepository(
                 AppSettings(openAiApiKey = "openai-test", cleanupProvider = CleanupProvider.OPENAI),
@@ -43,7 +43,7 @@ class DictationCoordinatorSnippetsTest {
                     clipboard = object : ClipboardGateway {
                         override var currentText: String? = null
                     },
-                    pasteTarget = insertion,
+                    directTextTarget = insertion,
                 )
             },
         )
@@ -86,10 +86,10 @@ class DictationCoordinatorSnippetsTest {
         ): CleanedTranscript = CleanedTranscript(text = cleanedText, provider = "openai", model = model)
     }
 
-    private class CapturingPasteTarget : PasteTarget {
+    private class CapturingDirectTextTarget : DirectTextTarget {
         var insertedText: String? = null
 
-        override fun pasteFromClipboard(text: String): Boolean {
+        override suspend fun insertDirectly(text: String): Boolean {
             insertedText = text
             return true
         }

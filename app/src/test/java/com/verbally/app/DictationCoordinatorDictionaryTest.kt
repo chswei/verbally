@@ -6,7 +6,7 @@ import com.verbally.app.dictionary.InMemoryDictionaryRepository
 import com.verbally.app.history.InMemoryDictationHistoryRepository
 import com.verbally.app.insertion.ClipboardGateway
 import com.verbally.app.insertion.ClipboardPasteInserter
-import com.verbally.app.insertion.PasteTarget
+import com.verbally.app.insertion.DirectTextTarget
 import com.verbally.app.providers.CleanedTranscript
 import com.verbally.app.providers.RawTranscript
 import com.verbally.app.providers.TextCleanupClient
@@ -81,8 +81,8 @@ class DictationCoordinatorDictionaryTest {
                 clipboard = object : ClipboardGateway {
                     override var currentText: String? = null
                 },
-                pasteTarget = object : PasteTarget {
-                    override fun pasteFromClipboard(text: String): Boolean = true
+                directTextTarget = object : DirectTextTarget {
+                    override suspend fun insertDirectly(text: String): Boolean = true
                 },
             )
         },
