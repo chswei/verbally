@@ -94,6 +94,7 @@ import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.permissions.PermissionAction
 import com.verbally.app.permissions.PermissionGuidance
 import com.verbally.app.permissions.PermissionSetupStep
+import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
 import kotlinx.coroutines.launch
@@ -932,7 +933,7 @@ fun SettingsScreenContent(
                     .fillMaxWidth()
                     .height(PrimaryActionHeight),
             ) {
-                Text("儲存文字處理 API Key")
+                Text("儲存文字處理設定")
             }
         }
         Spacer(modifier = Modifier.height(64.dp))
@@ -1070,6 +1071,13 @@ private fun CleanupSettingsFields(
             }
         }
     }
+    CleanupPromptField(
+        prompt = settings.cleanupPrompt,
+        onPromptChange = { onSettingsChange(settings.copy(cleanupPrompt = it)) },
+        onRestoreDefault = {
+            onSettingsChange(settings.copy(cleanupPrompt = CleanupPromptFactory.defaultCleanupPrompt))
+        },
+    )
 }
 
 @Composable
@@ -1138,6 +1146,40 @@ private fun SecretField(label: String, value: String, onChange: (String) -> Unit
         onChange = onChange,
         visualTransformation = PasswordVisualTransformation(),
     )
+}
+
+@Composable
+private fun CleanupPromptField(
+    prompt: String,
+    onPromptChange: (String) -> Unit,
+    onRestoreDefault: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "文字處理提示詞",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onRestoreDefault) {
+                Text("還原預設")
+            }
+        }
+        OutlinedTextField(
+            value = prompt,
+            onValueChange = onPromptChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .semantics { contentDescription = "文字處理提示詞輸入" },
+            textStyle = MaterialTheme.typography.bodyMedium,
+        )
+    }
 }
 
 @Composable
@@ -1541,6 +1583,7 @@ private fun AppSettings.normalizedModelChoices(): AppSettings = copy(
         ?: OpenAiCleanupModelOptions.first(),
     geminiCleanupModel = geminiCleanupModel.takeIf { it in GeminiCleanupModelOptions }
         ?: GeminiCleanupModelOptions.first(),
+    cleanupPrompt = cleanupPrompt.ifBlank { CleanupPromptFactory.defaultCleanupPrompt },
 )
 
 private val AppSettings.cleanupModelOptionLabel: String

@@ -51,11 +51,13 @@ class DictationCoordinator(
                     apiKey = settings.openAiApiKey,
                     model = settings.openAiCleanupModel,
                     rawTranscript = raw.text,
+                    cleanupPrompt = settings.cleanupPrompt,
                 )
                 CleanupProvider.GEMINI -> geminiCleanupClient.clean(
                     apiKey = settings.geminiApiKey,
                     model = settings.geminiCleanupModel,
                     rawTranscript = raw.text,
+                    cleanupPrompt = settings.cleanupPrompt,
                 )
             }
             val insertResult = insertionFactory().insert(cleaned.text)

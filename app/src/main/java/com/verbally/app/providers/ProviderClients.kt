@@ -38,17 +38,29 @@ class OpenAiTranscriptionClient(
 }
 
 interface TextCleanupClient {
-    suspend fun clean(apiKey: String, model: String, rawTranscript: String): CleanedTranscript
+    suspend fun clean(
+        apiKey: String,
+        model: String,
+        rawTranscript: String,
+        cleanupPrompt: String,
+    ): CleanedTranscript
 }
 
 class OpenAiTextCleanupClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val requestFactory: OpenAiCleanupRequestFactory = OpenAiCleanupRequestFactory(),
 ) : TextCleanupClient {
-    override suspend fun clean(apiKey: String, model: String, rawTranscript: String): CleanedTranscript =
+    override suspend fun clean(
+        apiKey: String,
+        model: String,
+        rawTranscript: String,
+        cleanupPrompt: String,
+    ): CleanedTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 OpenAI API Key。")
-            val response = httpClient.newCall(requestFactory.create(apiKey, model, rawTranscript)).execute()
+            val response = httpClient.newCall(
+                requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt),
+            ).execute()
             response.use {
                 val body = it.body.string()
                 if (!it.isSuccessful) throw ProviderException("OpenAI 文字整理失敗：${it.code}")
@@ -71,10 +83,17 @@ class GeminiTextCleanupClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val requestFactory: GeminiCleanupRequestFactory = GeminiCleanupRequestFactory(),
 ) : TextCleanupClient {
-    override suspend fun clean(apiKey: String, model: String, rawTranscript: String): CleanedTranscript =
+    override suspend fun clean(
+        apiKey: String,
+        model: String,
+        rawTranscript: String,
+        cleanupPrompt: String,
+    ): CleanedTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 Gemini API Key。")
-            val response = httpClient.newCall(requestFactory.create(apiKey, model, rawTranscript)).execute()
+            val response = httpClient.newCall(
+                requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt),
+            ).execute()
             response.use {
                 val body = it.body.string()
                 if (!it.isSuccessful) throw ProviderException("Gemini 文字整理失敗：${it.code}")

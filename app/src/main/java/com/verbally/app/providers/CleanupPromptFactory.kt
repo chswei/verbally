@@ -1,7 +1,9 @@
 package com.verbally.app.providers
 
 object CleanupPromptFactory {
-    fun naturalCleanupPrompt(rawTranscript: String): String = """
+    const val TranscriptPlaceholder = "{{transcript}}"
+
+    val defaultCleanupPrompt: String = """
         請將以下語音轉錄整理成可以直接貼到目前文字框的自然文字。
 
         規則：
@@ -13,6 +15,23 @@ object CleanupPromptFactory {
         - 只輸出整理後文字，不要加說明。
 
         原始轉錄：
-        $rawTranscript
+        $TranscriptPlaceholder
     """.trimIndent()
+
+    fun naturalCleanupPrompt(rawTranscript: String): String =
+        cleanupPrompt(defaultCleanupPrompt, rawTranscript)
+
+    fun cleanupPrompt(promptTemplate: String, rawTranscript: String): String {
+        val template = promptTemplate.trim().ifBlank { defaultCleanupPrompt }
+        return if (template.contains(TranscriptPlaceholder)) {
+            template.replace(TranscriptPlaceholder, rawTranscript)
+        } else {
+            """
+                $template
+
+                原始轉錄：
+                $rawTranscript
+            """.trimIndent()
+        }
+    }
 }

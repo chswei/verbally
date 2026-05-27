@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.verbally.app.providers.CleanupPromptFactory
 
 class EncryptedSettingsRepository(
     context: Context,
@@ -19,6 +20,9 @@ class EncryptedSettingsRepository(
         transcriptionModel = prefs.getString(KEY_TRANSCRIPTION_MODEL, "gpt-4o-transcribe").orEmpty(),
         openAiCleanupModel = prefs.getString(KEY_OPENAI_MODEL, "gpt-5.4-nano").orEmpty(),
         geminiCleanupModel = prefs.getString(KEY_GEMINI_MODEL, "gemini-3.1-flash-lite").orEmpty(),
+        cleanupPrompt = prefs.getString(KEY_CLEANUP_PROMPT, CleanupPromptFactory.defaultCleanupPrompt)
+            .orEmpty()
+            .ifBlank { CleanupPromptFactory.defaultCleanupPrompt },
     )
 
     override fun save(settings: AppSettings) {
@@ -29,6 +33,10 @@ class EncryptedSettingsRepository(
             .putString(KEY_TRANSCRIPTION_MODEL, settings.transcriptionModel)
             .putString(KEY_OPENAI_MODEL, settings.openAiCleanupModel)
             .putString(KEY_GEMINI_MODEL, settings.geminiCleanupModel)
+            .putString(
+                KEY_CLEANUP_PROMPT,
+                settings.cleanupPrompt.ifBlank { CleanupPromptFactory.defaultCleanupPrompt },
+            )
             .apply()
     }
 
@@ -58,5 +66,6 @@ class EncryptedSettingsRepository(
         const val KEY_TRANSCRIPTION_MODEL = "transcription_model"
         const val KEY_OPENAI_MODEL = "openai_cleanup_model"
         const val KEY_GEMINI_MODEL = "gemini_cleanup_model"
+        const val KEY_CLEANUP_PROMPT = "cleanup_prompt"
     }
 }

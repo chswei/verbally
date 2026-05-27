@@ -12,10 +12,13 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import com.verbally.app.history.DictationHistoryEntry
+import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
 import org.junit.Assert.assertEquals
@@ -246,7 +249,10 @@ class MainActivitySettingsScreenTest {
             .assertCountEquals(0)
         composeRule.onNodeWithText("儲存語音轉錄 API Key")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("儲存文字處理 API Key")
+        composeRule.onNodeWithText("儲存文字處理設定")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("文字處理提示詞")
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("Transcribe")
@@ -297,6 +303,9 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("API Key")
             .assertIsDisplayed()
+        composeRule.onNodeWithText("文字處理提示詞")
+            .performScrollTo()
+            .assertIsDisplayed()
         composeRule.onAllNodesWithText("整理 Provider")
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("OpenAI 整理模型")
@@ -324,6 +333,9 @@ class MainActivitySettingsScreenTest {
         composeRule.onNodeWithText("API Key")
             .assertIsDisplayed()
         assertLabelAppearsBefore("文字處理模型", "API Key")
+        composeRule.onNodeWithText("文字處理提示詞")
+            .performScrollTo()
+            .assertIsDisplayed()
         composeRule.onAllNodesWithText("整理 Provider")
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("Gemini API Key")
@@ -370,6 +382,53 @@ class MainActivitySettingsScreenTest {
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("Gemini 整理模型")
             .assertCountEquals(0)
+    }
+
+    @Test
+    fun cleanupPromptCanBeEditedAndRestoredToDefault() {
+        var settings by mutableStateOf(
+            AppSettings(
+                cleanupProvider = CleanupProvider.GEMINI,
+                geminiApiKey = "gemini-key",
+                geminiCleanupModel = "gemini-3.1-flash-lite",
+                cleanupPrompt = "自訂提示詞",
+            ),
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                CleanupSettingsScreenContent(
+                    settings = settings,
+                    onSettingsChange = { settings = it },
+                    onSave = {},
+                )
+            }
+        }
+
+        val promptField = composeRule.onNodeWithContentDescription("文字處理提示詞輸入")
+        promptField
+            .performScrollTo()
+            .performTextClearance()
+        promptField
+            .performTextInput("請整理成條列摘要")
+
+        composeRule.runOnIdle {
+            assertEquals("請整理成條列摘要", settings.cleanupPrompt)
+            assertEquals(CleanupProvider.GEMINI, settings.cleanupProvider)
+            assertEquals("gemini-key", settings.geminiApiKey)
+            assertEquals("gemini-3.1-flash-lite", settings.geminiCleanupModel)
+        }
+
+        composeRule.onNodeWithText("還原預設")
+            .performScrollTo()
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(CleanupPromptFactory.defaultCleanupPrompt, settings.cleanupPrompt)
+            assertEquals(CleanupProvider.GEMINI, settings.cleanupProvider)
+            assertEquals("gemini-key", settings.geminiApiKey)
+            assertEquals("gemini-3.1-flash-lite", settings.geminiCleanupModel)
+        }
     }
 
     @Test

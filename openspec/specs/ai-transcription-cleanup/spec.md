@@ -29,7 +29,7 @@ The system SHALL clean raw transcript text with either OpenAI or Gemini accordin
 - **THEN** the system uses the returned cleaned text for insertion and history
 
 ### Requirement: Cleanup preserves language and intent
-The cleanup prompt SHALL preserve the user's original language and mixed-language style, improve punctuation and readability, remove filler words, and avoid translation unless explicitly instructed in a future mode.
+The built-in default cleanup prompt SHALL preserve the user's original language and mixed-language style, improve punctuation and readability, remove filler words, and avoid translation.
 
 #### Scenario: Mixed Chinese and English transcript
 - **WHEN** the raw transcript contains mixed Traditional Chinese and English
@@ -41,4 +41,22 @@ The system SHALL delete temporary audio files after transcription succeeds, fail
 #### Scenario: Processing finishes
 - **WHEN** dictation processing reaches success or failure
 - **THEN** the system deletes the temporary recording file
+
+### Requirement: Cleanup prompt can be customized
+The system SHALL provide a user-editable cleanup prompt setting, SHALL default it to the built-in natural cleanup prompt, and SHALL use the configured prompt when cleaning transcript text with OpenAI or Gemini.
+
+#### Scenario: Default cleanup prompt is used
+- **WHEN** no custom cleanup prompt has been saved
+- **THEN** the cleanup settings show the built-in natural cleanup prompt
+- **THEN** cleanup requests use the built-in natural cleanup prompt with the raw transcript attached
+
+#### Scenario: Custom cleanup prompt is used
+- **WHEN** the user saves a custom cleanup prompt
+- **THEN** subsequent OpenAI cleanup requests send the custom prompt with the raw transcript attached
+- **THEN** subsequent Gemini cleanup requests send the custom prompt with the raw transcript attached
+
+#### Scenario: User restores the default cleanup prompt
+- **WHEN** the user chooses to restore the default cleanup prompt
+- **THEN** the cleanup prompt setting returns to the built-in natural cleanup prompt
+- **THEN** provider, API key, and model settings remain unchanged
 

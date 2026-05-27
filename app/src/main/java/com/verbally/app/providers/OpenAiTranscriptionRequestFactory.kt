@@ -37,11 +37,16 @@ class OpenAiTranscriptionRequestFactory(
 class OpenAiCleanupRequestFactory(
     private val baseUrl: String = "https://api.openai.com",
 ) {
-    fun create(apiKey: String, model: String, rawTranscript: String): Request {
+    fun create(
+        apiKey: String,
+        model: String,
+        rawTranscript: String,
+        cleanupPrompt: String = CleanupPromptFactory.defaultCleanupPrompt,
+    ): Request {
         val json = """
             {
               "model": "${escapeJson(model)}",
-              "input": ${jsonString(CleanupPromptFactory.naturalCleanupPrompt(rawTranscript))}
+              "input": ${jsonString(CleanupPromptFactory.cleanupPrompt(cleanupPrompt, rawTranscript))}
             }
         """.trimIndent()
 

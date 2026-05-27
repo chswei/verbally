@@ -11,8 +11,9 @@ class GeminiCleanupRequestFactory(
         apiKey: String,
         model: String,
         rawTranscript: String,
+        cleanupPrompt: String = CleanupPromptFactory.defaultCleanupPrompt,
     ): Request {
-        val prompt = CleanupPromptFactory.naturalCleanupPrompt(rawTranscript)
+        val prompt = CleanupPromptFactory.cleanupPrompt(cleanupPrompt, rawTranscript)
         val json = """
             {
               "contents": [

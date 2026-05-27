@@ -1,5 +1,7 @@
 package com.verbally.app.settings
 
+import com.verbally.app.providers.CleanupPromptFactory
+
 enum class CleanupProvider {
     OPENAI,
     GEMINI,
@@ -12,6 +14,7 @@ data class AppSettings(
     val transcriptionModel: String = "gpt-4o-transcribe",
     val openAiCleanupModel: String = "gpt-5.4-nano",
     val geminiCleanupModel: String = "gemini-3.1-flash-lite",
+    val cleanupPrompt: String = CleanupPromptFactory.defaultCleanupPrompt,
 )
 
 interface SettingsRepository {
