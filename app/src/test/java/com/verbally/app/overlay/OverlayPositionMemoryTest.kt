@@ -17,6 +17,17 @@ class OverlayPositionMemoryTest {
     }
 
     @Test
+    fun `resolves default right margin with runtime edge pixels before user moves bubble`() {
+        val memory = OverlayPositionMemory()
+
+        val position = memory.currentPosition(screenWidth = 1080, bubbleWidth = 80, edgeMargin = 60)
+
+        assertEquals(Gravity.END or Gravity.CENTER_VERTICAL, position.gravity)
+        assertEquals(60, position.x)
+        assertEquals(0, position.y)
+    }
+
+    @Test
     fun `snaps moved bubble to left edge when released closer to left side`() {
         val memory = OverlayPositionMemory()
 
