@@ -1,6 +1,7 @@
 package com.verbally.app.providers
 
 import com.verbally.app.dictionary.DictionaryEntry
+import com.verbally.app.style.CleanupStyleContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -14,8 +15,9 @@ class GeminiCleanupRequestFactory(
         rawTranscript: String,
         cleanupPrompt: String = CleanupPromptFactory.defaultCleanupPrompt,
         dictionaryEntries: List<DictionaryEntry> = emptyList(),
+        styleContext: CleanupStyleContext? = null,
     ): Request {
-        val prompt = CleanupPromptFactory.cleanupPrompt(cleanupPrompt, rawTranscript, dictionaryEntries)
+        val prompt = CleanupPromptFactory.cleanupPrompt(cleanupPrompt, rawTranscript, dictionaryEntries, styleContext)
         val json = """
             {
               "contents": [

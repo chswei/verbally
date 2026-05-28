@@ -1,6 +1,7 @@
 package com.verbally.app.providers
 
 import com.verbally.app.dictionary.DictionaryEntry
+import com.verbally.app.style.CleanupStyleContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -49,6 +50,7 @@ interface TextCleanupClient {
         rawTranscript: String,
         cleanupPrompt: String,
         dictionaryEntries: List<DictionaryEntry> = emptyList(),
+        styleContext: CleanupStyleContext = CleanupStyleContext.default(),
     ): CleanedTranscript
 }
 
@@ -62,11 +64,12 @@ class OpenAiTextCleanupClient(
         rawTranscript: String,
         cleanupPrompt: String,
         dictionaryEntries: List<DictionaryEntry>,
+        styleContext: CleanupStyleContext,
     ): CleanedTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 OpenAI API Key。")
             val response = httpClient.newCall(
-                requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt, dictionaryEntries),
+                requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt, dictionaryEntries, styleContext),
             ).execute()
             response.use {
                 val body = it.body.string()
@@ -96,11 +99,12 @@ class GeminiTextCleanupClient(
         rawTranscript: String,
         cleanupPrompt: String,
         dictionaryEntries: List<DictionaryEntry>,
+        styleContext: CleanupStyleContext,
     ): CleanedTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 Gemini API Key。")
             val response = httpClient.newCall(
-                requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt, dictionaryEntries),
+                requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt, dictionaryEntries, styleContext),
             ).execute()
             response.use {
                 val body = it.body.string()

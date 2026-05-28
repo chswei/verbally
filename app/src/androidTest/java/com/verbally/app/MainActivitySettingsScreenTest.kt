@@ -23,6 +23,10 @@ import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.snippets.SnippetEntry
+import com.verbally.app.style.AppCategory
+import com.verbally.app.style.AppStyleProfile
+import com.verbally.app.style.InMemoryAppStyleProfileRepository
+import com.verbally.app.style.OutputStyle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -254,7 +258,7 @@ class MainActivitySettingsScreenTest {
         composeRule.onNodeWithText("儲存文字處理設定")
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithText("文字處理提示詞")
+        composeRule.onNodeWithText("基本文字處理提示詞")
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("Transcribe")
@@ -305,7 +309,7 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("API Key")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("文字處理提示詞")
+        composeRule.onNodeWithText("基本文字處理提示詞")
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("整理 Provider")
@@ -335,7 +339,7 @@ class MainActivitySettingsScreenTest {
         composeRule.onNodeWithText("API Key")
             .assertIsDisplayed()
         assertLabelAppearsBefore("文字處理模型", "API Key")
-        composeRule.onNodeWithText("文字處理提示詞")
+        composeRule.onNodeWithText("基本文字處理提示詞")
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("整理 Provider")
@@ -407,7 +411,7 @@ class MainActivitySettingsScreenTest {
             }
         }
 
-        val promptField = composeRule.onNodeWithContentDescription("文字處理提示詞輸入")
+        val promptField = composeRule.onNodeWithContentDescription("基本文字處理提示詞輸入")
         promptField
             .performScrollTo()
             .performTextClearance()
@@ -449,6 +453,7 @@ class MainActivitySettingsScreenTest {
                     dictionaryContent = {},
                     snippetsContent = {},
                     historyContent = {},
+                    styleContent = {},
                 )
             }
         }
@@ -463,6 +468,8 @@ class MainActivitySettingsScreenTest {
             .assertCountEquals(1)
         composeRule.onAllNodesWithText("歷史")
             .assertCountEquals(1)
+        composeRule.onAllNodesWithText("語氣")
+            .assertCountEquals(1)
         composeRule.onAllNodesWithText("Home")
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("Dictionary")
@@ -470,6 +477,8 @@ class MainActivitySettingsScreenTest {
         composeRule.onAllNodesWithText("Snippets")
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("History")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("Style")
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("☰")
             .assertCountEquals(0)
@@ -504,6 +513,7 @@ class MainActivitySettingsScreenTest {
                     dictionaryContent = {},
                     snippetsContent = {},
                     historyContent = {},
+                    styleContent = {},
                 )
             }
         }
@@ -512,6 +522,50 @@ class MainActivitySettingsScreenTest {
             .performClick()
 
         assertTrue(openedPermissions)
+    }
+
+    @Test
+    fun styleProfilesShowCategoriesAndSaveSelection() {
+        val repository = InMemoryAppStyleProfileRepository()
+        var profiles by mutableStateOf(repository.list())
+
+        composeRule.setContent {
+            MaterialTheme {
+                StyleProfilesScreenContent(
+                    profiles = profiles,
+                    onProfileChange = { profile ->
+                        repository.save(profile)
+                        profiles = repository.list()
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("語氣風格")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("聊天")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("工作")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("其他")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("聊天 Casual")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("工作 Formal")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("其他 Formal")
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription("聊天 Formal")
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(OutputStyle.FORMAL, repository.styleFor(AppCategory.CHAT))
+            assertEquals(
+                AppStyleProfile(category = AppCategory.CHAT, style = OutputStyle.FORMAL),
+                profiles.first { it.category == AppCategory.CHAT },
+            )
+        }
     }
 
     @Test

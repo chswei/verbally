@@ -8,6 +8,7 @@ import com.verbally.app.providers.OpenAiTextCleanupClient
 import com.verbally.app.providers.OpenAiTranscriptionClient
 import com.verbally.app.settings.EncryptedSettingsRepository
 import com.verbally.app.snippets.SharedPreferencesSnippetRepository
+import com.verbally.app.style.SharedPreferencesAppStyleProfileRepository
 
 class VerballyApplication : Application() {
     lateinit var container: VerballyContainer
@@ -24,6 +25,7 @@ class VerballyContainer(application: Application) {
     val historyRepository = SharedPreferencesDictationHistoryRepository(application)
     val dictionaryRepository = SharedPreferencesDictionaryRepository(application)
     val snippetRepository = SharedPreferencesSnippetRepository(application)
+    val styleProfileRepository = SharedPreferencesAppStyleProfileRepository(application)
     val transcriptionClient = OpenAiTranscriptionClient()
     val openAiCleanupClient = OpenAiTextCleanupClient()
     val geminiCleanupClient = GeminiTextCleanupClient()

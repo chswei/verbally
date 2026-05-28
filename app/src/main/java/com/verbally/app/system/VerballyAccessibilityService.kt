@@ -42,6 +42,7 @@ class VerballyAccessibilityService : AccessibilityService() {
             historyRepository = container.historyRepository,
             dictionaryRepository = container.dictionaryRepository,
             snippetRepository = container.snippetRepository,
+            styleProfileRepository = container.styleProfileRepository,
             audioRecorder = TemporaryAudioRecorder(this),
             transcriptionClient = container.transcriptionClient,
             openAiCleanupClient = container.openAiCleanupClient,

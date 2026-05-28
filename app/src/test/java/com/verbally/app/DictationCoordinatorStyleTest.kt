@@ -15,67 +15,58 @@ import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.SettingsRepository
 import com.verbally.app.snippets.InMemorySnippetRepository
+import com.verbally.app.style.AppCategory
 import com.verbally.app.style.CleanupStyleContext
 import com.verbally.app.style.InMemoryAppStyleProfileRepository
+import com.verbally.app.style.OutputStyle
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class DictationCoordinatorDictionaryTest {
+class DictationCoordinatorStyleTest {
     @Test
-    fun confirmRecordingPassesDictionaryEntriesToOpenAiCleanup() = runBlocking {
-        val dictionaryRepository = InMemoryDictionaryRepository()
-        dictionaryRepository.save(DictionaryEntry(term = "OpenAI", note = "品牌名，不要加空白", id = 1L))
-        val openAiCleanup = CapturingCleanupClient(provider = "openai")
-        val audioRecorder = FakeAudioRecorder()
+    fun confirmRecordingPassesChatCasualStyleToOpenAiCleanup() = runBlocking {
+        val cleanup = CapturingCleanupClient(provider = "openai")
         val coordinator = coordinator(
             settings = AppSettings(openAiApiKey = "openai-test", cleanupProvider = CleanupProvider.OPENAI),
-            dictionaryRepository = dictionaryRepository,
-            audioRecorder = audioRecorder,
-            openAiCleanupClient = openAiCleanup,
+            openAiCleanupClient = cleanup,
         )
 
-        coordinator.confirmRecording(appLabel = "Test")
+        coordinator.confirmRecording(appLabel = "jp.naver.line.android")
 
-        assertEquals(listOf("OpenAI"), openAiCleanup.dictionaryEntries.map { it.term })
-        assertEquals("品牌名，不要加空白", openAiCleanup.dictionaryEntries.single().note)
-        assertEquals(true, audioRecorder.deleted)
+        assertEquals(AppCategory.CHAT, cleanup.styleContext.category)
+        assertEquals(OutputStyle.CASUAL, cleanup.styleContext.style)
     }
 
     @Test
-    fun confirmRecordingPassesDictionaryEntriesToGeminiCleanup() = runBlocking {
-        val dictionaryRepository = InMemoryDictionaryRepository()
-        dictionaryRepository.save(DictionaryEntry(term = "Gemini", note = "Google 模型名稱", id = 1L))
-        val geminiCleanup = CapturingCleanupClient(provider = "gemini")
+    fun confirmRecordingPassesWorkFormalStyleToGeminiCleanup() = runBlocking {
+        val cleanup = CapturingCleanupClient(provider = "gemini")
         val coordinator = coordinator(
             settings = AppSettings(
                 geminiApiKey = "gemini-test",
                 cleanupProvider = CleanupProvider.GEMINI,
             ),
-            dictionaryRepository = dictionaryRepository,
-            geminiCleanupClient = geminiCleanup,
+            geminiCleanupClient = cleanup,
         )
 
-        coordinator.confirmRecording(appLabel = "Test")
+        coordinator.confirmRecording(appLabel = "com.google.android.gm")
 
-        assertEquals(listOf("Gemini"), geminiCleanup.dictionaryEntries.map { it.term })
-        assertEquals("Google 模型名稱", geminiCleanup.dictionaryEntries.single().note)
+        assertEquals(AppCategory.WORK, cleanup.styleContext.category)
+        assertEquals(OutputStyle.FORMAL, cleanup.styleContext.style)
     }
 
     private fun coordinator(
         settings: AppSettings,
-        dictionaryRepository: InMemoryDictionaryRepository,
-        audioRecorder: FakeAudioRecorder = FakeAudioRecorder(),
         openAiCleanupClient: CapturingCleanupClient = CapturingCleanupClient(provider = "openai"),
         geminiCleanupClient: CapturingCleanupClient = CapturingCleanupClient(provider = "gemini"),
     ) = DictationCoordinator(
         settingsRepository = FakeSettingsRepository(settings),
         historyRepository = InMemoryDictationHistoryRepository(),
-        dictionaryRepository = dictionaryRepository,
+        dictionaryRepository = InMemoryDictionaryRepository(),
         snippetRepository = InMemorySnippetRepository(),
         styleProfileRepository = InMemoryAppStyleProfileRepository(),
-        audioRecorder = audioRecorder,
+        audioRecorder = FakeAudioRecorder(),
         transcriptionClient = FakeTranscriptionClient(),
         openAiCleanupClient = openAiCleanupClient,
         geminiCleanupClient = geminiCleanupClient,
@@ -99,27 +90,24 @@ class DictationCoordinatorDictionaryTest {
 
     private class FakeAudioRecorder : AudioRecorder {
         private val file = File.createTempFile("verbally-test-", ".m4a")
-        var deleted = false
-
         override fun start(): File = file
         override fun stop(): File = file
         override fun stopAndDelete() = Unit
         override fun currentAmplitude(): Int = 0
         override fun delete(file: File?) {
-            deleted = true
             file?.delete()
         }
     }
 
     private class FakeTranscriptionClient : TranscriptionClient {
         override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript =
-            RawTranscript(text = "請提醒 open ai 的 Sarah", model = model)
+            RawTranscript(text = "請幫我傳給 Sarah", model = model)
     }
 
     private class CapturingCleanupClient(
         private val provider: String,
     ) : TextCleanupClient {
-        var dictionaryEntries: List<DictionaryEntry> = emptyList()
+        var styleContext: CleanupStyleContext = CleanupStyleContext.default()
 
         override suspend fun clean(
             apiKey: String,
@@ -129,8 +117,8 @@ class DictationCoordinatorDictionaryTest {
             dictionaryEntries: List<DictionaryEntry>,
             styleContext: CleanupStyleContext,
         ): CleanedTranscript {
-            this.dictionaryEntries = dictionaryEntries
-            return CleanedTranscript(text = "請提醒 OpenAI 的 Sarah。", provider = provider, model = model)
+            this.styleContext = styleContext
+            return CleanedTranscript(text = "請幫我傳給 Sarah。", provider = provider, model = model)
         }
     }
 }
