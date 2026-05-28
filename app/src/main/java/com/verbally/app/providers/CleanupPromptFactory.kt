@@ -1,6 +1,8 @@
 package com.verbally.app.providers
 
 import com.verbally.app.dictionary.DictionaryEntry
+import com.verbally.app.style.CleanupStyleContext
+import com.verbally.app.style.OutputStyle
 
 object CleanupPromptFactory {
     const val TranscriptPlaceholder = "{{transcript}}"
@@ -13,7 +15,7 @@ object CleanupPromptFactory {
         - 保留原本語言、語氣與中英混用比例。
         - 不要翻譯，不要把中英混用改成單一語言。
         - 去除口頭禪、重複詞與明顯語音辨識雜訊。
-        - 補上自然標點，修正常見錯字。
+        - 修正常見錯字。
         - 不要新增原文沒有的事實。
         - 只輸出整理後文字，不要加說明。
 
@@ -28,7 +30,11 @@ object CleanupPromptFactory {
         promptTemplate: String,
         rawTranscript: String,
         dictionaryEntries: List<DictionaryEntry> = emptyList(),
+        styleContext: CleanupStyleContext? = null,
     ): String {
+        if (styleContext != null) {
+            return styledCleanupPrompt(promptTemplate, rawTranscript, dictionaryEntries, styleContext)
+        }
         val template = promptTemplate.trim().ifBlank { defaultCleanupPrompt }
         val prompt = if (template.contains(TranscriptPlaceholder)) {
             template.replace(TranscriptPlaceholder, rawTranscript)
@@ -59,6 +65,52 @@ object CleanupPromptFactory {
                 $dictionaryContext
             """.trimIndent()
         }
+    }
+
+    private fun styledCleanupPrompt(
+        promptTemplate: String,
+        rawTranscript: String,
+        dictionaryEntries: List<DictionaryEntry>,
+        styleContext: CleanupStyleContext,
+    ): String {
+        val basicPrompt = basicPromptInstructions(promptTemplate)
+        val dictionaryContext = dictionaryContext(dictionaryEntries)
+        return buildString {
+            appendLine("基本文字處理提示詞：")
+            appendLine(basicPrompt)
+            appendLine()
+            if (dictionaryContext.isNotBlank()) {
+                appendLine(dictionaryContext)
+                appendLine()
+            }
+            appendLine("App 類別：${styleContext.category.label}")
+            appendLine(styleInstructions(styleContext.style))
+            appendLine()
+            appendLine("原始轉錄：")
+            append(rawTranscript)
+        }
+    }
+
+    private fun basicPromptInstructions(promptTemplate: String): String {
+        val template = promptTemplate.trim().ifBlank { defaultCleanupPrompt }
+        val withoutDefaultTranscriptBlock = template.replace(
+            Regex("\\n*原始轉錄：\\s*\\n\\s*${Regex.escape(TranscriptPlaceholder)}\\s*$"),
+            "",
+        )
+        return withoutDefaultTranscriptBlock
+            .replace(TranscriptPlaceholder, "下方原始轉錄")
+            .trim()
+    }
+
+    private fun styleInstructions(style: OutputStyle): String = when (style) {
+        OutputStyle.FORMAL -> """
+            輸出語氣：Formal
+            - 補上標點符號。
+        """.trimIndent()
+        OutputStyle.CASUAL -> """
+            輸出語氣：Casual
+            - 以空格取代標點符號。
+        """.trimIndent()
     }
 
     private fun dictionaryContext(entries: List<DictionaryEntry>): String {

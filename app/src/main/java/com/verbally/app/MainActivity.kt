@@ -99,6 +99,8 @@ import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.snippets.SnippetEntry
+import com.verbally.app.style.AppStyleProfile
+import com.verbally.app.style.OutputStyle
 import kotlinx.coroutines.launch
 
 private val VerballyBrandBlue = Color(0xFF14233A)
@@ -288,6 +290,12 @@ fun VerballyApp(container: VerballyContainer) {
                 modifier = Modifier.fillMaxSize(),
             )
         },
+        styleContent = {
+            StyleProfilesScreen(
+                container = container,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
     )
 }
 
@@ -295,6 +303,7 @@ enum class AppDestination(val label: String, @param:DrawableRes val iconRes: Int
     HOME("首頁", R.drawable.ic_app_home_24),
     DICTIONARY("字典", R.drawable.ic_app_dictionary_24),
     SNIPPETS("片段", R.drawable.ic_app_snippets_24),
+    STYLE("語氣", R.drawable.ic_app_style_24),
     HISTORY("歷史", R.drawable.ic_app_history_24),
 }
 
@@ -309,6 +318,7 @@ fun VerballyAppScaffold(
     dictionaryContent: @Composable () -> Unit,
     snippetsContent: @Composable () -> Unit,
     historyContent: @Composable () -> Unit,
+    styleContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -379,6 +389,7 @@ fun VerballyAppScaffold(
                         AppDestination.DICTIONARY -> dictionaryContent()
                         AppDestination.SNIPPETS -> snippetsContent()
                         AppDestination.HISTORY -> historyContent()
+                        AppDestination.STYLE -> styleContent()
                     }
                 }
             }
@@ -1165,7 +1176,7 @@ private fun CleanupPromptField(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = "文字處理提示詞",
+                text = "基本文字處理提示詞",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1180,7 +1191,7 @@ private fun CleanupPromptField(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp)
-                .semantics { contentDescription = "文字處理提示詞輸入" },
+                .semantics { contentDescription = "基本文字處理提示詞輸入" },
             textStyle = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -1778,6 +1789,114 @@ private fun SnippetEntryDialog(
         },
     )
 }
+
+@Composable
+private fun StyleProfilesScreen(container: VerballyContainer, modifier: Modifier = Modifier) {
+    var profiles by remember { mutableStateOf(container.styleProfileRepository.list()) }
+    val context = LocalContext.current
+
+    StyleProfilesScreenContent(
+        profiles = profiles,
+        onProfileChange = { profile ->
+            container.styleProfileRepository.save(profile)
+            profiles = container.styleProfileRepository.list()
+            Toast.makeText(context, "語氣已更新", Toast.LENGTH_SHORT).show()
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun StyleProfilesScreenContent(
+    profiles: List<AppStyleProfile>,
+    onProfileChange: (AppStyleProfile) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        ScreenHeader(
+            title = "語氣風格",
+            subtitle = "不同類型的 App 可以使用不同語氣；基本文字處理會先整理內容，再套用這裡的風格。",
+        )
+        profiles.forEach { profile ->
+            StyleProfileRow(
+                profile = profile,
+                onProfileChange = onProfileChange,
+            )
+        }
+        Spacer(modifier = Modifier.height(64.dp))
+    }
+}
+
+@Composable
+private fun StyleProfileRow(
+    profile: AppStyleProfile,
+    onProfileChange: (AppStyleProfile) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = VerballySurface),
+        border = BorderStroke(1.dp, VerballyOutline),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = profile.category.label,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = styleProfileDescription(profile),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutputStyle.entries.forEach { outputStyle ->
+                    val selected = profile.style == outputStyle
+                    val buttonModifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .semantics { contentDescription = "${profile.category.label} ${outputStyle.label}" }
+                    if (selected) {
+                        Button(
+                            onClick = { onProfileChange(profile.copy(style = outputStyle)) },
+                            modifier = buttonModifier,
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                        ) {
+                            Text(outputStyle.label)
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { onProfileChange(profile.copy(style = outputStyle)) },
+                            modifier = buttonModifier,
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                        ) {
+                            Text(outputStyle.label)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun styleProfileDescription(profile: AppStyleProfile): String =
+    when (profile.category.label) {
+        "聊天" -> "LINE、Messenger、WhatsApp 等聊天 App 預設比較自然口語。"
+        "工作" -> "Email、Slack、Teams、文件與筆記 App 預設比較完整正式。"
+        else -> "無法分類或尚未支援的 App 會使用這組預設。"
+    }
 
 @Composable
 private fun PlaceholderDataScreen(

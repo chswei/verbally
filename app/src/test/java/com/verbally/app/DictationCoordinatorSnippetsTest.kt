@@ -15,6 +15,8 @@ import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.SettingsRepository
 import com.verbally.app.snippets.InMemorySnippetRepository
 import com.verbally.app.snippets.SnippetEntry
+import com.verbally.app.style.CleanupStyleContext
+import com.verbally.app.style.InMemoryAppStyleProfileRepository
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -34,6 +36,7 @@ class DictationCoordinatorSnippetsTest {
             historyRepository = history,
             dictionaryRepository = InMemoryDictionaryRepository(),
             snippetRepository = snippets,
+            styleProfileRepository = InMemoryAppStyleProfileRepository(),
             audioRecorder = FakeAudioRecorder(),
             transcriptionClient = FakeTranscriptionClient(),
             openAiCleanupClient = FakeCleanupClient(cleanedText = "請寄到我的地址。"),
@@ -83,6 +86,7 @@ class DictationCoordinatorSnippetsTest {
             rawTranscript: String,
             cleanupPrompt: String,
             dictionaryEntries: List<com.verbally.app.dictionary.DictionaryEntry>,
+            styleContext: CleanupStyleContext,
         ): CleanedTranscript = CleanedTranscript(text = cleanedText, provider = "openai", model = model)
     }
 

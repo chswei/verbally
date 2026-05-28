@@ -1,6 +1,11 @@
 package com.verbally.app.providers
 
 import com.verbally.app.dictionary.DictionaryEntry
+import com.verbally.app.style.AppCategory
+import com.verbally.app.style.CleanupStyleContext
+import com.verbally.app.style.OutputStyle
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -16,6 +21,7 @@ class CleanupPromptFactoryTest {
         assertTrue(prompt.contains("不要翻譯"))
         assertTrue(prompt.contains("去除口頭禪"))
         assertTrue(prompt.contains("我等一下要 send 給 Alex"))
+        assertFalse(prompt.contains("標點"))
     }
 
     @Test
@@ -88,4 +94,53 @@ class CleanupPromptFactoryTest {
         assertTrue(prompt.contains("- 詞100"))
         assertTrue(!prompt.contains("- 詞101"))
     }
+
+    @Test
+    fun cleanupPromptAppliesBasicTextProcessingBeforeCasualStyle() {
+        val prompt = CleanupPromptFactory.cleanupPrompt(
+            promptTemplate = "基本規則：移除口頭禪但保留意思。${CleanupPromptFactory.TranscriptPlaceholder}",
+            rawTranscript = "我等等傳給你",
+            styleContext = CleanupStyleContext(
+                category = AppCategory.CHAT,
+                style = OutputStyle.CASUAL,
+            ),
+        )
+
+        assertTrue(prompt.contains("基本規則：移除口頭禪但保留意思。"))
+        assertTrue(prompt.contains("App 類別：聊天"))
+        assertFalse(prompt.contains("以輸出語氣為準"))
+        assertEquals(
+            """
+                輸出語氣：Casual
+                - 以空格取代標點符號。
+            """.trimIndent(),
+            prompt.styleBlock("輸出語氣：Casual"),
+        )
+        assertTrue(prompt.indexOf("基本規則：") < prompt.indexOf("輸出語氣：Casual"))
+        assertTrue(prompt.indexOf("輸出語氣：Casual") < prompt.indexOf("原始轉錄："))
+    }
+
+    @Test
+    fun cleanupPromptIncludesFormalStyleInstructions() {
+        val prompt = CleanupPromptFactory.cleanupPrompt(
+            promptTemplate = "請修正語音辨識錯誤。",
+            rawTranscript = "please send this to sarah tomorrow",
+            styleContext = CleanupStyleContext(
+                category = AppCategory.WORK,
+                style = OutputStyle.FORMAL,
+            ),
+        )
+
+        assertTrue(prompt.contains("App 類別：工作"))
+        assertEquals(
+            """
+                輸出語氣：Formal
+                - 補上標點符號。
+            """.trimIndent(),
+            prompt.styleBlock("輸出語氣：Formal"),
+        )
+    }
+
+    private fun String.styleBlock(label: String): String =
+        (label + substringAfter(label).substringBefore("\n\n原始轉錄：")).trim()
 }
