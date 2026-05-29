@@ -17,6 +17,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -56,13 +58,16 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -70,7 +75,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -78,6 +82,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -97,6 +102,7 @@ import com.verbally.app.permissions.PermissionGuidance
 import com.verbally.app.permissions.PermissionSetupStep
 import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
+import com.verbally.app.settings.AppThemeMode
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.ModelOptions
 import com.verbally.app.settings.TranscriptionProvider
@@ -147,6 +153,32 @@ private val VerballyColorScheme = lightColorScheme(
     onError = Color.White,
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),
+)
+
+private val VerballyDarkColorScheme = darkColorScheme(
+    primary = Color(0xFFB9C7E8),
+    onPrimary = Color(0xFF243049),
+    primaryContainer = Color(0xFF33415D),
+    onPrimaryContainer = Color(0xFFDCE5FF),
+    secondary = Color(0xFF9BCFC6),
+    onSecondary = Color(0xFF063A35),
+    secondaryContainer = Color(0xFF1E504A),
+    onSecondaryContainer = Color(0xFFB7ECE3),
+    tertiary = Color(0xFFCFC2FF),
+    onTertiary = Color(0xFF372D65),
+    tertiaryContainer = Color(0xFF4E4380),
+    onTertiaryContainer = Color(0xFFE8DEFF),
+    background = Color(0xFF101318),
+    onBackground = Color(0xFFE0E2E8),
+    surface = Color(0xFF1B1F24),
+    onSurface = Color(0xFFE0E2E8),
+    surfaceVariant = Color(0xFF42474F),
+    onSurfaceVariant = Color(0xFFC3C7D0),
+    outline = Color(0xFF8C919A),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
 )
 
 private val VerballyTypography = Typography(
@@ -212,17 +244,32 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val container = (application as VerballyApplication).container
         setContent {
-            VerballyTheme {
-                VerballyApp(container)
+            var appSettings by remember {
+                mutableStateOf(container.settingsRepository.load().normalizedModelChoices())
+            }
+            VerballyTheme(themeMode = appSettings.themeMode) {
+                VerballyApp(
+                    container = container,
+                    appSettings = appSettings,
+                    onSettingsSaved = { appSettings = it.normalizedModelChoices() },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun VerballyTheme(content: @Composable () -> Unit) {
+fun VerballyTheme(
+    themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    content: @Composable () -> Unit,
+) {
+    val useDarkTheme = when (themeMode) {
+        AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK -> true
+    }
     MaterialTheme(
-        colorScheme = VerballyColorScheme,
+        colorScheme = if (useDarkTheme) VerballyDarkColorScheme else VerballyColorScheme,
         typography = VerballyTypography,
         shapes = VerballyShapes,
         content = content,
@@ -230,9 +277,14 @@ private fun VerballyTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun VerballyApp(container: VerballyContainer) {
+fun VerballyApp(
+    container: VerballyContainer,
+    appSettings: AppSettings,
+    onSettingsSaved: (AppSettings) -> Unit,
+) {
     val context = LocalContext.current
     var selectedDestination by remember { mutableStateOf(AppDestination.HOME) }
+    var showingAppSettings by remember { mutableStateOf(false) }
     var permissionsReady by remember { mutableStateOf(hasRequiredPermissions(context)) }
     var showingPermissions by remember { mutableStateOf(!permissionsReady) }
 
@@ -252,17 +304,21 @@ fun VerballyApp(container: VerballyContainer) {
     VerballyAppScaffold(
         permissionsReady = permissionsReady,
         selectedDestination = selectedDestination,
+        showingSettings = showingAppSettings,
         onDestinationSelected = {
             refreshPermissions()
+            showingAppSettings = false
             selectedDestination = it
         },
         onOpenSettings = {
-            selectedDestination = AppDestination.HOME
+            showingAppSettings = true
         },
         onOpenPermissions = { showingPermissions = true },
         homeContent = {
             SettingsScreen(
                 container = container,
+                savedSettings = appSettings,
+                onSettingsSaved = onSettingsSaved,
                 modifier = Modifier.fillMaxSize(),
             )
         },
@@ -290,6 +346,14 @@ fun VerballyApp(container: VerballyContainer) {
                 modifier = Modifier.fillMaxSize(),
             )
         },
+        settingsContent = {
+            AppSettingsScreen(
+                container = container,
+                savedSettings = appSettings,
+                onSettingsSaved = onSettingsSaved,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
     )
 }
 
@@ -304,6 +368,7 @@ enum class AppDestination(val label: String, @param:DrawableRes val iconRes: Int
 @Composable
 fun VerballyAppScaffold(
     permissionsReady: Boolean,
+    showingSettings: Boolean,
     selectedDestination: AppDestination,
     onDestinationSelected: (AppDestination) -> Unit,
     onOpenSettings: () -> Unit,
@@ -313,22 +378,21 @@ fun VerballyAppScaffold(
     snippetsContent: @Composable () -> Unit,
     historyContent: @Composable () -> Unit,
     styleContent: @Composable () -> Unit,
+    settingsContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-
-    fun closeDrawer() {
-        scope.launch { drawerState.close() }
-    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             VerballyDrawerContent(
                 onOpenSettings = {
-                    onOpenSettings()
-                    closeDrawer()
+                    scope.launch {
+                        drawerState.close()
+                        onOpenSettings()
+                    }
                 },
             )
         },
@@ -345,7 +409,7 @@ fun VerballyAppScaffold(
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     AppDestination.entries.forEach { destination ->
                         NavigationBarItem(
-                            selected = selectedDestination == destination,
+                            selected = !showingSettings && selectedDestination == destination,
                             onClick = { onDestinationSelected(destination) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -378,12 +442,16 @@ fun VerballyAppScaffold(
                     )
                 }
                 Box(modifier = Modifier.weight(1f)) {
-                    when (selectedDestination) {
-                        AppDestination.HOME -> homeContent()
-                        AppDestination.DICTIONARY -> dictionaryContent()
-                        AppDestination.SNIPPETS -> snippetsContent()
-                        AppDestination.HISTORY -> historyContent()
-                        AppDestination.STYLE -> styleContent()
+                    if (showingSettings) {
+                        settingsContent()
+                    } else {
+                        when (selectedDestination) {
+                            AppDestination.HOME -> homeContent()
+                            AppDestination.DICTIONARY -> dictionaryContent()
+                            AppDestination.SNIPPETS -> snippetsContent()
+                            AppDestination.HISTORY -> historyContent()
+                            AppDestination.STYLE -> styleContent()
+                        }
                     }
                 }
             }
@@ -872,12 +940,16 @@ private fun StatusPill(text: String, positive: Boolean) {
 @Composable
 private fun SettingsScreen(
     container: VerballyContainer,
+    savedSettings: AppSettings,
+    onSettingsSaved: (AppSettings) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var settings by remember { mutableStateOf(container.settingsRepository.load().normalizedModelChoices()) }
+    var settings by remember(savedSettings) { mutableStateOf(savedSettings.normalizedModelChoices()) }
     val context = LocalContext.current
     val saveSettings = {
-        container.settingsRepository.save(settings)
+        val normalizedSettings = settings.normalizedModelChoices()
+        container.settingsRepository.save(normalizedSettings)
+        onSettingsSaved(normalizedSettings)
         Toast.makeText(context, "設定已儲存", Toast.LENGTH_SHORT).show()
     }
 
@@ -887,6 +959,90 @@ private fun SettingsScreen(
         onSave = saveSettings,
         modifier = modifier,
     )
+}
+
+@Composable
+private fun AppSettingsScreen(
+    container: VerballyContainer,
+    savedSettings: AppSettings,
+    onSettingsSaved: (AppSettings) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var settings by remember(savedSettings) { mutableStateOf(savedSettings.normalizedModelChoices()) }
+    val selectThemeMode = { themeMode: AppThemeMode ->
+        val updatedSettings = settings.copy(themeMode = themeMode).normalizedModelChoices()
+        settings = updatedSettings
+        container.settingsRepository.save(updatedSettings)
+        onSettingsSaved(updatedSettings)
+    }
+
+    AppSettingsScreenContent(
+        settings = settings,
+        onThemeModeSelected = selectThemeMode,
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun AppSettingsScreenContent(
+    settings: AppSettings,
+    onThemeModeSelected: (AppThemeMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        ScreenHeader(
+            title = "設定",
+            subtitle = "調整 Verbally 的外觀顯示模式。",
+        )
+        SectionLabel("外觀模式")
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            AppThemeMode.entries.forEach { mode ->
+                ThemeModeRadioOption(
+                    mode = mode,
+                    selected = settings.themeMode == mode,
+                    onSelected = { onThemeModeSelected(mode) },
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(64.dp))
+    }
+}
+
+@Composable
+private fun ThemeModeRadioOption(
+    mode: AppThemeMode,
+    selected: Boolean,
+    onSelected: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(FormFieldHeight)
+            .selectable(
+                selected = selected,
+                onClick = onSelected,
+                role = Role.RadioButton,
+            )
+            .semantics { contentDescription = "選擇 ${mode.label}外觀" }
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null,
+        )
+        Text(
+            text = mode.label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
 }
 
 @Composable

@@ -1,11 +1,14 @@
 package com.verbally.app
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -21,6 +24,7 @@ import com.verbally.app.dictionary.DictionaryEntry
 import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
+import com.verbally.app.settings.AppThemeMode
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.TranscriptionProvider
 import com.verbally.app.snippets.SnippetEntry
@@ -45,7 +49,41 @@ class MainActivitySettingsScreenTest {
     }
 
     @Test
-    fun settingsOverviewIsOnlyForApiSettings() {
+    fun appSettingsContentShowsAppearanceModeChoices() {
+        var settings by mutableStateOf(AppSettings())
+
+        composeRule.setContent {
+            MaterialTheme {
+                AppSettingsScreenContent(
+                    settings = settings,
+                    onThemeModeSelected = { settings = settings.copy(themeMode = it) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("外觀模式")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("跟隨系統")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("淺色")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("深色")
+            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("儲存外觀設定")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("選擇 外觀模式")
+            .assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("選擇 深色外觀")
+            .assertIsDisplayed()
+            .performClick()
+
+        assertEquals(AppThemeMode.DARK, settings.themeMode)
+        composeRule.onNodeWithText("深色")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsOverviewShowsApiSettings() {
         composeRule.setContent {
             MaterialTheme {
                 SettingsScreenContent(
@@ -65,6 +103,7 @@ class MainActivitySettingsScreenTest {
         composeRule.onNodeWithText("選擇語音辨識模型，貼上 OpenAI API Key 後儲存。")
             .assertIsDisplayed()
         composeRule.onNodeWithText("選擇整理文字的模型；切換服務時只會顯示對應的 API Key。")
+            .performScrollTo()
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("API")
             .assertCountEquals(0)
@@ -72,6 +111,30 @@ class MainActivitySettingsScreenTest {
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("資料")
             .assertCountEquals(0)
+        composeRule.onAllNodesWithText("外觀模式")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("儲存外觀設定")
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun verballyThemeUsesSelectedLightAndDarkSchemes() {
+        var lightBackground = Color.Unspecified
+        var darkBackground = Color.Unspecified
+
+        composeRule.setContent {
+            VerballyTheme(themeMode = AppThemeMode.LIGHT) {
+                lightBackground = MaterialTheme.colorScheme.background
+            }
+            VerballyTheme(themeMode = AppThemeMode.DARK) {
+                darkBackground = MaterialTheme.colorScheme.background
+            }
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(Color(0xFFF7F9FC), lightBackground)
+            assertEquals(Color(0xFF101318), darkBackground)
+        }
     }
 
     @Test
@@ -223,8 +286,8 @@ class MainActivitySettingsScreenTest {
         composeRule.onNodeWithContentDescription("選擇 語音轉錄模型")
             .assertIsDisplayed()
             .performClick()
-        composeRule.onNodeWithText("OpenAI: gpt-4o-mini-transcribe")
-            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("OpenAI: gpt-4o-mini-transcribe")
+            .assertCountEquals(2)
         composeRule.onNodeWithText("OpenAI: gpt-4o-transcribe")
             .assertIsDisplayed()
         composeRule.onNodeWithText("Soniox: Soniox Realtime")
@@ -235,11 +298,13 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("whisper-1")
             .assertCountEquals(0)
-        composeRule.onNodeWithText("OpenAI: gpt-4o-mini-transcribe")
+        composeRule.onNodeWithText("OpenAI: gpt-4o-transcribe")
             .performClick()
         composeRule.onNodeWithText("文字處理模型")
+            .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithContentDescription("選擇 文字處理模型")
+            .performScrollTo()
             .assertIsDisplayed()
             .performClick()
         composeRule.onAllNodesWithText("OpenAI: gpt-5.4-nano")
@@ -324,6 +389,8 @@ class MainActivitySettingsScreenTest {
         composeRule.onNodeWithText("Groq: whisper-large-v3-turbo")
             .performClick()
         composeRule.onNodeWithText("API Key")
+            .assertIsDisplayed()
+        composeRule.onNode(hasSetTextAction())
             .performTextInput("groq-key")
 
         composeRule.runOnIdle {
@@ -481,20 +548,26 @@ class MainActivitySettingsScreenTest {
     @Test
     fun mainAppShellUsesHistoryAndSettingsAsPrimaryDestinations() {
         var openedSettings = false
+        var showingSettings by mutableStateOf(false)
 
         composeRule.setContent {
             MaterialTheme {
                 VerballyAppScaffold(
                     permissionsReady = true,
+                    showingSettings = showingSettings,
                     selectedDestination = AppDestination.HOME,
                     onDestinationSelected = {},
-                    onOpenSettings = { openedSettings = true },
+                    onOpenSettings = {
+                        openedSettings = true
+                        showingSettings = true
+                    },
                     onOpenPermissions = {},
                     homeContent = {},
                     dictionaryContent = {},
                     snippetsContent = {},
                     historyContent = {},
                     styleContent = {},
+                    settingsContent = { Text("外觀模式") },
                 )
             }
         }
@@ -535,7 +608,11 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
             .performClick()
 
+        composeRule.waitUntil(timeoutMillis = 5_000) { openedSettings }
         assertTrue(openedSettings)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("外觀模式")
+            .assertIsDisplayed()
     }
 
     @Test
@@ -546,6 +623,7 @@ class MainActivitySettingsScreenTest {
             MaterialTheme {
                 VerballyAppScaffold(
                     permissionsReady = false,
+                    showingSettings = false,
                     selectedDestination = AppDestination.HOME,
                     onDestinationSelected = {},
                     onOpenSettings = {},
@@ -555,6 +633,7 @@ class MainActivitySettingsScreenTest {
                     snippetsContent = {},
                     historyContent = {},
                     styleContent = {},
+                    settingsContent = {},
                 )
             }
         }

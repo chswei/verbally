@@ -31,6 +31,7 @@ class EncryptedSettingsRepository(
         cleanupPrompt = prefs.getString(KEY_CLEANUP_PROMPT, CleanupPromptFactory.defaultCleanupPrompt)
             .orEmpty()
             .ifBlank { CleanupPromptFactory.defaultCleanupPrompt },
+        themeMode = AppThemeMode.fromStoredName(prefs.getString(KEY_THEME_MODE, AppThemeMode.SYSTEM.name)),
     ).normalizedModelChoices()
 
     override fun save(settings: AppSettings) {
@@ -49,6 +50,7 @@ class EncryptedSettingsRepository(
                 KEY_CLEANUP_PROMPT,
                 settings.cleanupPrompt.ifBlank { CleanupPromptFactory.defaultCleanupPrompt },
             )
+            .putString(KEY_THEME_MODE, settings.themeMode.name)
             .apply()
     }
 
@@ -83,5 +85,6 @@ class EncryptedSettingsRepository(
         const val KEY_OPENAI_MODEL = "openai_cleanup_model"
         const val KEY_GEMINI_MODEL = "gemini_cleanup_model"
         const val KEY_CLEANUP_PROMPT = "cleanup_prompt"
+        const val KEY_THEME_MODE = "theme_mode"
     }
 }
