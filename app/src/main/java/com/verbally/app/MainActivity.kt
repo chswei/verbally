@@ -1,9 +1,11 @@
 package com.verbally.app
 
 import android.Manifest
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -12,8 +14,10 @@ import android.provider.Settings
 import android.text.TextUtils
 import android.widget.Toast
 import androidx.annotation.DrawableRes
+import androidx.activity.SystemBarStyle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -28,6 +32,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -56,6 +61,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -70,6 +76,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,8 +85,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.Role
@@ -87,6 +96,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -119,14 +129,15 @@ import kotlinx.coroutines.launch
 private val VerballyBrandBlue = Color(0xFF14233A)
 private val VerballySoftBlue = Color(0xFFE6EDF6)
 private val VerballyAccentTeal = Color(0xFF2F6F68)
-private val VerballyAccentMint = Color(0xFFD9EEE9)
-private val VerballyAccentLavender = Color(0xFFECE7F8)
-private val VerballyPageBackground = Color(0xFFF7F9FC)
+private val VerballyAccentMint = Color(0xFFD6F1EA)
+private val VerballyAccentLavender = Color(0xFFEDE7FF)
+private val VerballyPageBackground = Color(0xFFF8FAFC)
 private val VerballySurface = Color(0xFFFFFFFF)
 private val VerballyOutline = Color(0xFFD1D9E4)
 private val ScreenHorizontalPadding = 24.dp
 private val ScreenVerticalPadding = 12.dp
 private val FormFieldHeight = 56.dp
+private val ModelDropdownHeight = 64.dp
 private val PrimaryActionHeight = 52.dp
 
 private val VerballyColorScheme = lightColorScheme(
@@ -162,13 +173,13 @@ private val VerballyDarkColorScheme = darkColorScheme(
     onPrimaryContainer = Color(0xFFDCE5FF),
     secondary = Color(0xFF9BCFC6),
     onSecondary = Color(0xFF063A35),
-    secondaryContainer = Color(0xFF1E504A),
+    secondaryContainer = Color(0xFF234E48),
     onSecondaryContainer = Color(0xFFB7ECE3),
     tertiary = Color(0xFFCFC2FF),
     onTertiary = Color(0xFF372D65),
-    tertiaryContainer = Color(0xFF4E4380),
+    tertiaryContainer = Color(0xFF564A88),
     onTertiaryContainer = Color(0xFFE8DEFF),
-    background = Color(0xFF101318),
+    background = Color(0xFF0F1419),
     onBackground = Color(0xFFE0E2E8),
     surface = Color(0xFF1B1F24),
     onSurface = Color(0xFFE0E2E8),
@@ -268,13 +279,62 @@ fun VerballyTheme(
         AppThemeMode.LIGHT -> false
         AppThemeMode.DARK -> true
     }
+    val colorScheme = if (useDarkTheme) VerballyDarkColorScheme else VerballyColorScheme
+    VerballySystemBarEffect(
+        useDarkTheme = useDarkTheme,
+        statusBarColor = colorScheme.background,
+        navigationBarColor = colorScheme.surface,
+    )
     MaterialTheme(
-        colorScheme = if (useDarkTheme) VerballyDarkColorScheme else VerballyColorScheme,
+        colorScheme = colorScheme,
         typography = VerballyTypography,
         shapes = VerballyShapes,
         content = content,
     )
 }
+
+@Composable
+private fun VerballySystemBarEffect(
+    useDarkTheme: Boolean,
+    statusBarColor: Color,
+    navigationBarColor: Color,
+) {
+    val view = LocalView.current
+    SideEffect {
+        if (view.isInEditMode) return@SideEffect
+        val activity = view.context.findActivity() as? ComponentActivity ?: return@SideEffect
+        val statusBarArgb = statusBarColor.toArgb()
+        val navigationBarArgb = navigationBarColor.toArgb()
+        activity.enableEdgeToEdge(
+            statusBarStyle = if (useDarkTheme) {
+                SystemBarStyle.dark(statusBarArgb)
+            } else {
+                SystemBarStyle.light(statusBarArgb, statusBarArgb)
+            },
+            navigationBarStyle = if (useDarkTheme) {
+                SystemBarStyle.dark(navigationBarArgb)
+            } else {
+                SystemBarStyle.light(navigationBarArgb, navigationBarArgb)
+            },
+        )
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+internal enum class PermissionScreenOpenReason {
+    REQUIRED_SETUP,
+    SUPPORT,
+}
+
+internal fun shouldDismissPermissionScreenOnPermissionRefresh(
+    openReason: PermissionScreenOpenReason,
+    permissionsReady: Boolean,
+): Boolean = permissionsReady && openReason == PermissionScreenOpenReason.REQUIRED_SETUP
 
 @Composable
 fun VerballyApp(
@@ -287,15 +347,32 @@ fun VerballyApp(
     var showingAppSettings by remember { mutableStateOf(false) }
     var permissionsReady by remember { mutableStateOf(hasRequiredPermissions(context)) }
     var showingPermissions by remember { mutableStateOf(!permissionsReady) }
+    var permissionScreenOpenReason by remember {
+        mutableStateOf(
+            if (permissionsReady) PermissionScreenOpenReason.SUPPORT else PermissionScreenOpenReason.REQUIRED_SETUP,
+        )
+    }
 
-    fun refreshPermissions() {
-        permissionsReady = hasRequiredPermissions(context)
-        if (permissionsReady) showingPermissions = false
+    fun refreshPermissions(openReason: PermissionScreenOpenReason = permissionScreenOpenReason) {
+        val currentPermissionsReady = hasRequiredPermissions(context)
+        permissionsReady = currentPermissionsReady
+        if (
+            shouldDismissPermissionScreenOnPermissionRefresh(
+                openReason = openReason,
+                permissionsReady = currentPermissionsReady,
+            )
+        ) {
+            showingPermissions = false
+        }
     }
 
     if (showingPermissions) {
         PermissionScreen(
             onPermissionsChanged = { refreshPermissions() },
+            onComplete = {
+                refreshPermissions(PermissionScreenOpenReason.REQUIRED_SETUP)
+                showingPermissions = false
+            },
             modifier = Modifier.fillMaxSize(),
         )
         return
@@ -313,7 +390,14 @@ fun VerballyApp(
         onOpenSettings = {
             showingAppSettings = true
         },
-        onOpenPermissions = { showingPermissions = true },
+        onOpenPermissions = {
+            permissionScreenOpenReason = if (permissionsReady) {
+                PermissionScreenOpenReason.SUPPORT
+            } else {
+                PermissionScreenOpenReason.REQUIRED_SETUP
+            }
+            showingPermissions = true
+        },
         homeContent = {
             SettingsScreen(
                 container = container,
@@ -392,6 +476,12 @@ fun VerballyAppScaffold(
                     scope.launch {
                         drawerState.close()
                         onOpenSettings()
+                    }
+                },
+                onOpenPermissions = {
+                    scope.launch {
+                        drawerState.close()
+                        onOpenPermissions()
                     }
                 },
             )
@@ -497,41 +587,114 @@ private fun VerballyTopBar(
 @Composable
 private fun VerballyDrawerContent(
     onOpenSettings: () -> Unit,
+    onOpenPermissions: () -> Unit,
 ) {
     ModalDrawerSheet(
-        modifier = Modifier.width(260.dp),
+        modifier = Modifier.width(292.dp),
         drawerContainerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(
             modifier = Modifier
                 .statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 16.dp, vertical = 20.dp),
         ) {
             Text(
-                text = "選單",
-                style = MaterialTheme.typography.headlineSmall,
+                text = "管理與支援",
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = "應用程式設定",
-                style = MaterialTheme.typography.labelLarge,
+                text = "設定、權限與疑難排解",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(18.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(14.dp))
+            DrawerSectionLabel(text = "應用程式")
             NavigationDrawerItem(
-                label = { Text("設定") },
+                modifier = Modifier.semantics { contentDescription = "設定選單項目" },
+                icon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_app_settings_24),
+                        contentDescription = null,
+                    )
+                },
+                label = {
+                    DrawerItemLabel(
+                        title = "設定",
+                        subtitle = "外觀與 App 偏好",
+                    )
+                },
                 selected = false,
                 onClick = onOpenSettings,
+                colors = NavigationDrawerItemDefaults.colors(
+                    unselectedContainerColor = Color.Transparent,
+                    unselectedIconColor = MaterialTheme.colorScheme.primary,
+                ),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            DrawerSectionLabel(text = "支援")
+            NavigationDrawerItem(
+                modifier = Modifier.semantics { contentDescription = "權限與疑難排解選單項目" },
+                icon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_app_support_24),
+                        contentDescription = null,
+                    )
+                },
+                label = {
+                    DrawerItemLabel(
+                        title = "權限與疑難排解",
+                        subtitle = "錄音、浮動視窗與輔助使用",
+                    )
+                },
+                selected = false,
+                onClick = onOpenPermissions,
+                colors = NavigationDrawerItemDefaults.colors(
+                    unselectedContainerColor = Color.Transparent,
+                    unselectedIconColor = MaterialTheme.colorScheme.secondary,
+                ),
             )
         }
     }
 }
 
 @Composable
+private fun DrawerSectionLabel(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontWeight = FontWeight.SemiBold,
+    )
+}
+
+@Composable
+private fun DrawerItemLabel(
+    title: String,
+    subtitle: String,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun PermissionScreen(
     onPermissionsChanged: () -> Unit,
+    onComplete: () -> Unit = onPermissionsChanged,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -612,7 +775,7 @@ private fun PermissionScreen(
                 context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
             PermissionSetupStep.COMPLETE -> {
-                onPermissionsChanged()
+                onComplete()
             }
         }
     }
@@ -1341,7 +1504,7 @@ private fun CleanupPromptField(
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
@@ -1401,6 +1564,7 @@ private fun DropdownField(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val displayValue = selectedValue.takeIf { it in options } ?: options.firstOrNull().orEmpty()
+    val displayParts = ModelOptionLabelParts.from(displayValue)
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
@@ -1414,24 +1578,41 @@ private fun DropdownField(
                 onClick = { expanded = true },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(FormFieldHeight)
+                    .height(ModelDropdownHeight)
                     .semantics { contentDescription = "選擇 $label" },
-                contentPadding = PaddingValues(horizontal = 16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 12.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(
-                        text = displayValue,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "⌄",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
+                    ) {
+                        displayParts.provider?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Text(
+                            text = displayParts.model,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Icon(
+                        painter = painterResource(R.drawable.ic_app_chevron_down_24),
+                        contentDescription = "$label 展開箭頭",
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -1448,6 +1629,22 @@ private fun DropdownField(
                         },
                     )
                 }
+            }
+        }
+    }
+}
+
+private data class ModelOptionLabelParts(
+    val provider: String?,
+    val model: String,
+) {
+    companion object {
+        fun from(label: String): ModelOptionLabelParts {
+            val parts = label.split(": ", limit = 2)
+            return if (parts.size == 2) {
+                ModelOptionLabelParts(provider = parts[0], model = parts[1])
+            } else {
+                ModelOptionLabelParts(provider = null, model = label)
             }
         }
     }
@@ -1617,8 +1814,8 @@ private fun DictionaryEntryCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = VerballySurface),
-        border = BorderStroke(1.dp, VerballyOutline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         shape = RoundedCornerShape(8.dp),
     ) {
         Column(
@@ -1857,8 +2054,8 @@ private fun SnippetEntryCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = VerballySurface),
-        border = BorderStroke(1.dp, VerballyOutline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         shape = RoundedCornerShape(8.dp),
     ) {
         Column(
@@ -2008,8 +2205,8 @@ private fun StyleProfileRow(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = VerballySurface),
-        border = BorderStroke(1.dp, VerballyOutline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         shape = RoundedCornerShape(8.dp),
     ) {
         Column(
@@ -2182,6 +2379,7 @@ fun HistoryScreenContent(
     modifier: Modifier = Modifier,
 ) {
     var showClearConfirmation by remember { mutableStateOf(false) }
+    var showHistoryMenu by remember { mutableStateOf(false) }
 
     if (showClearConfirmation) {
         AlertDialog(
@@ -2210,20 +2408,17 @@ fun HistoryScreenContent(
         modifier = modifier.padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        ScreenHeader(
-            title = "歷史",
-            subtitle = "只保留最近 100 筆轉錄紀錄",
+        HistoryScreenHeader(
+            showOverflow = entries.isNotEmpty(),
+            overflowExpanded = showHistoryMenu,
+            onOverflowClick = { showHistoryMenu = true },
+            onOverflowDismiss = { showHistoryMenu = false },
+            onClearHistoryClick = {
+                showHistoryMenu = false
+                showClearConfirmation = true
+            },
         )
         SearchField(value = query, onChange = onQueryChange, placeholder = "搜尋歷史")
-        OutlinedButton(
-            onClick = { showClearConfirmation = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(PrimaryActionHeight),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
-        ) {
-            Text("清空歷史", color = MaterialTheme.colorScheme.error)
-        }
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -2248,6 +2443,54 @@ fun HistoryScreenContent(
                         entry = entry,
                         onCopy = { onCopy(entry) },
                         onDelete = { onDelete(entry) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryScreenHeader(
+    showOverflow: Boolean,
+    overflowExpanded: Boolean,
+    onOverflowClick: () -> Unit,
+    onOverflowDismiss: () -> Unit,
+    onClearHistoryClick: () -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        ScreenHeader(
+            title = "歷史",
+            subtitle = "只保留最近 100 筆轉錄紀錄",
+        )
+        if (showOverflow) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(y = (-6).dp),
+            ) {
+                IconButton(
+                    onClick = onOverflowClick,
+                    modifier = Modifier.semantics { contentDescription = "歷史選單" },
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_app_more_vert_24),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                DropdownMenu(
+                    expanded = overflowExpanded,
+                    onDismissRequest = onOverflowDismiss,
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = "清空歷史",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        onClick = onClearHistoryClick,
                     )
                 }
             }

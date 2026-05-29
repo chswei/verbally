@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -32,6 +33,7 @@ import com.verbally.app.style.AppCategory
 import com.verbally.app.style.AppStyleProfile
 import com.verbally.app.style.InMemoryAppStyleProfileRepository
 import com.verbally.app.style.OutputStyle
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -119,26 +121,41 @@ class MainActivitySettingsScreenTest {
 
     @Test
     fun verballyThemeUsesSelectedLightAndDarkSchemes() {
+        var lightPrimary = Color.Unspecified
         var lightBackground = Color.Unspecified
+        var lightSecondaryContainer = Color.Unspecified
+        var lightTertiaryContainer = Color.Unspecified
         var darkBackground = Color.Unspecified
+        var darkSecondaryContainer = Color.Unspecified
+        var darkTertiaryContainer = Color.Unspecified
 
         composeRule.setContent {
             VerballyTheme(themeMode = AppThemeMode.LIGHT) {
+                lightPrimary = MaterialTheme.colorScheme.primary
                 lightBackground = MaterialTheme.colorScheme.background
+                lightSecondaryContainer = MaterialTheme.colorScheme.secondaryContainer
+                lightTertiaryContainer = MaterialTheme.colorScheme.tertiaryContainer
             }
             VerballyTheme(themeMode = AppThemeMode.DARK) {
                 darkBackground = MaterialTheme.colorScheme.background
+                darkSecondaryContainer = MaterialTheme.colorScheme.secondaryContainer
+                darkTertiaryContainer = MaterialTheme.colorScheme.tertiaryContainer
             }
         }
 
         composeRule.runOnIdle {
-            assertEquals(Color(0xFFF7F9FC), lightBackground)
-            assertEquals(Color(0xFF101318), darkBackground)
+            assertEquals(Color(0xFF14233A), lightPrimary)
+            assertEquals(Color(0xFFF8FAFC), lightBackground)
+            assertEquals(Color(0xFFD6F1EA), lightSecondaryContainer)
+            assertEquals(Color(0xFFEDE7FF), lightTertiaryContainer)
+            assertEquals(Color(0xFF0F1419), darkBackground)
+            assertEquals(Color(0xFF234E48), darkSecondaryContainer)
+            assertEquals(Color(0xFF564A88), darkTertiaryContainer)
         }
     }
 
     @Test
-    fun historyScreenConfirmsBeforeClearingHistory() {
+    fun historyScreenClearsHistoryFromOverflowMenuWithConfirmation() {
         var clearClicked = false
         val entries = listOf(
             DictationHistoryEntry(
@@ -166,6 +183,25 @@ class MainActivitySettingsScreenTest {
             }
         }
 
+        composeRule.onAllNodesWithText("清空歷史")
+            .assertCountEquals(0)
+        val titleCenterY = composeRule.onNodeWithText("歷史")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .center
+            .y
+        val menuCenterY = composeRule.onNodeWithContentDescription("歷史選單")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .center
+            .y
+        assertTrue(
+            "History overflow should align with the title center: title=$titleCenterY menu=$menuCenterY",
+            abs(titleCenterY - menuCenterY) <= 4f,
+        )
+        composeRule.onNodeWithContentDescription("歷史選單")
+            .assertIsDisplayed()
+            .performClick()
         composeRule.onNodeWithText("清空歷史")
             .assertIsDisplayed()
             .performClick()
@@ -178,6 +214,8 @@ class MainActivitySettingsScreenTest {
             .performClick()
 
         assertFalse(clearClicked)
+        composeRule.onNodeWithContentDescription("歷史選單")
+            .performClick()
         composeRule.onNodeWithText("清空歷史")
             .performClick()
         composeRule.onNodeWithText("確定刪除")
@@ -259,6 +297,74 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("完成聽寫後，整理好的文字會保存在這裡，最多保留最近 100 筆。")
             .assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("歷史選單")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("清空歷史")
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun historyTitlePositionDoesNotShiftWhenOverflowAppears() {
+        val entries = listOf(
+            DictationHistoryEntry(
+                rawTranscript = "raw",
+                cleanedText = "整理後文字",
+                createdAtMillis = 1L,
+                transcriptionProvider = "OpenAI",
+                transcriptionModel = "gpt-4o-transcribe",
+                cleanupProvider = "OpenAI",
+                cleanupModel = "gpt-test",
+                appLabel = null,
+            ),
+        )
+        var visibleEntries by mutableStateOf(emptyList<DictationHistoryEntry>())
+
+        composeRule.setContent {
+            MaterialTheme {
+                HistoryScreenContent(
+                    query = "",
+                    entries = visibleEntries,
+                    onQueryChange = {},
+                    onClearHistory = {},
+                    onCopy = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        val titleTopWithoutOverflow = composeRule.onNodeWithText("歷史")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .top
+
+        composeRule.runOnIdle {
+            visibleEntries = entries
+        }
+        composeRule.waitForIdle()
+
+        val titleTopWithOverflow = composeRule.onNodeWithText("歷史")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .top
+        val menuCenterY = composeRule.onNodeWithContentDescription("歷史選單")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .center
+            .y
+        val titleCenterY = composeRule.onNodeWithText("歷史")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .center
+            .y
+
+        assertTrue(
+            "History title should not move when overflow appears: without=$titleTopWithoutOverflow with=$titleTopWithOverflow",
+            abs(titleTopWithOverflow - titleTopWithoutOverflow) <= 2f,
+        )
+        assertTrue(
+            "History overflow should align with the title center: title=$titleCenterY menu=$menuCenterY",
+            abs(titleCenterY - menuCenterY) <= 4f,
+        )
     }
 
     @Test
@@ -287,7 +393,7 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.onAllNodesWithText("OpenAI: gpt-4o-mini-transcribe")
-            .assertCountEquals(2)
+            .assertCountEquals(1)
         composeRule.onNodeWithText("OpenAI: gpt-4o-transcribe")
             .assertIsDisplayed()
         composeRule.onNodeWithText("Soniox: Soniox Realtime")
@@ -308,7 +414,7 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.onAllNodesWithText("OpenAI: gpt-5.4-nano")
-            .assertCountEquals(2)
+            .assertCountEquals(1)
         composeRule.onNodeWithText("OpenAI: gpt-5.4-mini")
             .assertIsDisplayed()
         composeRule.onNodeWithText("OpenAI: gpt-5.5")
@@ -347,6 +453,76 @@ class MainActivitySettingsScreenTest {
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("OpenAI API Key、轉錄模型")
             .assertCountEquals(0)
+    }
+
+    @Test
+    fun modelDropdownKeepsTrailingArrowSeparateFromLongModelName() {
+        composeRule.setContent {
+            MaterialTheme {
+                SettingsScreenContent(
+                    settings = AppSettings(),
+                    onSettingsChange = {},
+                    onSave = {},
+                )
+            }
+        }
+
+        val fieldBounds = composeRule.onNodeWithContentDescription("選擇 語音轉錄模型")
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val modelBounds = composeRule.onNodeWithText(
+            "gpt-4o-mini-transcribe",
+            useUnmergedTree = true,
+        )
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val arrowBounds = composeRule.onNodeWithContentDescription(
+            "語音轉錄模型 展開箭頭",
+            useUnmergedTree = true,
+        )
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        assertTrue(
+            "Model text should leave room before the trailing arrow: model=$modelBounds arrow=$arrowBounds",
+            modelBounds.right <= arrowBounds.left - 8f,
+        )
+        assertTrue(
+            "Dropdown arrow should align to the field center: field=$fieldBounds arrow=$arrowBounds",
+            abs(fieldBounds.center.y - arrowBounds.center.y) <= 2f,
+        )
+    }
+
+    @Test
+    fun modelDropdownSeparatesProviderAndModelNameWithBreathingRoom() {
+        composeRule.setContent {
+            MaterialTheme {
+                SettingsScreenContent(
+                    settings = AppSettings(),
+                    onSettingsChange = {},
+                    onSave = {},
+                )
+            }
+        }
+
+        val modelBounds = composeRule.onNodeWithText(
+            "gpt-4o-mini-transcribe",
+            useUnmergedTree = true,
+        )
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val providerBounds = composeRule.onAllNodesWithText(
+            "OpenAI",
+            useUnmergedTree = true,
+        )
+            .fetchSemanticsNodes()
+            .map { it.boundsInRoot }
+            .first { it.bottom <= modelBounds.top }
+
+        assertTrue(
+            "Provider and model name should have enough breathing room: provider=$providerBounds model=$modelBounds",
+            providerBounds.bottom <= modelBounds.top - 5f,
+        )
     }
 
     @Test
@@ -598,11 +774,29 @@ class MainActivitySettingsScreenTest {
             .assertCountEquals(0)
         composeRule.onNodeWithContentDescription("開啟選單")
             .performClick()
-        composeRule.onNodeWithText("選單")
+        composeRule.onNodeWithText("管理與支援")
+            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("選單")
+            .assertCountEquals(0)
+        composeRule.onNodeWithText("應用程式")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("設定選單項目")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("外觀與 App 偏好")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("支援")
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("權限與疑難排解選單項目")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("權限與疑難排解")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("錄音、浮動視窗與輔助使用")
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("Permission Setup")
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("Settings")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("API 與偏好")
             .assertCountEquals(0)
         composeRule.onNodeWithText("設定")
             .assertIsDisplayed()
@@ -613,6 +807,39 @@ class MainActivitySettingsScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("外觀模式")
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun drawerPermissionSupportOpensPermissionSetup() {
+        var openedPermissions = false
+
+        composeRule.setContent {
+            MaterialTheme {
+                VerballyAppScaffold(
+                    permissionsReady = true,
+                    showingSettings = false,
+                    selectedDestination = AppDestination.HOME,
+                    onDestinationSelected = {},
+                    onOpenSettings = {},
+                    onOpenPermissions = { openedPermissions = true },
+                    homeContent = {},
+                    dictionaryContent = {},
+                    snippetsContent = {},
+                    historyContent = {},
+                    styleContent = {},
+                    settingsContent = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("開啟選單")
+            .performClick()
+        composeRule.onNodeWithText("權限與疑難排解")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { openedPermissions }
+        assertTrue(openedPermissions)
     }
 
     @Test
@@ -642,6 +869,28 @@ class MainActivitySettingsScreenTest {
             .performClick()
 
         assertTrue(openedPermissions)
+    }
+
+    @Test
+    fun drawerPermissionSupportStaysOpenWhenPermissionsAreAlreadyComplete() {
+        assertFalse(
+            shouldDismissPermissionScreenOnPermissionRefresh(
+                openReason = PermissionScreenOpenReason.SUPPORT,
+                permissionsReady = true,
+            ),
+        )
+        assertTrue(
+            shouldDismissPermissionScreenOnPermissionRefresh(
+                openReason = PermissionScreenOpenReason.REQUIRED_SETUP,
+                permissionsReady = true,
+            ),
+        )
+        assertFalse(
+            shouldDismissPermissionScreenOnPermissionRefresh(
+                openReason = PermissionScreenOpenReason.REQUIRED_SETUP,
+                permissionsReady = false,
+            ),
+        )
     }
 
     @Test
