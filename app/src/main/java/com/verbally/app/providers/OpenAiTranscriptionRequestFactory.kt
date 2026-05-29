@@ -71,6 +71,60 @@ class OpenAiCleanupRequestFactory(
     }
 }
 
+class GroqTranscriptionRequestFactory(
+    private val baseUrl: String = "https://api.groq.com/openai",
+) {
+    fun create(
+        apiKey: String,
+        model: String,
+        audioFile: File,
+    ): Request {
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("model", model)
+            .addFormDataPart(
+                name = "file",
+                filename = audioFile.name,
+                body = audioFile.asRequestBody(mediaTypeFor(audioFile).toMediaType()),
+            )
+            .addFormDataPart("response_format", "json")
+            .build()
+
+        return Request.Builder()
+            .url("${baseUrl.trimEnd('/')}/v1/audio/transcriptions")
+            .header("Authorization", "Bearer $apiKey")
+            .post(body)
+            .build()
+    }
+}
+
+class DeepgramTranscriptionRequestFactory(
+    private val baseUrl: String = "https://api.deepgram.com",
+) {
+    fun create(
+        apiKey: String,
+        model: String,
+        audioFile: File,
+    ): Request {
+        return Request.Builder()
+            .url("${baseUrl.trimEnd('/')}/v1/listen?model=${escapeJson(model)}&language=multi&smart_format=true")
+            .header("Authorization", "Token $apiKey")
+            .post(audioFile.asRequestBody(mediaTypeFor(audioFile).toMediaType()))
+            .build()
+    }
+}
+
+class SonioxRealtimeConfigFactory {
+    fun create(apiKey: String, model: String): String =
+        "{" +
+            "\"api_key\":${jsonString(apiKey)}," +
+            "\"model\":${jsonString(model)}," +
+            "\"audio_format\":\"auto\"," +
+            "\"enable_language_identification\":true," +
+            "\"enable_endpoint_detection\":true" +
+            "}"
+}
+
 internal fun jsonString(value: String): String = buildString {
     append('"')
     value.forEach { char ->
@@ -88,7 +142,7 @@ internal fun jsonString(value: String): String = buildString {
 
 internal fun escapeJson(value: String): String = jsonString(value).removeSurrounding("\"")
 
-private fun mediaTypeFor(file: File): String = when (file.extension.lowercase()) {
+internal fun mediaTypeFor(file: File): String = when (file.extension.lowercase()) {
     "m4a" -> "audio/mp4"
     "mp3" -> "audio/mpeg"
     "webm" -> "audio/webm"

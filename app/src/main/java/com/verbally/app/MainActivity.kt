@@ -98,6 +98,13 @@ import com.verbally.app.permissions.PermissionSetupStep
 import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
+import com.verbally.app.settings.ModelOptions
+import com.verbally.app.settings.TranscriptionProvider
+import com.verbally.app.settings.cleanupModelOptionLabel
+import com.verbally.app.settings.normalizedModelChoices
+import com.verbally.app.settings.transcriptionModelOptionLabel
+import com.verbally.app.settings.withCleanupModelOption
+import com.verbally.app.settings.withTranscriptionModelOption
 import com.verbally.app.snippets.SnippetEntry
 import com.verbally.app.style.AppStyleProfile
 import com.verbally.app.style.OutputStyle
@@ -115,19 +122,6 @@ private val ScreenHorizontalPadding = 24.dp
 private val ScreenVerticalPadding = 12.dp
 private val FormFieldHeight = 56.dp
 private val PrimaryActionHeight = 52.dp
-private val TranscriptionModelOptions = listOf(
-    "gpt-4o-transcribe",
-    "gpt-4o-mini-transcribe",
-)
-private val OpenAiCleanupModelOptions = listOf(
-    "gpt-5.4-nano",
-    "gpt-5.4-mini",
-)
-private val GeminiCleanupModelOptions = listOf(
-    "gemini-3.1-flash-lite",
-)
-private val CleanupModelOptions = OpenAiCleanupModelOptions.map { "OpenAI: $it" } +
-    GeminiCleanupModelOptions.map { "Gemini: $it" }
 
 private val VerballyColorScheme = lightColorScheme(
     primary = VerballyBrandBlue,
@@ -1054,12 +1048,31 @@ private fun TranscriptionSettingsFields(
 ) {
     DropdownField(
         label = "語音轉錄模型",
-        selectedValue = settings.transcriptionModel,
-        options = TranscriptionModelOptions,
-        onSelected = { onSettingsChange(settings.copy(transcriptionModel = it)) },
+        selectedValue = settings.transcriptionModelOptionLabel,
+        options = ModelOptions.TranscriptionOptions.map { it.label },
+        onSelected = { onSettingsChange(settings.withTranscriptionModelOption(it)) },
     )
-    SecretField("API Key", settings.openAiApiKey) {
-        onSettingsChange(settings.copy(openAiApiKey = it))
+    when (settings.transcriptionProvider) {
+        TranscriptionProvider.OPENAI -> {
+            SecretField("API Key", settings.openAiApiKey) {
+                onSettingsChange(settings.copy(openAiApiKey = it))
+            }
+        }
+        TranscriptionProvider.SONIOX -> {
+            SecretField("API Key", settings.sonioxApiKey) {
+                onSettingsChange(settings.copy(sonioxApiKey = it))
+            }
+        }
+        TranscriptionProvider.GROQ -> {
+            SecretField("API Key", settings.groqApiKey) {
+                onSettingsChange(settings.copy(groqApiKey = it))
+            }
+        }
+        TranscriptionProvider.DEEPGRAM -> {
+            SecretField("API Key", settings.deepgramApiKey) {
+                onSettingsChange(settings.copy(deepgramApiKey = it))
+            }
+        }
     }
 }
 
@@ -1071,7 +1084,7 @@ private fun CleanupSettingsFields(
     DropdownField(
         label = "文字處理模型",
         selectedValue = settings.cleanupModelOptionLabel,
-        options = CleanupModelOptions,
+        options = ModelOptions.CleanupOptions.map { it.label },
         onSelected = { onSettingsChange(settings.withCleanupModelOption(it)) },
     )
     when (settings.cleanupProvider) {
@@ -2107,44 +2120,6 @@ private fun HistoryItem(
                 TextButton(onClick = onDelete) { Text("刪除") }
             }
         }
-    }
-}
-
-private val CleanupProvider.label: String
-    get() = when (this) {
-        CleanupProvider.OPENAI -> "OpenAI"
-        CleanupProvider.GEMINI -> "Gemini"
-    }
-
-private fun AppSettings.normalizedModelChoices(): AppSettings = copy(
-    transcriptionModel = transcriptionModel.takeIf { it in TranscriptionModelOptions }
-        ?: TranscriptionModelOptions.first(),
-    openAiCleanupModel = openAiCleanupModel.takeIf { it in OpenAiCleanupModelOptions }
-        ?: OpenAiCleanupModelOptions.first(),
-    geminiCleanupModel = geminiCleanupModel.takeIf { it in GeminiCleanupModelOptions }
-        ?: GeminiCleanupModelOptions.first(),
-    cleanupPrompt = cleanupPrompt.ifBlank { CleanupPromptFactory.defaultCleanupPrompt },
-)
-
-private val AppSettings.cleanupModelOptionLabel: String
-    get() = when (cleanupProvider) {
-        CleanupProvider.OPENAI -> "OpenAI: $openAiCleanupModel"
-        CleanupProvider.GEMINI -> "Gemini: $geminiCleanupModel"
-    }.takeIf { it in CleanupModelOptions } ?: CleanupModelOptions.first()
-
-private fun AppSettings.withCleanupModelOption(option: String): AppSettings {
-    val parts = option.split(": ", limit = 2)
-    if (parts.size != 2) return this
-    return when (parts[0]) {
-        CleanupProvider.OPENAI.label -> copy(
-            cleanupProvider = CleanupProvider.OPENAI,
-            openAiCleanupModel = parts[1],
-        )
-        CleanupProvider.GEMINI.label -> copy(
-            cleanupProvider = CleanupProvider.GEMINI,
-            geminiCleanupModel = parts[1],
-        )
-        else -> this
     }
 }
 

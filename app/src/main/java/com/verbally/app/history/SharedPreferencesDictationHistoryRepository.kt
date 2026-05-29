@@ -24,14 +24,16 @@ class SharedPreferencesDictationHistoryRepository(
             buildList {
                 for (index in 0 until array.length()) {
                     val item = array.getJSONObject(index)
+                    val legacyProvider = item.optString("provider").ifBlank { "openai" }
                     add(
                         DictationHistoryEntry(
                             id = item.getLong("id"),
                             rawTranscript = item.getString("rawTranscript"),
                             cleanedText = item.getString("cleanedText"),
                             createdAtMillis = item.getLong("createdAtMillis"),
-                            provider = item.getString("provider"),
+                            transcriptionProvider = item.optString("transcriptionProvider").ifBlank { "openai" },
                             transcriptionModel = item.getString("transcriptionModel"),
+                            cleanupProvider = item.optString("cleanupProvider").ifBlank { legacyProvider },
                             cleanupModel = item.getString("cleanupModel"),
                             appLabel = item.optString("appLabel").ifBlank { null },
                         ),
@@ -67,8 +69,10 @@ class SharedPreferencesDictationHistoryRepository(
                     .put("rawTranscript", entry.rawTranscript)
                     .put("cleanedText", entry.cleanedText)
                     .put("createdAtMillis", entry.createdAtMillis)
-                    .put("provider", entry.provider)
+                    .put("provider", entry.cleanupProvider)
+                    .put("transcriptionProvider", entry.transcriptionProvider)
                     .put("transcriptionModel", entry.transcriptionModel)
+                    .put("cleanupProvider", entry.cleanupProvider)
                     .put("cleanupModel", entry.cleanupModel)
                     .put("appLabel", entry.appLabel.orEmpty()),
             )

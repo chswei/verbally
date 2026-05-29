@@ -3,9 +3,13 @@ package com.verbally.app
 import android.app.Application
 import com.verbally.app.dictionary.SharedPreferencesDictionaryRepository
 import com.verbally.app.history.SharedPreferencesDictationHistoryRepository
+import com.verbally.app.providers.DeepgramTranscriptionClient
 import com.verbally.app.providers.GeminiTextCleanupClient
+import com.verbally.app.providers.GroqTranscriptionClient
 import com.verbally.app.providers.OpenAiTextCleanupClient
 import com.verbally.app.providers.OpenAiTranscriptionClient
+import com.verbally.app.providers.SonioxRealtimeTranscriptionClient
+import com.verbally.app.providers.TranscriptionClientRouter
 import com.verbally.app.settings.EncryptedSettingsRepository
 import com.verbally.app.snippets.SharedPreferencesSnippetRepository
 import com.verbally.app.style.SharedPreferencesAppStyleProfileRepository
@@ -26,7 +30,12 @@ class VerballyContainer(application: Application) {
     val dictionaryRepository = SharedPreferencesDictionaryRepository(application)
     val snippetRepository = SharedPreferencesSnippetRepository(application)
     val styleProfileRepository = SharedPreferencesAppStyleProfileRepository(application)
-    val transcriptionClient = OpenAiTranscriptionClient()
+    val transcriptionRouter = TranscriptionClientRouter(
+        openAiClient = OpenAiTranscriptionClient(),
+        sonioxClient = SonioxRealtimeTranscriptionClient(),
+        groqClient = GroqTranscriptionClient(),
+        deepgramClient = DeepgramTranscriptionClient(),
+    )
     val openAiCleanupClient = OpenAiTextCleanupClient()
     val geminiCleanupClient = GeminiTextCleanupClient()
 }

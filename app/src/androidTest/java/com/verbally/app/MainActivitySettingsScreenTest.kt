@@ -22,6 +22,7 @@ import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.providers.CleanupPromptFactory
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
+import com.verbally.app.settings.TranscriptionProvider
 import com.verbally.app.snippets.SnippetEntry
 import com.verbally.app.style.AppCategory
 import com.verbally.app.style.AppStyleProfile
@@ -81,8 +82,9 @@ class MainActivitySettingsScreenTest {
                 rawTranscript = "raw",
                 cleanedText = "整理後文字",
                 createdAtMillis = 1L,
-                provider = "OpenAI",
+                transcriptionProvider = "OpenAI",
                 transcriptionModel = "gpt-4o-transcribe",
+                cleanupProvider = "OpenAI",
                 cleanupModel = "gpt-test",
                 appLabel = null,
             ),
@@ -128,8 +130,9 @@ class MainActivitySettingsScreenTest {
                 rawTranscript = "raw 1",
                 cleanedText = "第一筆",
                 createdAtMillis = 1L,
-                provider = "OpenAI",
+                transcriptionProvider = "OpenAI",
                 transcriptionModel = "gpt-4o-transcribe",
+                cleanupProvider = "OpenAI",
                 cleanupModel = "gpt-test",
                 appLabel = null,
             ),
@@ -137,8 +140,9 @@ class MainActivitySettingsScreenTest {
                 rawTranscript = "raw 2",
                 cleanedText = "第二筆",
                 createdAtMillis = 2L,
-                provider = "Gemini",
+                transcriptionProvider = "OpenAI",
                 transcriptionModel = "gpt-4o-transcribe",
+                cleanupProvider = "Gemini",
                 cleanupModel = "gemini-test",
                 appLabel = null,
             ),
@@ -219,14 +223,19 @@ class MainActivitySettingsScreenTest {
         composeRule.onNodeWithContentDescription("選擇 語音轉錄模型")
             .assertIsDisplayed()
             .performClick()
-        composeRule.onNodeWithText("gpt-4o-mini-transcribe")
+        composeRule.onNodeWithText("OpenAI: gpt-4o-mini-transcribe")
             .assertIsDisplayed()
-            .performClick()
-        composeRule.onNodeWithContentDescription("選擇 語音轉錄模型")
-            .performClick()
+        composeRule.onNodeWithText("OpenAI: gpt-4o-transcribe")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Soniox: Soniox Realtime")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Groq: whisper-large-v3-turbo")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Deepgram: Real-time Nova-3 (多語言)")
+            .assertIsDisplayed()
         composeRule.onAllNodesWithText("whisper-1")
             .assertCountEquals(0)
-        composeRule.onNodeWithText("gpt-4o-mini-transcribe")
+        composeRule.onNodeWithText("OpenAI: gpt-4o-mini-transcribe")
             .performClick()
         composeRule.onNodeWithText("文字處理模型")
             .assertIsDisplayed()
@@ -237,7 +246,11 @@ class MainActivitySettingsScreenTest {
             .assertCountEquals(2)
         composeRule.onNodeWithText("OpenAI: gpt-5.4-mini")
             .assertIsDisplayed()
+        composeRule.onNodeWithText("OpenAI: gpt-5.5")
+            .assertIsDisplayed()
         composeRule.onNodeWithText("Gemini: gemini-3.1-flash-lite")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Gemini: gemini-3.1-pro-preview")
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("gpt-5-mini")
             .assertCountEquals(0)
@@ -291,6 +304,34 @@ class MainActivitySettingsScreenTest {
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("OpenAI 轉錄模型")
             .assertCountEquals(0)
+    }
+
+    @Test
+    fun transcriptionProviderSelectionSwitchesVisibleKeyField() {
+        var settings by mutableStateOf(AppSettings(openAiApiKey = "openai-key"))
+        composeRule.setContent {
+            MaterialTheme {
+                TranscriptionSettingsScreenContent(
+                    settings = settings,
+                    onSettingsChange = { settings = it },
+                    onSave = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("選擇 語音轉錄模型")
+            .performClick()
+        composeRule.onNodeWithText("Groq: whisper-large-v3-turbo")
+            .performClick()
+        composeRule.onNodeWithText("API Key")
+            .performTextInput("groq-key")
+
+        composeRule.runOnIdle {
+            assertEquals(TranscriptionProvider.GROQ, settings.transcriptionProvider)
+            assertEquals("whisper-large-v3-turbo", settings.transcriptionModel)
+            assertEquals("openai-key", settings.openAiApiKey)
+            assertEquals("groq-key", settings.groqApiKey)
+        }
     }
 
     @Test

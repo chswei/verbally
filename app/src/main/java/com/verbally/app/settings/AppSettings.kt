@@ -10,8 +10,12 @@ enum class CleanupProvider {
 data class AppSettings(
     val openAiApiKey: String = "",
     val geminiApiKey: String = "",
+    val sonioxApiKey: String = "",
+    val groqApiKey: String = "",
+    val deepgramApiKey: String = "",
+    val transcriptionProvider: TranscriptionProvider = TranscriptionProvider.OPENAI,
     val cleanupProvider: CleanupProvider = CleanupProvider.OPENAI,
-    val transcriptionModel: String = "gpt-4o-transcribe",
+    val transcriptionModel: String = "gpt-4o-mini-transcribe",
     val openAiCleanupModel: String = "gpt-5.4-nano",
     val geminiCleanupModel: String = "gemini-3.1-flash-lite",
     val cleanupPrompt: String = CleanupPromptFactory.defaultCleanupPrompt,

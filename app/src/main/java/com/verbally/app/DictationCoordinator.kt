@@ -8,6 +8,7 @@ import com.verbally.app.insertion.ClipboardPasteInserter
 import com.verbally.app.insertion.InsertResult
 import com.verbally.app.providers.TextCleanupClient
 import com.verbally.app.providers.TranscriptionClient
+import com.verbally.app.providers.TranscriptionClientRouter
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.SettingsRepository
 import com.verbally.app.snippets.SnippetExpander
@@ -24,11 +25,35 @@ class DictationCoordinator(
     private val snippetRepository: SnippetRepository,
     private val styleProfileRepository: AppStyleProfileRepository,
     private val audioRecorder: AudioRecorder,
-    private val transcriptionClient: TranscriptionClient,
+    private val transcriptionRouter: TranscriptionClientRouter,
     private val openAiCleanupClient: TextCleanupClient,
     private val geminiCleanupClient: TextCleanupClient,
     private val insertionFactory: () -> ClipboardPasteInserter,
 ) {
+    constructor(
+        settingsRepository: SettingsRepository,
+        historyRepository: DictationHistoryRepository,
+        dictionaryRepository: DictionaryRepository,
+        snippetRepository: SnippetRepository,
+        styleProfileRepository: AppStyleProfileRepository,
+        audioRecorder: AudioRecorder,
+        transcriptionClient: TranscriptionClient,
+        openAiCleanupClient: TextCleanupClient,
+        geminiCleanupClient: TextCleanupClient,
+        insertionFactory: () -> ClipboardPasteInserter,
+    ) : this(
+        settingsRepository = settingsRepository,
+        historyRepository = historyRepository,
+        dictionaryRepository = dictionaryRepository,
+        snippetRepository = snippetRepository,
+        styleProfileRepository = styleProfileRepository,
+        audioRecorder = audioRecorder,
+        transcriptionRouter = TranscriptionClientRouter.single(transcriptionClient),
+        openAiCleanupClient = openAiCleanupClient,
+        geminiCleanupClient = geminiCleanupClient,
+        insertionFactory = insertionFactory,
+    )
+
     private var currentRecording: File? = null
 
     fun startRecording() {
@@ -56,11 +81,7 @@ class DictationCoordinator(
                 category = appCategory,
                 style = styleProfileRepository.styleFor(appCategory),
             )
-            val raw = transcriptionClient.transcribe(
-                apiKey = settings.openAiApiKey,
-                model = settings.transcriptionModel,
-                audioFile = audioFile,
-            )
+            val raw = transcriptionRouter.transcribe(settings, audioFile)
             val cleaned = when (settings.cleanupProvider) {
                 CleanupProvider.OPENAI -> openAiCleanupClient.clean(
                     apiKey = settings.openAiApiKey,
@@ -86,8 +107,9 @@ class DictationCoordinator(
                     rawTranscript = raw.text,
                     cleanedText = expandedText,
                     createdAtMillis = System.currentTimeMillis(),
-                    provider = cleaned.provider,
+                    transcriptionProvider = raw.provider,
                     transcriptionModel = raw.model,
+                    cleanupProvider = cleaned.provider,
                     cleanupModel = cleaned.model,
                     appLabel = appLabel,
                 ),

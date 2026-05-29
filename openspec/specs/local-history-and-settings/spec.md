@@ -4,7 +4,7 @@
 TBD - created by archiving change add-android-floating-dictation. Update Purpose after archive.
 ## Requirements
 ### Requirement: Provider keys are stored locally and encrypted
-The system SHALL store OpenAI and Gemini API keys locally using Android encrypted storage and SHALL NOT send keys to any service other than the selected provider. The Home settings UI SHALL separate transcription API setup from text-processing setup as inline blocks.
+The system SHALL store OpenAI, Gemini, Soniox, Groq, and Deepgram API keys locally using Android encrypted storage and SHALL NOT send keys to any service other than the selected provider. The Home settings UI SHALL separate transcription API setup from text-processing setup as inline blocks.
 
 #### Scenario: User opens home
 - **WHEN** the user opens the Home destination
@@ -12,7 +12,8 @@ The system SHALL store OpenAI and Gemini API keys locally using Android encrypte
 
 #### Scenario: User edits transcription settings
 - **WHEN** the user views the voice transcription block
-- **THEN** the system shows a transcription model dropdown followed by a generic API Key input inline
+- **THEN** the system shows a transcription model dropdown whose five options include provider names
+- **THEN** the system shows only the generic API Key input for the provider implied by the selected transcription model
 
 #### Scenario: User edits text processing settings
 - **WHEN** the user views the text processing block
@@ -27,11 +28,11 @@ The system SHALL store dictation history locally and retain at most the latest 1
 - **THEN** the system deletes the oldest entries until only 100 remain
 
 ### Requirement: History entries preserve useful recovery data
-The system SHALL store raw transcript, cleaned text, timestamp, provider metadata, model metadata, and app label when available for each history entry.
+The system SHALL store raw transcript, cleaned text, timestamp, transcription provider/model metadata, cleanup provider/model metadata, and app label when available for each history entry.
 
 #### Scenario: Dictation processing succeeds
 - **WHEN** cleaned text is produced
-- **THEN** the system saves a history entry with raw transcript, cleaned text, timestamp, provider/model metadata, and optional app label
+- **THEN** the system saves a history entry with raw transcript, cleaned text, timestamp, transcription provider/model metadata, cleanup provider/model metadata, and optional app label
 
 ### Requirement: History can be searched and reused
 The system SHALL allow the user to access history from bottom navigation, search, copy, re-paste, delete one entry, and clear all history entries after confirmation.
