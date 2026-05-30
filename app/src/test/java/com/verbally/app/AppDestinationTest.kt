@@ -7,8 +7,14 @@ class AppDestinationTest {
     @Test
     fun bottomNavigationKeepsHistoryRightmost() {
         assertEquals(
-            listOf("首頁", "字典", "片段", "語氣", "歷史"),
-            AppDestination.entries.map { it.label },
+            listOf(
+                R.string.nav_home,
+                R.string.nav_dictionary,
+                R.string.nav_snippets,
+                R.string.nav_style,
+                R.string.nav_history,
+            ),
+            AppDestination.entries.map { it.labelRes },
         )
     }
 }

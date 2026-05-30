@@ -1,6 +1,7 @@
 package com.verbally.app.system
 
 import android.accessibilityservice.AccessibilityService
+import android.app.LocaleManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -12,6 +13,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.verbally.app.DictationCoordinator
+import com.verbally.app.R
 import com.verbally.app.VerballyApplication
 import com.verbally.app.audio.TemporaryAudioRecorder
 import com.verbally.app.insertion.AccessibilityTextInsertionTarget
@@ -19,6 +21,7 @@ import com.verbally.app.insertion.AndroidClipboardGateway
 import com.verbally.app.insertion.ClipboardPasteInserter
 import com.verbally.app.overlay.FloatingDictationOverlay
 import com.verbally.app.overlay.LiveWaveformLevelSmoother
+import com.verbally.app.settings.AppLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -43,14 +46,19 @@ class VerballyAccessibilityService : AccessibilityService() {
             dictionaryRepository = container.dictionaryRepository,
             snippetRepository = container.snippetRepository,
             styleProfileRepository = container.styleProfileRepository,
+            styleRuleRepository = container.styleRuleRepository,
             audioRecorder = TemporaryAudioRecorder(this),
             transcriptionRouter = container.transcriptionRouter,
             openAiCleanupClient = container.openAiCleanupClient,
             geminiCleanupClient = container.geminiCleanupClient,
+            noRecordingMessage = getString(R.string.error_no_recording),
+            defaultPromptLanguageFor = { language -> defaultPromptLanguageFor(language) },
             insertionFactory = {
                 ClipboardPasteInserter(
                     clipboard = AndroidClipboardGateway(this),
                     directTextTarget = AccessibilityTextInsertionTarget(this),
+                    directInsertMessage = getString(R.string.insert_success),
+                    clipboardFallbackMessage = getString(R.string.insert_clipboard_fallback),
                 )
             },
         )
@@ -113,6 +121,12 @@ class VerballyAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
+    private fun defaultPromptLanguageFor(language: AppLanguage): AppLanguage =
+        AppLanguage.defaultPromptLanguageFor(
+            selectedInterfaceLanguage = language,
+            systemLanguageTag = getSystemService(LocaleManager::class.java).systemLocales[0]?.toLanguageTag(),
+        )
+
     private fun processRecording() {
         scope.launch {
             runCatching { coordinator.confirmRecording(appLabel) }
@@ -120,7 +134,7 @@ class VerballyAccessibilityService : AccessibilityService() {
                     overlay?.completeProcessing(result.message)
                 }
                 .onFailure { error ->
-                    overlay?.completeProcessing(error.message ?: "發生錯誤")
+                    overlay?.completeProcessing(error.message ?: getString(R.string.error_generic))
                 }
         }
     }
@@ -163,6 +177,8 @@ class VerballyAccessibilityService : AccessibilityService() {
                     val result = ClipboardPasteInserter(
                         clipboard = AndroidClipboardGateway(this@VerballyAccessibilityService),
                         directTextTarget = AccessibilityTextInsertionTarget(this@VerballyAccessibilityService),
+                        directInsertMessage = getString(R.string.insert_success),
+                        clipboardFallbackMessage = getString(R.string.insert_clipboard_fallback),
                     ).insert(text)
                     Log.d(DEBUG_TAG, "debug insert result=$result")
                 }

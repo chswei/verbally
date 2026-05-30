@@ -150,8 +150,8 @@ class FloatingDictationOverlay(
             ),
             onLeadingTap = { handleCancelTap() },
             onTrailingTap = { handleConfirmTap() },
-            centerContentDescription = "錄音中",
-            trailingContentDescription = "送出錄音",
+            centerContentDescription = context.getString(R.string.overlay_recording),
+            trailingContentDescription = context.getString(R.string.overlay_send_recording),
         )
 
     private fun createProcessingControls(): View =
@@ -168,8 +168,8 @@ class FloatingDictationOverlay(
             ),
             onLeadingTap = null,
             onTrailingTap = null,
-            centerContentDescription = "轉錄處理中",
-            trailingContentDescription = "處理中",
+            centerContentDescription = context.getString(R.string.overlay_processing_transcription),
+            trailingContentDescription = context.getString(R.string.overlay_processing),
         )
 
     private fun createActiveControls(
@@ -190,7 +190,7 @@ class FloatingDictationOverlay(
                 iconRes = R.drawable.ic_verbally_close,
                 iconTint = color(OverlayColorDefaults.ACTIVE_CANCEL_ICON_COLOR_RES),
             ).apply {
-                contentDescription = "取消錄音"
+                contentDescription = context.getString(R.string.overlay_cancel_recording)
                 bindDragAndClick(this, onLeadingTap)
             }
             val centerCapsule = FrameLayout(context).apply {
@@ -444,9 +444,9 @@ class FloatingDictationOverlay(
         ).roundToInt()
 
     private fun contentDescriptionFor(state: OverlayUiState): String = when (state) {
-        OverlayUiState.READY -> "開始聽寫"
-        OverlayUiState.RECORDING -> "錄音中"
-        OverlayUiState.PROCESSING -> "處理中"
+        OverlayUiState.READY -> context.getString(R.string.overlay_start_dictation)
+        OverlayUiState.RECORDING -> context.getString(R.string.overlay_recording)
+        OverlayUiState.PROCESSING -> context.getString(R.string.overlay_processing)
     }
 
     private inner class DragTouchListener(

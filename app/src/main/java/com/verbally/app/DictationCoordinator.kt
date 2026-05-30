@@ -10,12 +10,17 @@ import com.verbally.app.providers.TextCleanupClient
 import com.verbally.app.providers.TranscriptionClient
 import com.verbally.app.providers.TranscriptionClientRouter
 import com.verbally.app.settings.CleanupProvider
+import com.verbally.app.settings.AppLanguage
 import com.verbally.app.settings.SettingsRepository
+import com.verbally.app.settings.withDefaultCleanupPromptLanguage
 import com.verbally.app.snippets.SnippetExpander
 import com.verbally.app.snippets.SnippetRepository
 import com.verbally.app.style.AppCategoryClassifier
+import com.verbally.app.style.AppStyleRuleRepository
 import com.verbally.app.style.AppStyleProfileRepository
 import com.verbally.app.style.CleanupStyleContext
+import com.verbally.app.style.InMemoryAppStyleRuleRepository
+import com.verbally.app.style.normalizedStyleRuleLanguage
 import java.io.File
 
 class DictationCoordinator(
@@ -24,11 +29,16 @@ class DictationCoordinator(
     private val dictionaryRepository: DictionaryRepository,
     private val snippetRepository: SnippetRepository,
     private val styleProfileRepository: AppStyleProfileRepository,
+    private val styleRuleRepository: AppStyleRuleRepository = InMemoryAppStyleRuleRepository(),
     private val audioRecorder: AudioRecorder,
     private val transcriptionRouter: TranscriptionClientRouter,
     private val openAiCleanupClient: TextCleanupClient,
     private val geminiCleanupClient: TextCleanupClient,
     private val insertionFactory: () -> ClipboardPasteInserter,
+    private val noRecordingMessage: String = "沒有可處理的錄音。",
+    private val defaultPromptLanguageFor: (AppLanguage) -> AppLanguage = { language ->
+        if (language == AppLanguage.SYSTEM) AppLanguage.TRADITIONAL_CHINESE else language
+    },
 ) {
     constructor(
         settingsRepository: SettingsRepository,
@@ -36,22 +46,30 @@ class DictationCoordinator(
         dictionaryRepository: DictionaryRepository,
         snippetRepository: SnippetRepository,
         styleProfileRepository: AppStyleProfileRepository,
+        styleRuleRepository: AppStyleRuleRepository = InMemoryAppStyleRuleRepository(),
         audioRecorder: AudioRecorder,
         transcriptionClient: TranscriptionClient,
         openAiCleanupClient: TextCleanupClient,
         geminiCleanupClient: TextCleanupClient,
         insertionFactory: () -> ClipboardPasteInserter,
+        noRecordingMessage: String = "沒有可處理的錄音。",
+        defaultPromptLanguageFor: (AppLanguage) -> AppLanguage = { language ->
+            if (language == AppLanguage.SYSTEM) AppLanguage.TRADITIONAL_CHINESE else language
+        },
     ) : this(
         settingsRepository = settingsRepository,
         historyRepository = historyRepository,
         dictionaryRepository = dictionaryRepository,
         snippetRepository = snippetRepository,
         styleProfileRepository = styleProfileRepository,
+        styleRuleRepository = styleRuleRepository,
         audioRecorder = audioRecorder,
         transcriptionRouter = TranscriptionClientRouter.single(transcriptionClient),
         openAiCleanupClient = openAiCleanupClient,
         geminiCleanupClient = geminiCleanupClient,
         insertionFactory = insertionFactory,
+        noRecordingMessage = noRecordingMessage,
+        defaultPromptLanguageFor = defaultPromptLanguageFor,
     )
 
     private var currentRecording: File? = null
@@ -70,16 +88,22 @@ class DictationCoordinator(
     suspend fun confirmRecording(appLabel: String?): InsertResult {
         val audioFile = audioRecorder.stop() ?: currentRecording
         currentRecording = null
-        if (audioFile == null) return InsertResult(false, "沒有可處理的錄音。")
+        if (audioFile == null) return InsertResult(false, noRecordingMessage)
 
         return try {
-            val settings = settingsRepository.load()
+            val storedSettings = settingsRepository.load()
+            val styleRuleLanguage = defaultPromptLanguageFor(storedSettings.interfaceLanguage)
+                .normalizedStyleRuleLanguage()
+            val settings = storedSettings.withDefaultCleanupPromptLanguage(styleRuleLanguage)
             val dictionaryEntries = dictionaryRepository.list()
             val snippetEntries = snippetRepository.list()
             val appCategory = AppCategoryClassifier.classify(appLabel)
+            val outputStyle = styleProfileRepository.styleFor(appCategory)
             val styleContext = CleanupStyleContext(
                 category = appCategory,
-                style = styleProfileRepository.styleFor(appCategory),
+                style = outputStyle,
+                language = styleRuleLanguage,
+                customRule = styleRuleRepository.customRuleFor(styleRuleLanguage, outputStyle),
             )
             val raw = transcriptionRouter.transcribe(settings, audioFile)
             val cleaned = when (settings.cleanupProvider) {

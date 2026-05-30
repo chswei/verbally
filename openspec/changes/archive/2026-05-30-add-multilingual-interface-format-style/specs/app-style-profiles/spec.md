@@ -1,8 +1,5 @@
-# app-style-profiles Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-app-style-profiles. Update Purpose after archive.
-## Requirements
 ### Requirement: App style profiles define category defaults
 The system SHALL maintain local style settings for `聊天`, `工作`, and `其他`, each set to either Formal or Casual, where Formal and Casual only select output formatting behavior and do not authorize rewriting the cleaned text.
 
@@ -22,21 +19,6 @@ The system SHALL maintain local style settings for `聊天`, `工作`, and `其�
 - **THEN** Formal or Casual may affect punctuation, spacing, capitalization, and language-required writing conventions
 - **THEN** Formal or Casual must not ask the model to rewrite, shorten, translate, replace words, or change the user's tone
 
-### Requirement: Foreground apps are classified into style categories
-The system SHALL classify the active editable app into `聊天`, `工作`, or `其他` before cleanup.
-
-#### Scenario: Known chat app is active
-- **WHEN** the active editable app is a known chat app
-- **THEN** the system classifies it as `聊天`
-
-#### Scenario: Known work app is active
-- **WHEN** the active editable app is a known work or productivity app
-- **THEN** the system classifies it as `工作`
-
-#### Scenario: Unknown app is active
-- **WHEN** the active editable app is unknown or unavailable
-- **THEN** the system classifies it as `其他`
-
 ### Requirement: Style profiles are editable from the main app
 The system SHALL expose `語氣` as a localized main app page for choosing Formal or Casual output format per category.
 
@@ -50,6 +32,8 @@ The system SHALL expose `語氣` as a localized main app page for choosing Forma
 - **WHEN** the user changes a category between Formal and Casual
 - **THEN** the selected value is saved
 - **THEN** the page reflects the updated value
+
+## ADDED Requirements
 
 ### Requirement: Style rules are customizable per language and output style
 The system SHALL allow users to customize the Formal and Casual rule text used by the style layer, scoped to a specific interface language and output style, without replacing the basic text-processing prompt.
@@ -74,4 +58,3 @@ The system SHALL allow users to customize the Formal and Casual rule text used b
 - **WHEN** the user restores a custom Formal or Casual rule to default
 - **THEN** the custom rule for that language and output style is removed
 - **AND** future cleanup uses the built-in default rule for that language and output style
-

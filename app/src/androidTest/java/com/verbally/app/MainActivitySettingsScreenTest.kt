@@ -1,11 +1,14 @@
 package com.verbally.app
 
+import android.app.LocaleManager
+import android.os.LocaleList
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasSetTextAction
@@ -18,12 +21,15 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import com.verbally.app.dictionary.DictionaryEntry
 import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.providers.CleanupPromptFactory
+import com.verbally.app.settings.AppLanguage
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.AppThemeMode
 import com.verbally.app.settings.CleanupProvider
@@ -31,18 +37,29 @@ import com.verbally.app.settings.TranscriptionProvider
 import com.verbally.app.snippets.SnippetEntry
 import com.verbally.app.style.AppCategory
 import com.verbally.app.style.AppStyleProfile
+import com.verbally.app.style.AppStyleRule
 import com.verbally.app.style.InMemoryAppStyleProfileRepository
 import com.verbally.app.style.OutputStyle
+import com.verbally.app.style.StyleRuleDefaults
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class MainActivitySettingsScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun useTraditionalChineseResources() {
+        InstrumentationRegistry.getInstrumentation()
+            .targetContext
+            .getSystemService(LocaleManager::class.java)
+            .applicationLocales = LocaleList.forLanguageTags("zh-TW")
+    }
 
     private fun assertLabelAppearsBefore(first: String, second: String) {
         val firstTop = composeRule.onNodeWithText(first).fetchSemanticsNode().positionInRoot.y
@@ -51,8 +68,9 @@ class MainActivitySettingsScreenTest {
     }
 
     @Test
-    fun appSettingsContentShowsAppearanceModeChoices() {
+    fun appSettingsContentOpensAppearanceModeChoicesInDialog() {
         var settings by mutableStateOf(AppSettings())
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
 
         composeRule.setContent {
             MaterialTheme {
@@ -63,24 +81,113 @@ class MainActivitySettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("外觀模式")
+        composeRule.onNodeWithText(context.getString(R.string.settings_appearance_mode))
             .assertIsDisplayed()
-        composeRule.onNodeWithText("跟隨系統")
-            .assertIsDisplayed()
-        composeRule.onNodeWithText("淺色")
-            .assertIsDisplayed()
-        composeRule.onNodeWithText("深色")
-            .assertIsDisplayed()
+        composeRule.onAllNodesWithText(context.getString(R.string.settings_theme_light))
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText(context.getString(R.string.settings_theme_dark))
+            .assertCountEquals(0)
         composeRule.onAllNodesWithText("儲存外觀設定")
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("選擇 外觀模式")
             .assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("選擇 深色外觀")
+        composeRule.onNodeWithContentDescription(context.getString(R.string.settings_open_appearance_picker))
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.onAllNodesWithText(context.getString(R.string.settings_appearance_mode))
+            .assertCountEquals(2)
+        composeRule.onNodeWithContentDescription(context.getString(R.string.settings_choose_appearance, "深色"))
             .assertIsDisplayed()
             .performClick()
 
         assertEquals(AppThemeMode.DARK, settings.themeMode)
-        composeRule.onNodeWithText("深色")
+        composeRule.onNodeWithText(context.getString(R.string.settings_theme_dark))
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun appSettingsChoiceDialogUsesCompactOptionSpacing() {
+        var settings by mutableStateOf(AppSettings())
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        composeRule.setContent {
+            MaterialTheme {
+                AppSettingsScreenContent(
+                    settings = settings,
+                    onThemeModeSelected = { settings = settings.copy(themeMode = it) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.settings_open_appearance_picker))
+            .assertIsDisplayed()
+            .performClick()
+
+        val systemTop = composeRule.onNodeWithContentDescription(
+            context.getString(
+                R.string.settings_choose_appearance,
+                context.getString(R.string.settings_theme_system),
+            ),
+        ).fetchSemanticsNode().positionInRoot.y
+        val lightTop = composeRule.onNodeWithContentDescription(
+            context.getString(
+                R.string.settings_choose_appearance,
+                context.getString(R.string.settings_theme_light),
+            ),
+        ).fetchSemanticsNode().positionInRoot.y
+        val maxCompactSpacing = with(composeRule.density) { 52.dp.toPx() }
+
+        assertTrue(
+            "Settings dialog radio rows should be compact, but spacing was ${lightTop - systemTop}px",
+            lightTop - systemTop <= maxCompactSpacing,
+        )
+    }
+
+    @Test
+    fun appSettingsContentOpensInterfaceLanguageChoicesInDialog() {
+        var settings by mutableStateOf(AppSettings())
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        composeRule.setContent {
+            MaterialTheme {
+                AppSettingsScreenContent(
+                    settings = settings,
+                    onThemeModeSelected = { settings = settings.copy(themeMode = it) },
+                    onInterfaceLanguageSelected = { settings = settings.copy(interfaceLanguage = it) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(context.getString(R.string.settings_interface_language))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("English")
+            .assertCountEquals(0)
+        composeRule.onNodeWithContentDescription(context.getString(R.string.settings_open_interface_language_picker))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.onAllNodesWithText(context.getString(R.string.settings_interface_language))
+            .assertCountEquals(2)
+        composeRule.onNodeWithContentDescription(
+            context.getString(
+                R.string.settings_choose_interface_language,
+                context.getString(R.string.settings_language_system),
+            ),
+        )
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(
+            context.getString(R.string.settings_choose_interface_language, "English"),
+        )
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+
+        assertEquals(AppLanguage.ENGLISH, settings.interfaceLanguage)
+        composeRule.onNodeWithText("English")
             .assertIsDisplayed()
     }
 
@@ -400,7 +507,7 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("Groq: whisper-large-v3-turbo")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Deepgram: Real-time Nova-3 (多語言)")
+        composeRule.onNodeWithText("Deepgram: Real-time Nova-3")
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("whisper-1")
             .assertCountEquals(0)
@@ -682,6 +789,7 @@ class MainActivitySettingsScreenTest {
                 geminiApiKey = "gemini-key",
                 geminiCleanupModel = "gemini-3.1-flash-lite",
                 cleanupPrompt = "自訂提示詞",
+                cleanupPromptIsCustom = true,
             ),
         )
 
@@ -709,6 +817,9 @@ class MainActivitySettingsScreenTest {
             assertEquals("gemini-3.1-flash-lite", settings.geminiCleanupModel)
         }
 
+        composeRule.onNodeWithContentDescription("基本文字處理提示詞選單")
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText("還原預設")
             .performScrollTo()
             .performClick()
@@ -722,9 +833,57 @@ class MainActivitySettingsScreenTest {
     }
 
     @Test
+    fun cleanupPromptDefaultActionLivesInOverflowMenuAndUsesInterfaceLanguageDefault() {
+        var settings by mutableStateOf(
+            AppSettings(
+                interfaceLanguage = AppLanguage.ENGLISH,
+                cleanupPrompt = CleanupPromptFactory.defaultCleanupPrompt,
+                cleanupPromptIsCustom = false,
+            ),
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                CleanupSettingsScreenContent(
+                    settings = settings,
+                    onSettingsChange = { settings = it },
+                    onSave = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("基本文字處理提示詞")
+            .performScrollTo()
+            .assertIsDisplayed()
+        val promptText = composeRule.onNodeWithContentDescription("基本文字處理提示詞輸入")
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.EditableText]
+            .text
+        assertTrue(promptText.contains("Do not translate"))
+        assertFalse(promptText.contains("請將以下語音轉錄"))
+        composeRule.onAllNodesWithText("還原預設")
+            .assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("基本文字處理提示詞選單")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText("還原預設")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertFalse(settings.cleanupPromptIsCustom)
+            assertEquals(
+                CleanupPromptFactory.defaultCleanupPromptFor(AppLanguage.ENGLISH),
+                settings.cleanupPrompt,
+            )
+        }
+    }
+
+    @Test
     fun mainAppShellUsesHistoryAndSettingsAsPrimaryDestinations() {
         var openedSettings = false
         var showingSettings by mutableStateOf(false)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
 
         composeRule.setContent {
             MaterialTheme {
@@ -743,33 +902,23 @@ class MainActivitySettingsScreenTest {
                     snippetsContent = {},
                     historyContent = {},
                     styleContent = {},
-                    settingsContent = { Text("外觀模式") },
+                    settingsContent = { Text(context.getString(R.string.settings_appearance_mode)) },
                 )
             }
         }
 
         composeRule.onNodeWithText("Verbally")
             .assertIsDisplayed()
-        composeRule.onAllNodesWithText("首頁")
+        composeRule.onAllNodesWithText(context.getString(R.string.nav_home))
             .assertCountEquals(1)
-        composeRule.onAllNodesWithText("字典")
+        composeRule.onAllNodesWithText(context.getString(R.string.nav_dictionary))
             .assertCountEquals(1)
-        composeRule.onAllNodesWithText("片段")
+        composeRule.onAllNodesWithText(context.getString(R.string.nav_snippets))
             .assertCountEquals(1)
-        composeRule.onAllNodesWithText("歷史")
+        composeRule.onAllNodesWithText(context.getString(R.string.nav_history))
             .assertCountEquals(1)
-        composeRule.onAllNodesWithText("語氣")
+        composeRule.onAllNodesWithText(context.getString(R.string.nav_style))
             .assertCountEquals(1)
-        composeRule.onAllNodesWithText("Home")
-            .assertCountEquals(0)
-        composeRule.onAllNodesWithText("Dictionary")
-            .assertCountEquals(0)
-        composeRule.onAllNodesWithText("Snippets")
-            .assertCountEquals(0)
-        composeRule.onAllNodesWithText("History")
-            .assertCountEquals(0)
-        composeRule.onAllNodesWithText("Style")
-            .assertCountEquals(0)
         composeRule.onAllNodesWithText("☰")
             .assertCountEquals(0)
         composeRule.onNodeWithContentDescription("開啟選單")
@@ -794,8 +943,6 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("Permission Setup")
             .assertCountEquals(0)
-        composeRule.onAllNodesWithText("Settings")
-            .assertCountEquals(0)
         composeRule.onAllNodesWithText("API 與偏好")
             .assertCountEquals(0)
         composeRule.onNodeWithText("設定")
@@ -805,7 +952,7 @@ class MainActivitySettingsScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) { openedSettings }
         assertTrue(openedSettings)
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("外觀模式")
+        composeRule.onNodeWithText(context.getString(R.string.settings_appearance_mode))
             .assertIsDisplayed()
     }
 
@@ -934,6 +1081,96 @@ class MainActivitySettingsScreenTest {
                 AppStyleProfile(category = AppCategory.CHAT, style = OutputStyle.FORMAL),
                 profiles.first { it.category == AppCategory.CHAT },
             )
+        }
+    }
+
+    @Test
+    fun styleProfilesExposeCustomRuleRows() {
+        val repository = InMemoryAppStyleProfileRepository()
+        val language = AppLanguage.TRADITIONAL_CHINESE
+        val rules = OutputStyle.entries.map { style ->
+            AppStyleRule(
+                language = language,
+                style = style,
+                rule = StyleRuleDefaults.defaultRuleFor(language, style),
+                isCustom = style == OutputStyle.CASUAL,
+            )
+        }
+        var requestedStyle: OutputStyle? = null
+
+        composeRule.setContent {
+            MaterialTheme {
+                StyleProfilesScreenContent(
+                    profiles = repository.list(),
+                    styleRules = rules,
+                    onProfileChange = {},
+                    onEditRule = { requestedStyle = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("自訂語氣規則")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Casual 規則")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("自訂規則")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("開啟 Casual 規則")
+            .performScrollTo()
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(OutputStyle.CASUAL, requestedStyle)
+        }
+    }
+
+    @Test
+    fun styleRuleEditorSavesAndRestoresCustomText() {
+        val language = AppLanguage.TRADITIONAL_CHINESE
+        var savedRule: String? = null
+        var restoredDefault = false
+
+        composeRule.setContent {
+            MaterialTheme {
+                StyleRuleEditorScreen(
+                    language = language,
+                    rule = AppStyleRule(
+                        language = language,
+                        style = OutputStyle.CASUAL,
+                        rule = StyleRuleDefaults.defaultRuleFor(language, OutputStyle.CASUAL),
+                        isCustom = false,
+                    ),
+                    onBack = {},
+                    onSave = { savedRule = it },
+                    onRestoreDefault = { restoredDefault = true },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Casual 規則")
+            .assertIsDisplayed()
+        val ruleTextField = composeRule.onNodeWithContentDescription("Casual 規則輸入")
+        ruleTextField.performTextClearance()
+        ruleTextField.performTextInput("Only punctuation and spacing.")
+        composeRule.onNodeWithText("儲存 Casual 規則")
+            .performScrollTo()
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertEquals("Only punctuation and spacing.", savedRule)
+        }
+
+        composeRule.onNodeWithContentDescription("Casual 規則選單")
+            .performClick()
+        composeRule.onNodeWithText("還原預設")
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertTrue(restoredDefault)
         }
     }
 

@@ -16,13 +16,15 @@ data class InsertResult(
 class ClipboardPasteInserter(
     private val clipboard: ClipboardGateway,
     private val directTextTarget: DirectTextTarget,
+    private val directInsertMessage: String = "已貼上。",
+    private val clipboardFallbackMessage: String = "請手動貼上，文字已複製到剪貼簿。",
 ) {
     suspend fun insert(text: String): InsertResult {
         if (directTextTarget.insertDirectly(text)) {
-            return InsertResult(pasted = true, message = "已貼上。")
+            return InsertResult(pasted = true, message = directInsertMessage)
         }
 
         clipboard.currentText = text
-        return InsertResult(pasted = false, message = "請手動貼上，文字已複製到剪貼簿。")
+        return InsertResult(pasted = false, message = clipboardFallbackMessage)
     }
 }
