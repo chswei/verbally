@@ -117,7 +117,7 @@ class VerballyAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         stopWaveformUpdates()
         unregisterDebugInsertReceiver()
-        overlay?.hide()
+        overlay?.dispose()
         super.onDestroy()
     }
 

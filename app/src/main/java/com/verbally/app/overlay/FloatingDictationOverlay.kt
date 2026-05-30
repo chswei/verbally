@@ -2,7 +2,9 @@ package com.verbally.app.overlay
 
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
+import android.content.ComponentCallbacks
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -58,6 +60,19 @@ class FloatingDictationOverlay(
     private var currentLayoutParams: WindowManager.LayoutParams? = null
     private var customContentDescription: String? = null
     private var recordingWaveformView: RecordingWaveformView? = null
+    private val configurationCallbacks = object : ComponentCallbacks {
+        override fun onConfigurationChanged(newConfig: Configuration) {
+            rootView?.post {
+                rootView?.let(::realignToRememberedEdge)
+            }
+        }
+
+        override fun onLowMemory() = Unit
+    }
+
+    init {
+        context.registerComponentCallbacks(configurationCallbacks)
+    }
 
     val isShown: Boolean
         get() = rootView != null
@@ -73,6 +88,11 @@ class FloatingDictationOverlay(
         currentLayoutParams = null
         customContentDescription = null
         session.forceState(OverlayUiState.READY)
+    }
+
+    fun dispose() {
+        hide()
+        runCatching { context.unregisterComponentCallbacks(configurationCallbacks) }
     }
 
     fun setState(next: OverlayUiState) {
@@ -335,30 +355,28 @@ class FloatingDictationOverlay(
     @ColorInt
     private fun color(@ColorRes colorRes: Int): Int = context.getColor(colorRes)
 
-    private fun layoutParams(view: View) = WindowManager.LayoutParams(
-        view.resolvedWidth(),
-        view.resolvedHeight(),
-        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-        PixelFormat.TRANSLUCENT,
-    ).apply {
-        val position = positionMemory.currentPosition(
-            screenWidth = screenWidth(),
-            bubbleWidth = view.resolvedWidth(),
-            edgeMargin = edgeMargin,
-        )
-        gravity = position.gravity
-        x = position.x
-        y = position.y
-        windowAnimations = 0
-    }
-
-    private fun updatePosition(view: View, x: Int, y: Int) {
-        val params = currentLayoutParams ?: return
-        params.gravity = Gravity.TOP or Gravity.START
-        params.x = x.coerceAtLeast(0)
-        params.y = y.coerceAtLeast(0)
-        runCatching { windowManager.updateViewLayout(view, params) }
+    private fun layoutParams(view: View): WindowManager.LayoutParams {
+        val width = view.resolvedWidth()
+        val height = view.resolvedHeight()
+        return WindowManager.LayoutParams(
+            width,
+            height,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            val position = positionMemory.currentPosition(
+                screenWidth = screenWidth(),
+                screenHeight = screenHeight(),
+                bubbleWidth = width,
+                bubbleHeight = height,
+                edgeMargin = edgeMargin,
+            )
+            gravity = position.gravity
+            x = position.x
+            y = position.y
+            windowAnimations = 0
+        }
     }
 
     private fun applyAnchoredPosition(view: View, position: OverlayPosition) {
@@ -371,13 +389,25 @@ class FloatingDictationOverlay(
         runCatching { windowManager.updateViewLayout(view, params) }
     }
 
+    private fun updatePosition(view: View, x: Int, y: Int) {
+        val params = currentLayoutParams ?: return
+        params.gravity = Gravity.TOP or Gravity.START
+        params.x = x.coerceAtLeast(0)
+        params.y = y.coerceAtLeast(0)
+        runCatching { windowManager.updateViewLayout(view, params) }
+    }
+
     private fun snapAndRememberPosition(view: View, releasedX: Int, releasedY: Int) {
+        val width = view.resolvedWidth()
+        val height = view.resolvedHeight()
         val position = positionMemory.rememberSnappedPosition(
             releasedX = releasedX,
             releasedY = releasedY,
-            bubbleWidth = view.resolvedWidth(),
+            bubbleWidth = width,
             screenWidth = screenWidth(),
             edgeMargin = edgeMargin,
+            screenHeight = screenHeight(),
+            bubbleHeight = height,
         )
         applyAnchoredPosition(view, position)
         preferences.edit {
@@ -389,13 +419,17 @@ class FloatingDictationOverlay(
 
     private fun realignToRememberedEdge(view: View) {
         val params = currentLayoutParams ?: return
+        val width = view.resolvedWidth()
+        val height = view.resolvedHeight()
         val position = positionMemory.currentPosition(
             screenWidth = screenWidth(),
-            bubbleWidth = view.resolvedWidth(),
+            screenHeight = screenHeight(),
+            bubbleWidth = width,
+            bubbleHeight = height,
             edgeMargin = edgeMargin,
         )
-        params.width = view.resolvedWidth()
-        params.height = view.resolvedHeight()
+        params.width = width
+        params.height = height
         params.gravity = position.gravity
         params.x = position.x
         params.y = position.y
@@ -417,6 +451,9 @@ class FloatingDictationOverlay(
 
     private fun screenWidth(): Int =
         windowManager.currentWindowMetrics.bounds.width()
+
+    private fun screenHeight(): Int =
+        windowManager.currentWindowMetrics.bounds.height()
 
     private fun View.resolvedWidth(): Int {
         measure(
