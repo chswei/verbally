@@ -13,7 +13,7 @@ class ModelOptionsTest {
                 "OpenAI: gpt-4o-transcribe",
                 "Soniox: Soniox Realtime",
                 "Groq: whisper-large-v3-turbo",
-                "Deepgram: Real-time Nova-3 (多語言)",
+                "Deepgram: Real-time Nova-3",
             ),
             ModelOptions.TranscriptionOptions.map { it.label },
         )

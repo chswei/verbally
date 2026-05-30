@@ -1,5 +1,7 @@
 package com.verbally.app.providers
 
+import android.content.Context
+import com.verbally.app.R
 import com.verbally.app.dictionary.DictionaryEntry
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.TranscriptionProvider
@@ -32,6 +34,56 @@ data class CleanedTranscript(
 )
 
 class ProviderException(message: String) : RuntimeException(message)
+
+interface ProviderMessages {
+    fun missingApiKey(provider: String): String
+    fun transcriptionFailed(provider: String, detail: String): String
+    fun noTranscriptionText(provider: String): String
+    fun audioStreamFailed(detail: String): String
+    fun responseParseFailed(provider: String): String
+    fun connectionClosed(provider: String): String
+    fun cleanupFailed(provider: String, detail: String): String
+    fun noCleanedText(provider: String): String
+
+    companion object {
+        val TraditionalChinese: ProviderMessages = object : ProviderMessages {
+            override fun missingApiKey(provider: String): String = "請先在設定中填入 $provider API Key。"
+            override fun transcriptionFailed(provider: String, detail: String): String = "$provider 轉錄失敗：$detail"
+            override fun noTranscriptionText(provider: String): String = "$provider 沒有回傳轉錄文字。"
+            override fun audioStreamFailed(detail: String): String = "Soniox 音訊串流失敗：$detail"
+            override fun responseParseFailed(provider: String): String = "$provider 回傳格式無法解析。"
+            override fun connectionClosed(provider: String): String = "$provider 連線已關閉。"
+            override fun cleanupFailed(provider: String, detail: String): String = "$provider 文字整理失敗：$detail"
+            override fun noCleanedText(provider: String): String = "$provider 沒有回傳整理後文字。"
+        }
+    }
+}
+
+class AndroidProviderMessages(private val context: Context) : ProviderMessages {
+    override fun missingApiKey(provider: String): String =
+        context.getString(R.string.provider_missing_api_key, provider)
+
+    override fun transcriptionFailed(provider: String, detail: String): String =
+        context.getString(R.string.provider_transcription_failed, provider, detail)
+
+    override fun noTranscriptionText(provider: String): String =
+        context.getString(R.string.provider_no_transcription_text, provider)
+
+    override fun audioStreamFailed(detail: String): String =
+        context.getString(R.string.provider_audio_stream_failed, detail)
+
+    override fun responseParseFailed(provider: String): String =
+        context.getString(R.string.provider_response_parse_failed, provider)
+
+    override fun connectionClosed(provider: String): String =
+        context.getString(R.string.provider_connection_closed, provider)
+
+    override fun cleanupFailed(provider: String, detail: String): String =
+        context.getString(R.string.provider_cleanup_failed, provider, detail)
+
+    override fun noCleanedText(provider: String): String =
+        context.getString(R.string.provider_no_cleaned_text, provider)
+}
 
 interface TranscriptionClient {
     suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript
@@ -79,16 +131,17 @@ class TranscriptionClientRouter(
 class OpenAiTranscriptionClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val requestFactory: OpenAiTranscriptionRequestFactory = OpenAiTranscriptionRequestFactory(),
+    private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
 ) : TranscriptionClient {
     override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript =
         withContext(Dispatchers.IO) {
-            if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 OpenAI API Key。")
+            if (apiKey.isBlank()) throw ProviderException(messages.missingApiKey("OpenAI"))
             val response = httpClient.newCall(requestFactory.create(apiKey, model, audioFile)).execute()
             response.use {
                 val body = it.body.string()
-                if (!it.isSuccessful) throw ProviderException("OpenAI 轉錄失敗：${it.code}")
+                if (!it.isSuccessful) throw ProviderException(messages.transcriptionFailed("OpenAI", it.code.toString()))
                 val text = JSONObject(body).optString("text")
-                if (text.isBlank()) throw ProviderException("OpenAI 沒有回傳轉錄文字。")
+                if (text.isBlank()) throw ProviderException(messages.noTranscriptionText("OpenAI"))
                 RawTranscript(text = text, model = model, provider = "openai")
             }
         }
@@ -97,16 +150,17 @@ class OpenAiTranscriptionClient(
 class GroqTranscriptionClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val requestFactory: GroqTranscriptionRequestFactory = GroqTranscriptionRequestFactory(),
+    private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
 ) : TranscriptionClient {
     override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript =
         withContext(Dispatchers.IO) {
-            if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 Groq API Key。")
+            if (apiKey.isBlank()) throw ProviderException(messages.missingApiKey("Groq"))
             val response = httpClient.newCall(requestFactory.create(apiKey, model, audioFile)).execute()
             response.use {
                 val body = it.body.string()
-                if (!it.isSuccessful) throw ProviderException("Groq 轉錄失敗：${it.code}")
+                if (!it.isSuccessful) throw ProviderException(messages.transcriptionFailed("Groq", it.code.toString()))
                 val text = JSONObject(body).optString("text")
-                if (text.isBlank()) throw ProviderException("Groq 沒有回傳轉錄文字。")
+                if (text.isBlank()) throw ProviderException(messages.noTranscriptionText("Groq"))
                 RawTranscript(text = text, model = model, provider = "groq")
             }
         }
@@ -115,14 +169,15 @@ class GroqTranscriptionClient(
 class DeepgramTranscriptionClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val requestFactory: DeepgramTranscriptionRequestFactory = DeepgramTranscriptionRequestFactory(),
+    private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
 ) : TranscriptionClient {
     override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript =
         withContext(Dispatchers.IO) {
-            if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 Deepgram API Key。")
+            if (apiKey.isBlank()) throw ProviderException(messages.missingApiKey("Deepgram"))
             val response = httpClient.newCall(requestFactory.create(apiKey, model, audioFile)).execute()
             response.use {
                 val body = it.body.string()
-                if (!it.isSuccessful) throw ProviderException("Deepgram 轉錄失敗：${it.code}")
+                if (!it.isSuccessful) throw ProviderException(messages.transcriptionFailed("Deepgram", it.code.toString()))
                 val text = JSONObject(body)
                     .optJSONObject("results")
                     ?.optJSONArray("channels")
@@ -131,7 +186,7 @@ class DeepgramTranscriptionClient(
                     ?.optJSONObject(0)
                     ?.optString("transcript")
                     .orEmpty()
-                if (text.isBlank()) throw ProviderException("Deepgram 沒有回傳轉錄文字。")
+                if (text.isBlank()) throw ProviderException(messages.noTranscriptionText("Deepgram"))
                 RawTranscript(text = text, model = model, provider = "deepgram")
             }
         }
@@ -141,10 +196,11 @@ class SonioxRealtimeTranscriptionClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val configFactory: SonioxRealtimeConfigFactory = SonioxRealtimeConfigFactory(),
     private val websocketUrl: String = "wss://stt-rt.soniox.com/transcribe-websocket",
+    private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
 ) : TranscriptionClient {
     override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript =
         withContext(Dispatchers.IO) {
-            if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 Soniox API Key。")
+            if (apiKey.isBlank()) throw ProviderException(messages.missingApiKey("Soniox"))
             val text = transcribeOverWebSocket(apiKey, model, audioFile)
             RawTranscript(text = text, model = model, provider = "soniox")
         }
@@ -161,7 +217,7 @@ class SonioxRealtimeTranscriptionClient(
             if (completed.compareAndSet(false, true)) {
                 webSocket.close(1000, null)
                 if (text.isBlank()) {
-                    continuation.resumeWithException(ProviderException("Soniox 沒有回傳轉錄文字。"))
+                    continuation.resumeWithException(ProviderException(messages.noTranscriptionText("Soniox")))
                 } else {
                     continuation.resume(text)
                 }
@@ -192,21 +248,24 @@ class SonioxRealtimeTranscriptionClient(
                         }
                         webSocket.send("")
                     }.onFailure {
-                        fail(ProviderException("Soniox 音訊串流失敗：${it.message.orEmpty()}"), webSocket)
+                        fail(ProviderException(messages.audioStreamFailed(it.message.orEmpty())), webSocket)
                     }
                 }.start()
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val json = runCatching { JSONObject(text) }.getOrElse {
-                    fail(ProviderException("Soniox 回傳格式無法解析。"), webSocket)
+                    fail(ProviderException(messages.responseParseFailed("Soniox")), webSocket)
                     return
                 }
                 val errorCode = json.optString("error_code")
                 if (errorCode.isNotBlank()) {
                     fail(
                         ProviderException(
-                            "Soniox 轉錄失敗：$errorCode ${json.optString("error_message")}".trim(),
+                            messages.transcriptionFailed(
+                                "Soniox",
+                                "$errorCode ${json.optString("error_message")}".trim(),
+                            ),
                         ),
                         webSocket,
                     )
@@ -227,12 +286,12 @@ class SonioxRealtimeTranscriptionClient(
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                fail(ProviderException("Soniox 轉錄失敗：${t.message.orEmpty()}"), webSocket)
+                fail(ProviderException(messages.transcriptionFailed("Soniox", t.message.orEmpty())), webSocket)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 if (!completed.get()) {
-                    fail(ProviderException("Soniox 連線已關閉。"), webSocket)
+                    fail(ProviderException(messages.connectionClosed("Soniox")), webSocket)
                 }
             }
         }
@@ -255,6 +314,7 @@ interface TextCleanupClient {
 class OpenAiTextCleanupClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val requestFactory: OpenAiCleanupRequestFactory = OpenAiCleanupRequestFactory(),
+    private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
 ) : TextCleanupClient {
     override suspend fun clean(
         apiKey: String,
@@ -265,13 +325,13 @@ class OpenAiTextCleanupClient(
         styleContext: CleanupStyleContext,
     ): CleanedTranscript =
         withContext(Dispatchers.IO) {
-            if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 OpenAI API Key。")
+            if (apiKey.isBlank()) throw ProviderException(messages.missingApiKey("OpenAI"))
             val response = httpClient.newCall(
                 requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt, dictionaryEntries, styleContext),
             ).execute()
             response.use {
                 val body = it.body.string()
-                if (!it.isSuccessful) throw ProviderException("OpenAI 文字整理失敗：${it.code}")
+                if (!it.isSuccessful) throw ProviderException(messages.cleanupFailed("OpenAI", it.code.toString()))
                 val json = JSONObject(body)
                 val text = json.optString("output_text").ifBlank {
                     json.optJSONArray("output")
@@ -281,7 +341,7 @@ class OpenAiTextCleanupClient(
                         ?.optString("text")
                         .orEmpty()
                 }
-                if (text.isBlank()) throw ProviderException("OpenAI 沒有回傳整理後文字。")
+                if (text.isBlank()) throw ProviderException(messages.noCleanedText("OpenAI"))
                 CleanedTranscript(text = text, provider = "openai", model = model)
             }
         }
@@ -290,6 +350,7 @@ class OpenAiTextCleanupClient(
 class GeminiTextCleanupClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val requestFactory: GeminiCleanupRequestFactory = GeminiCleanupRequestFactory(),
+    private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
 ) : TextCleanupClient {
     override suspend fun clean(
         apiKey: String,
@@ -300,13 +361,13 @@ class GeminiTextCleanupClient(
         styleContext: CleanupStyleContext,
     ): CleanedTranscript =
         withContext(Dispatchers.IO) {
-            if (apiKey.isBlank()) throw ProviderException("請先在設定中填入 Gemini API Key。")
+            if (apiKey.isBlank()) throw ProviderException(messages.missingApiKey("Gemini"))
             val response = httpClient.newCall(
                 requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt, dictionaryEntries, styleContext),
             ).execute()
             response.use {
                 val body = it.body.string()
-                if (!it.isSuccessful) throw ProviderException("Gemini 文字整理失敗：${it.code}")
+                if (!it.isSuccessful) throw ProviderException(messages.cleanupFailed("Gemini", it.code.toString()))
                 val text = JSONObject(body)
                     .optJSONArray("candidates")
                     ?.optJSONObject(0)
@@ -315,7 +376,7 @@ class GeminiTextCleanupClient(
                     ?.optJSONObject(0)
                     ?.optString("text")
                     .orEmpty()
-                if (text.isBlank()) throw ProviderException("Gemini 沒有回傳整理後文字。")
+                if (text.isBlank()) throw ProviderException(messages.noCleanedText("Gemini"))
                 CleanedTranscript(text = text, provider = "gemini", model = model)
             }
         }

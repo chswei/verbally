@@ -2,6 +2,7 @@ package com.verbally.app
 
 import android.Manifest
 import android.app.Activity
+import android.app.LocaleManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -10,10 +11,13 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.LocaleList
 import android.provider.Settings
 import android.text.TextUtils
 import android.widget.Toast
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
+import androidx.activity.compose.BackHandler
 import androidx.activity.SystemBarStyle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -21,6 +25,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +37,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -76,6 +82,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -87,6 +94,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
@@ -110,20 +118,29 @@ import com.verbally.app.dictionary.DictionaryEntry
 import com.verbally.app.permissions.PermissionAction
 import com.verbally.app.permissions.PermissionGuidance
 import com.verbally.app.permissions.PermissionSetupStep
-import com.verbally.app.providers.CleanupPromptFactory
+import com.verbally.app.settings.AppLanguage
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.AppThemeMode
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.ModelOptions
+import com.verbally.app.settings.cleanupPromptForDisplay
 import com.verbally.app.settings.TranscriptionProvider
 import com.verbally.app.settings.cleanupModelOptionLabel
 import com.verbally.app.settings.normalizedModelChoices
+import com.verbally.app.settings.withCleanupPromptEdited
 import com.verbally.app.settings.transcriptionModelOptionLabel
 import com.verbally.app.settings.withCleanupModelOption
+import com.verbally.app.settings.withDefaultCleanupPromptLanguage
+import com.verbally.app.settings.withDefaultCleanupPromptRestored
+import com.verbally.app.settings.withInterfaceLanguage
 import com.verbally.app.settings.withTranscriptionModelOption
 import com.verbally.app.snippets.SnippetEntry
+import com.verbally.app.style.AppCategory
 import com.verbally.app.style.AppStyleProfile
+import com.verbally.app.style.AppStyleRule
 import com.verbally.app.style.OutputStyle
+import com.verbally.app.style.StyleRuleDefaults
+import com.verbally.app.style.normalizedStyleRuleLanguage
 import kotlinx.coroutines.launch
 
 private val VerballyBrandBlue = Color(0xFF14233A)
@@ -139,6 +156,7 @@ private val ScreenVerticalPadding = 12.dp
 private val FormFieldHeight = 56.dp
 private val ModelDropdownHeight = 64.dp
 private val PrimaryActionHeight = 52.dp
+private val SettingsChoiceRowHeight = 48.dp
 
 private val VerballyColorScheme = lightColorScheme(
     primary = VerballyBrandBlue,
@@ -254,10 +272,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val container = (application as VerballyApplication).container
+        val savedSettings = container.settingsRepository.load().normalizedModelChoices()
+        applyAppLanguage(savedSettings.interfaceLanguage)
+        val loadedSettings = savedSettings.withDefaultCleanupPromptLanguage(
+            defaultPromptLanguageFor(savedSettings.interfaceLanguage),
+        )
         setContent {
-            var appSettings by remember {
-                mutableStateOf(container.settingsRepository.load().normalizedModelChoices())
-            }
+            var appSettings by remember { mutableStateOf(loadedSettings) }
             VerballyTheme(themeMode = appSettings.themeMode) {
                 VerballyApp(
                     container = container,
@@ -326,6 +347,21 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
+private fun Context.applyAppLanguage(language: AppLanguage) {
+    val localeManager = getSystemService(LocaleManager::class.java)
+    localeManager.applicationLocales = if (language == AppLanguage.SYSTEM) {
+        LocaleList.getEmptyLocaleList()
+    } else {
+        LocaleList.forLanguageTags(language.languageTag)
+    }
+}
+
+private fun Context.defaultPromptLanguageFor(language: AppLanguage): AppLanguage =
+    AppLanguage.defaultPromptLanguageFor(
+        selectedInterfaceLanguage = language,
+        systemLanguageTag = getSystemService(LocaleManager::class.java).systemLocales[0]?.toLanguageTag(),
+    )
+
 internal enum class PermissionScreenOpenReason {
     REQUIRED_SETUP,
     SUPPORT,
@@ -345,6 +381,7 @@ fun VerballyApp(
     val context = LocalContext.current
     var selectedDestination by remember { mutableStateOf(AppDestination.HOME) }
     var showingAppSettings by remember { mutableStateOf(false) }
+    var styleRuleEditorActive by remember { mutableStateOf(false) }
     var permissionsReady by remember { mutableStateOf(hasRequiredPermissions(context)) }
     var showingPermissions by remember { mutableStateOf(!permissionsReady) }
     var permissionScreenOpenReason by remember {
@@ -385,9 +422,11 @@ fun VerballyApp(
         onDestinationSelected = {
             refreshPermissions()
             showingAppSettings = false
+            styleRuleEditorActive = false
             selectedDestination = it
         },
         onOpenSettings = {
+            styleRuleEditorActive = false
             showingAppSettings = true
         },
         onOpenPermissions = {
@@ -428,6 +467,7 @@ fun VerballyApp(
             StyleProfilesScreen(
                 container = container,
                 modifier = Modifier.fillMaxSize(),
+                onEditorActiveChange = { styleRuleEditorActive = it },
             )
         },
         settingsContent = {
@@ -438,15 +478,16 @@ fun VerballyApp(
                 modifier = Modifier.fillMaxSize(),
             )
         },
+        showAppChrome = !styleRuleEditorActive,
     )
 }
 
-enum class AppDestination(val label: String, @param:DrawableRes val iconRes: Int) {
-    HOME("首頁", R.drawable.ic_app_home_24),
-    DICTIONARY("字典", R.drawable.ic_app_dictionary_24),
-    SNIPPETS("片段", R.drawable.ic_app_snippets_24),
-    STYLE("語氣", R.drawable.ic_app_style_24),
-    HISTORY("歷史", R.drawable.ic_app_history_24),
+enum class AppDestination(@param:StringRes val labelRes: Int, @param:DrawableRes val iconRes: Int) {
+    HOME(R.string.nav_home, R.drawable.ic_app_home_24),
+    DICTIONARY(R.string.nav_dictionary, R.drawable.ic_app_dictionary_24),
+    SNIPPETS(R.string.nav_snippets, R.drawable.ic_app_snippets_24),
+    STYLE(R.string.nav_style, R.drawable.ic_app_style_24),
+    HISTORY(R.string.nav_history, R.drawable.ic_app_history_24),
 }
 
 @Composable
@@ -463,6 +504,7 @@ fun VerballyAppScaffold(
     historyContent: @Composable () -> Unit,
     styleContent: @Composable () -> Unit,
     settingsContent: @Composable () -> Unit,
+    showAppChrome: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -470,6 +512,7 @@ fun VerballyAppScaffold(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = showAppChrome,
         drawerContent = {
             VerballyDrawerContent(
                 onOpenSettings = {
@@ -491,31 +534,35 @@ fun VerballyAppScaffold(
             modifier = modifier,
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                VerballyTopBar(
-                    onOpenMenu = { scope.launch { drawerState.open() } },
-                )
+                if (showAppChrome) {
+                    VerballyTopBar(
+                        onOpenMenu = { scope.launch { drawerState.open() } },
+                    )
+                }
             },
             bottomBar = {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                    AppDestination.entries.forEach { destination ->
-                        NavigationBarItem(
-                            selected = !showingSettings && selectedDestination == destination,
-                            onClick = { onDestinationSelected(destination) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                            icon = {
-                                Icon(
-                                    painter = painterResource(destination.iconRes),
-                                    contentDescription = null,
-                                )
-                            },
-                            label = { Text(destination.label) },
-                        )
+                if (showAppChrome) {
+                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                        AppDestination.entries.forEach { destination ->
+                            NavigationBarItem(
+                                selected = !showingSettings && selectedDestination == destination,
+                                onClick = { onDestinationSelected(destination) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(destination.iconRes),
+                                        contentDescription = null,
+                                    )
+                                },
+                                label = { Text(stringResource(destination.labelRes)) },
+                            )
+                        }
                     }
                 }
             },
@@ -571,7 +618,7 @@ private fun VerballyTopBar(
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_app_menu_24),
-                    contentDescription = "開啟選單",
+                    contentDescription = stringResource(R.string.open_menu_content_description),
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -589,6 +636,9 @@ private fun VerballyDrawerContent(
     onOpenSettings: () -> Unit,
     onOpenPermissions: () -> Unit,
 ) {
+    val menuSettingsContentDescription = stringResource(R.string.drawer_settings_item_content_description)
+    val menuPermissionsContentDescription = stringResource(R.string.drawer_permissions_item_content_description)
+
     ModalDrawerSheet(
         modifier = Modifier.width(292.dp),
         drawerContainerColor = MaterialTheme.colorScheme.surface,
@@ -599,22 +649,24 @@ private fun VerballyDrawerContent(
                 .padding(horizontal = 16.dp, vertical = 20.dp),
         ) {
             Text(
-                text = "管理與支援",
+                text = stringResource(R.string.drawer_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = "設定、權限與疑難排解",
+                text = stringResource(R.string.drawer_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(18.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(modifier = Modifier.height(14.dp))
-            DrawerSectionLabel(text = "應用程式")
+            DrawerSectionLabel(text = stringResource(R.string.drawer_section_app))
             NavigationDrawerItem(
-                modifier = Modifier.semantics { contentDescription = "設定選單項目" },
+                modifier = Modifier.semantics {
+                    contentDescription = menuSettingsContentDescription
+                },
                 icon = {
                     Icon(
                         painter = painterResource(R.drawable.ic_app_settings_24),
@@ -623,8 +675,8 @@ private fun VerballyDrawerContent(
                 },
                 label = {
                     DrawerItemLabel(
-                        title = "設定",
-                        subtitle = "外觀與 App 偏好",
+                        title = stringResource(R.string.settings_title),
+                        subtitle = stringResource(R.string.drawer_settings_subtitle),
                     )
                 },
                 selected = false,
@@ -635,9 +687,11 @@ private fun VerballyDrawerContent(
                 ),
             )
             Spacer(modifier = Modifier.height(8.dp))
-            DrawerSectionLabel(text = "支援")
+            DrawerSectionLabel(text = stringResource(R.string.drawer_section_support))
             NavigationDrawerItem(
-                modifier = Modifier.semantics { contentDescription = "權限與疑難排解選單項目" },
+                modifier = Modifier.semantics {
+                    contentDescription = menuPermissionsContentDescription
+                },
                 icon = {
                     Icon(
                         painter = painterResource(R.drawable.ic_app_support_24),
@@ -646,8 +700,8 @@ private fun VerballyDrawerContent(
                 },
                 label = {
                     DrawerItemLabel(
-                        title = "權限與疑難排解",
-                        subtitle = "錄音、浮動視窗與輔助使用",
+                        title = stringResource(R.string.drawer_permissions_title),
+                        subtitle = stringResource(R.string.drawer_permissions_subtitle),
                     )
                 },
                 selected = false,
@@ -723,7 +777,11 @@ private fun PermissionScreen(
         refreshLocalPermissions()
         Toast.makeText(
             context,
-            if (granted) "麥克風權限已開啟" else "麥克風權限尚未開啟，請到 App 資訊中允許。",
+            if (granted) {
+                context.getString(R.string.permission_microphone_granted)
+            } else {
+                context.getString(R.string.permission_microphone_denied)
+            },
             Toast.LENGTH_LONG,
         ).show()
     }
@@ -735,7 +793,7 @@ private fun PermissionScreen(
             )
         ) {
             PermissionAction.ALREADY_GRANTED -> {
-                Toast.makeText(context, "麥克風權限已開啟", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.permission_microphone_granted), Toast.LENGTH_SHORT).show()
             }
             PermissionAction.REQUEST_RUNTIME_PERMISSION -> {
                 permissionPrefs.edit().putBoolean(KEY_MICROPHONE_REQUESTED, true).apply()
@@ -780,23 +838,23 @@ private fun PermissionScreen(
         }
     }
     val primaryActionLabel = when (
-        PermissionGuidance.nextSetupStep(
+        val nextStep = PermissionGuidance.nextSetupStep(
             microphoneGranted = microphoneGranted,
             overlayGranted = overlayGranted,
             accessibilityGranted = accessibilityGranted,
         )
     ) {
-        PermissionSetupStep.MICROPHONE -> PermissionGuidance.actionLabel(PermissionSetupStep.MICROPHONE)
-        PermissionSetupStep.OVERLAY -> PermissionGuidance.actionLabel(PermissionSetupStep.OVERLAY)
-        PermissionSetupStep.ACCESSIBILITY -> PermissionGuidance.actionLabel(PermissionSetupStep.ACCESSIBILITY)
-        PermissionSetupStep.COMPLETE -> PermissionGuidance.actionLabel(PermissionSetupStep.COMPLETE)
+        PermissionSetupStep.MICROPHONE -> context.getString(permissionActionLabelRes(nextStep))
+        PermissionSetupStep.OVERLAY -> context.getString(permissionActionLabelRes(nextStep))
+        PermissionSetupStep.ACCESSIBILITY -> context.getString(permissionActionLabelRes(nextStep))
+        PermissionSetupStep.COMPLETE -> context.getString(permissionActionLabelRes(nextStep))
     }
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            PlainPageTopBar("權限設定")
+            PlainPageTopBar(stringResource(R.string.permissions_title))
         },
     ) { padding ->
         PermissionSetupContent(
@@ -832,6 +890,8 @@ fun PermissionSetupContent(
 
     Column(
         modifier = modifier
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
         verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -840,13 +900,13 @@ fun PermissionSetupContent(
             PermissionStepCard(details = details)
         } else {
             Text(
-                text = details.title,
+                text = stringResource(details.titleRes),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = details.subtitle,
+                text = stringResource(details.subtitleRes),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -884,39 +944,47 @@ internal fun PermissionResumeRefreshEffect(
 }
 
 private data class PermissionStepDetails(
-    val progress: String,
-    val title: String,
-    val subtitle: String,
-    val description: String,
+    @param:StringRes val progressRes: Int,
+    @param:StringRes val titleRes: Int,
+    @param:StringRes val subtitleRes: Int,
+    @param:StringRes val descriptionRes: Int,
 ) {
     companion object {
         fun from(step: PermissionSetupStep): PermissionStepDetails = when (step) {
             PermissionSetupStep.MICROPHONE -> PermissionStepDetails(
-                progress = "步驟 1/3",
-                title = "允許錄音",
-                subtitle = "讓 Verbally 把你的語音轉成文字。",
-                description = "系統會跳出授權視窗，選擇允許後就會回到下一步。",
+                progressRes = R.string.permission_step_microphone_progress,
+                titleRes = R.string.permission_step_microphone_title,
+                subtitleRes = R.string.permission_step_microphone_subtitle,
+                descriptionRes = R.string.permission_step_microphone_description,
             )
             PermissionSetupStep.OVERLAY -> PermissionStepDetails(
-                progress = "步驟 2/3",
-                title = "允許浮動視窗",
-                subtitle = "讓聽寫按鈕出現在其他 app 的文字框旁。",
-                description = "在系統設定中開啟「允許顯示在其他應用程式上方」。",
+                progressRes = R.string.permission_step_overlay_progress,
+                titleRes = R.string.permission_step_overlay_title,
+                subtitleRes = R.string.permission_step_overlay_subtitle,
+                descriptionRes = R.string.permission_step_overlay_description,
             )
             PermissionSetupStep.ACCESSIBILITY -> PermissionStepDetails(
-                progress = "步驟 3/3",
-                title = "開啟輔助使用",
-                subtitle = "這一步讓 Verbally 能偵測文字框，並把整理後文字貼到游標位置。",
-                description = "到「已安裝的應用程式」找到 Verbally 浮動聽寫並開啟。",
+                progressRes = R.string.permission_step_accessibility_progress,
+                titleRes = R.string.permission_step_accessibility_title,
+                subtitleRes = R.string.permission_step_accessibility_subtitle,
+                descriptionRes = R.string.permission_step_accessibility_description,
             )
             PermissionSetupStep.COMPLETE -> PermissionStepDetails(
-                progress = "完成",
-                title = "權限都完成了",
-                subtitle = "按下完成設定即可進入 Verbally。",
-                description = "所有必要權限已開啟。",
+                progressRes = R.string.permission_step_complete_progress,
+                titleRes = R.string.permission_step_complete_title,
+                subtitleRes = R.string.permission_step_complete_subtitle,
+                descriptionRes = R.string.permission_step_complete_description,
             )
         }
     }
+}
+
+@StringRes
+private fun permissionActionLabelRes(step: PermissionSetupStep): Int = when (step) {
+    PermissionSetupStep.MICROPHONE -> R.string.permission_action_microphone
+    PermissionSetupStep.OVERLAY -> R.string.permission_action_settings
+    PermissionSetupStep.ACCESSIBILITY -> R.string.permission_action_settings
+    PermissionSetupStep.COMPLETE -> R.string.permission_action_complete
 }
 
 @Composable
@@ -931,13 +999,13 @@ private fun TroubleshootingCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "如果輔助使用被系統鎖住",
+                text = stringResource(R.string.permission_troubleshooting_title),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Text(
-                text = PermissionGuidance.restrictedSettingsExplanation,
+                text = stringResource(R.string.permission_restricted_settings_explanation),
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -947,7 +1015,7 @@ private fun TroubleshootingCard(
                     .fillMaxWidth()
                     .height(PrimaryActionHeight),
             ) {
-                Text("開啟 App 資訊")
+                Text(stringResource(R.string.open_app_info))
             }
         }
     }
@@ -964,13 +1032,13 @@ private fun ShortcutHintCard() {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "捷徑不用開",
+                text = stringResource(R.string.permission_shortcut_title),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
             Text(
-                text = "看到「Verbally 捷徑」時保持關閉即可。",
+                text = stringResource(R.string.permission_shortcut_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
@@ -998,7 +1066,7 @@ private fun PermissionStepCard(details: PermissionStepDetails) {
                     shape = MaterialTheme.shapes.small,
                 ) {
                     Text(
-                        text = details.progress,
+                        text = stringResource(details.progressRes),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
@@ -1006,18 +1074,18 @@ private fun PermissionStepCard(details: PermissionStepDetails) {
                 }
             }
             Text(
-                text = details.title,
+                text = stringResource(details.titleRes),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = details.subtitle,
+                text = stringResource(details.subtitleRes),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = details.description,
+                text = stringResource(details.descriptionRes),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1066,19 +1134,19 @@ private fun PermissionBanner(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "權限需要重新確認",
+                    text = stringResource(R.string.permission_banner_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 Text(
-                    text = "缺少權限時，浮動聽寫按鈕可能不會出現。",
+                    text = stringResource(R.string.permission_banner_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
             Button(onClick = onOpenPermissions) {
-                Text("補開權限")
+                Text(stringResource(R.string.permission_banner_button))
             }
         }
     }
@@ -1113,7 +1181,7 @@ private fun SettingsScreen(
         val normalizedSettings = settings.normalizedModelChoices()
         container.settingsRepository.save(normalizedSettings)
         onSettingsSaved(normalizedSettings)
-        Toast.makeText(context, "設定已儲存", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.settings_saved), Toast.LENGTH_SHORT).show()
     }
 
     SettingsScreenContent(
@@ -1132,16 +1200,30 @@ private fun AppSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     var settings by remember(savedSettings) { mutableStateOf(savedSettings.normalizedModelChoices()) }
+    val context = LocalContext.current
     val selectThemeMode = { themeMode: AppThemeMode ->
         val updatedSettings = settings.copy(themeMode = themeMode).normalizedModelChoices()
         settings = updatedSettings
         container.settingsRepository.save(updatedSettings)
         onSettingsSaved(updatedSettings)
     }
+    val selectInterfaceLanguage = { language: AppLanguage ->
+        val updatedSettings = settings
+            .withInterfaceLanguage(language)
+            .withDefaultCleanupPromptLanguage(context.defaultPromptLanguageFor(language))
+            .normalizedModelChoices()
+        settings = updatedSettings
+        container.settingsRepository.save(updatedSettings)
+        onSettingsSaved(updatedSettings)
+        context.applyAppLanguage(language)
+        context.findActivity()?.recreate()
+        Unit
+    }
 
     AppSettingsScreenContent(
         settings = settings,
         onThemeModeSelected = selectThemeMode,
+        onInterfaceLanguageSelected = selectInterfaceLanguage,
         modifier = modifier,
     )
 }
@@ -1150,8 +1232,47 @@ private fun AppSettingsScreen(
 fun AppSettingsScreenContent(
     settings: AppSettings,
     onThemeModeSelected: (AppThemeMode) -> Unit,
+    onInterfaceLanguageSelected: (AppLanguage) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    var showAppearanceDialog by remember { mutableStateOf(false) }
+    var showInterfaceLanguageDialog by remember { mutableStateOf(false) }
+
+    if (showAppearanceDialog) {
+        SettingsChoiceDialog(
+            title = { Text(stringResource(R.string.settings_appearance_mode)) },
+            onDismiss = { showAppearanceDialog = false },
+        ) {
+            AppThemeMode.entries.forEach { mode ->
+                ThemeModeRadioOption(
+                    mode = mode,
+                    selected = settings.themeMode == mode,
+                    onSelected = {
+                        showAppearanceDialog = false
+                        onThemeModeSelected(mode)
+                    },
+                )
+            }
+        }
+    }
+    if (showInterfaceLanguageDialog) {
+        SettingsChoiceDialog(
+            title = { Text(stringResource(R.string.settings_interface_language)) },
+            onDismiss = { showInterfaceLanguageDialog = false },
+        ) {
+            AppLanguage.entries.forEach { language ->
+                InterfaceLanguageRadioOption(
+                    language = language,
+                    selected = settings.interfaceLanguage == language,
+                    onSelected = {
+                        showInterfaceLanguageDialog = false
+                        onInterfaceLanguageSelected(language)
+                    },
+                )
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -1159,20 +1280,94 @@ fun AppSettingsScreenContent(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         ScreenHeader(
-            title = "設定",
-            subtitle = "調整 Verbally 的外觀顯示模式。",
+            title = stringResource(R.string.settings_title),
+            subtitle = stringResource(R.string.settings_subtitle),
         )
-        SectionLabel("外觀模式")
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            AppThemeMode.entries.forEach { mode ->
-                ThemeModeRadioOption(
-                    mode = mode,
-                    selected = settings.themeMode == mode,
-                    onSelected = { onThemeModeSelected(mode) },
-                )
-            }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            SettingsPickerRow(
+                title = stringResource(R.string.settings_appearance_mode),
+                value = settings.themeMode.localizedLabel(),
+                contentDescription = stringResource(R.string.settings_open_appearance_picker),
+                onClick = { showAppearanceDialog = true },
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsPickerRow(
+                title = stringResource(R.string.settings_interface_language),
+                value = settings.interfaceLanguage.localizedLabel(),
+                contentDescription = stringResource(R.string.settings_open_interface_language_picker),
+                onClick = { showInterfaceLanguageDialog = true },
+            )
         }
         Spacer(modifier = Modifier.height(64.dp))
+    }
+}
+
+@Composable
+private fun SettingsChoiceDialog(
+    title: @Composable () -> Unit,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = title,
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                content()
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun SettingsPickerRow(
+    title: String,
+    value: String,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(68.dp)
+            .clickable(onClick = onClick)
+            .semantics { this.contentDescription = contentDescription },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            painter = painterResource(R.drawable.ic_app_chevron_down_24),
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -1182,16 +1377,20 @@ private fun ThemeModeRadioOption(
     selected: Boolean,
     onSelected: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val label = mode.localizedLabel()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(FormFieldHeight)
+            .height(SettingsChoiceRowHeight)
             .selectable(
                 selected = selected,
                 onClick = onSelected,
                 role = Role.RadioButton,
             )
-            .semantics { contentDescription = "選擇 ${mode.label}外觀" }
+            .semantics {
+                contentDescription = context.getString(R.string.settings_choose_appearance, label)
+            }
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1201,11 +1400,63 @@ private fun ThemeModeRadioOption(
             onClick = null,
         )
         Text(
-            text = mode.label,
+            text = label,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }
+}
+
+@Composable
+private fun InterfaceLanguageRadioOption(
+    language: AppLanguage,
+    selected: Boolean,
+    onSelected: () -> Unit,
+) {
+    val context = LocalContext.current
+    val label = language.localizedLabel()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(SettingsChoiceRowHeight)
+            .selectable(
+                selected = selected,
+                onClick = onSelected,
+                role = Role.RadioButton,
+            )
+            .semantics {
+                contentDescription = context.getString(
+                    R.string.settings_choose_interface_language,
+                    label,
+                )
+            }
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+@Composable
+private fun AppThemeMode.localizedLabel(): String = when (this) {
+    AppThemeMode.SYSTEM -> stringResource(R.string.settings_theme_system)
+    AppThemeMode.LIGHT -> stringResource(R.string.settings_theme_light)
+    AppThemeMode.DARK -> stringResource(R.string.settings_theme_dark)
+}
+
+@Composable
+private fun AppLanguage.localizedLabel(): String = when (this) {
+    AppLanguage.SYSTEM -> stringResource(R.string.settings_language_system)
+    else -> label
 }
 
 @Composable
@@ -1222,17 +1473,17 @@ fun SettingsScreenContent(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         ScreenHeader(
-            title = "API 設定",
-            subtitle = "先完成語音轉錄，再完成文字處理；兩個都儲存後就能用浮動按鈕聽寫。",
+            title = stringResource(R.string.api_settings_title),
+            subtitle = stringResource(R.string.api_settings_subtitle),
         )
         Text(
-            text = "設定順序：語音轉錄 → 文字處理 → 開始聽寫",
+            text = stringResource(R.string.api_settings_order),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ApiSettingsBlock(
-            title = "語音轉錄",
-            subtitle = "選擇語音辨識模型，貼上 OpenAI API Key 後儲存。",
+            title = stringResource(R.string.transcription_settings_title),
+            subtitle = stringResource(R.string.transcription_settings_subtitle),
         ) {
             TranscriptionSettingsFields(
                 settings = settings,
@@ -1244,12 +1495,12 @@ fun SettingsScreenContent(
                     .fillMaxWidth()
                     .height(PrimaryActionHeight),
             ) {
-                Text("儲存語音轉錄 API Key")
+                Text(stringResource(R.string.save_transcription_api_key))
             }
         }
         ApiSettingsBlock(
-            title = "文字處理",
-            subtitle = "選擇整理文字的模型；切換服務時只會顯示對應的 API Key。",
+            title = stringResource(R.string.cleanup_settings_title),
+            subtitle = stringResource(R.string.cleanup_settings_subtitle),
         ) {
             CleanupSettingsFields(
                 settings = settings,
@@ -1261,7 +1512,7 @@ fun SettingsScreenContent(
                     .fillMaxWidth()
                     .height(PrimaryActionHeight),
             ) {
-                Text("儲存文字處理設定")
+                Text(stringResource(R.string.save_cleanup_settings))
             }
         }
         Spacer(modifier = Modifier.height(64.dp))
@@ -1282,7 +1533,7 @@ fun TranscriptionSettingsScreenContent(
             .padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        ScreenHeader(title = "語音轉錄", onBack = onBack)
+        ScreenHeader(title = stringResource(R.string.transcription_settings_title), onBack = onBack)
         TranscriptionSettingsFields(
             settings = settings,
             onSettingsChange = onSettingsChange,
@@ -1293,7 +1544,7 @@ fun TranscriptionSettingsScreenContent(
                 .fillMaxWidth()
                 .height(PrimaryActionHeight),
         ) {
-            Text("儲存設定")
+            Text(stringResource(R.string.save_settings))
         }
     }
 }
@@ -1312,7 +1563,7 @@ fun CleanupSettingsScreenContent(
             .padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        ScreenHeader(title = "文字處理", onBack = onBack)
+        ScreenHeader(title = stringResource(R.string.cleanup_settings_title), onBack = onBack)
         CleanupSettingsFields(
             settings = settings,
             onSettingsChange = onSettingsChange,
@@ -1323,7 +1574,7 @@ fun CleanupSettingsScreenContent(
                 .fillMaxWidth()
                 .height(PrimaryActionHeight),
         ) {
-            Text("儲存設定")
+            Text(stringResource(R.string.save_settings))
         }
     }
 }
@@ -1366,29 +1617,29 @@ private fun TranscriptionSettingsFields(
     onSettingsChange: (AppSettings) -> Unit,
 ) {
     DropdownField(
-        label = "語音轉錄模型",
+        label = stringResource(R.string.transcription_model_label),
         selectedValue = settings.transcriptionModelOptionLabel,
         options = ModelOptions.TranscriptionOptions.map { it.label },
         onSelected = { onSettingsChange(settings.withTranscriptionModelOption(it)) },
     )
     when (settings.transcriptionProvider) {
         TranscriptionProvider.OPENAI -> {
-            SecretField("API Key", settings.openAiApiKey) {
+            SecretField(stringResource(R.string.api_key_label), settings.openAiApiKey) {
                 onSettingsChange(settings.copy(openAiApiKey = it))
             }
         }
         TranscriptionProvider.SONIOX -> {
-            SecretField("API Key", settings.sonioxApiKey) {
+            SecretField(stringResource(R.string.api_key_label), settings.sonioxApiKey) {
                 onSettingsChange(settings.copy(sonioxApiKey = it))
             }
         }
         TranscriptionProvider.GROQ -> {
-            SecretField("API Key", settings.groqApiKey) {
+            SecretField(stringResource(R.string.api_key_label), settings.groqApiKey) {
                 onSettingsChange(settings.copy(groqApiKey = it))
             }
         }
         TranscriptionProvider.DEEPGRAM -> {
-            SecretField("API Key", settings.deepgramApiKey) {
+            SecretField(stringResource(R.string.api_key_label), settings.deepgramApiKey) {
                 onSettingsChange(settings.copy(deepgramApiKey = it))
             }
         }
@@ -1400,29 +1651,41 @@ private fun CleanupSettingsFields(
     settings: AppSettings,
     onSettingsChange: (AppSettings) -> Unit,
 ) {
+    val context = LocalContext.current
     DropdownField(
-        label = "文字處理模型",
+        label = stringResource(R.string.cleanup_model_label),
         selectedValue = settings.cleanupModelOptionLabel,
         options = ModelOptions.CleanupOptions.map { it.label },
         onSelected = { onSettingsChange(settings.withCleanupModelOption(it)) },
     )
     when (settings.cleanupProvider) {
         CleanupProvider.OPENAI -> {
-            SecretField("API Key", settings.openAiApiKey) {
+            SecretField(stringResource(R.string.api_key_label), settings.openAiApiKey) {
                 onSettingsChange(settings.copy(openAiApiKey = it))
             }
         }
         CleanupProvider.GEMINI -> {
-            SecretField("API Key", settings.geminiApiKey) {
+            SecretField(stringResource(R.string.api_key_label), settings.geminiApiKey) {
                 onSettingsChange(settings.copy(geminiApiKey = it))
             }
         }
     }
     CleanupPromptField(
-        prompt = settings.cleanupPrompt,
-        onPromptChange = { onSettingsChange(settings.copy(cleanupPrompt = it)) },
+        prompt = settings.cleanupPromptForDisplay(),
+        onPromptChange = {
+            onSettingsChange(
+                settings.withCleanupPromptEdited(
+                    prompt = it,
+                    defaultPromptLanguage = context.defaultPromptLanguageFor(settings.interfaceLanguage),
+                ),
+            )
+        },
         onRestoreDefault = {
-            onSettingsChange(settings.copy(cleanupPrompt = CleanupPromptFactory.defaultCleanupPrompt))
+            onSettingsChange(
+                settings.withDefaultCleanupPromptRestored(
+                    defaultPromptLanguage = context.defaultPromptLanguageFor(settings.interfaceLanguage),
+                ),
+            )
         },
     )
 }
@@ -1501,20 +1764,46 @@ private fun CleanupPromptField(
     onPromptChange: (String) -> Unit,
     onRestoreDefault: () -> Unit,
 ) {
+    val context = LocalContext.current
+    var showPromptMenu by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "基本文字處理提示詞",
+                text = stringResource(R.string.basic_cleanup_prompt_label),
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(end = 48.dp),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = onRestoreDefault) {
-                Text("還原預設")
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
+                IconButton(
+                    onClick = { showPromptMenu = true },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .semantics {
+                            contentDescription = context.getString(R.string.basic_cleanup_prompt_menu)
+                        },
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_app_more_vert_24),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                DropdownMenu(
+                    expanded = showPromptMenu,
+                    onDismissRequest = { showPromptMenu = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.restore_default)) },
+                        onClick = {
+                            showPromptMenu = false
+                            onRestoreDefault()
+                        },
+                    )
+                }
             }
         }
         OutlinedTextField(
@@ -1523,7 +1812,7 @@ private fun CleanupPromptField(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp)
-                .semantics { contentDescription = "基本文字處理提示詞輸入" },
+                .semantics { contentDescription = context.getString(R.string.basic_cleanup_prompt_input) },
             textStyle = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -1562,6 +1851,7 @@ private fun DropdownField(
     options: List<String>,
     onSelected: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
     val displayValue = selectedValue.takeIf { it in options } ?: options.firstOrNull().orEmpty()
     val displayParts = ModelOptionLabelParts.from(displayValue)
@@ -1579,7 +1869,9 @@ private fun DropdownField(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(ModelDropdownHeight)
-                    .semantics { contentDescription = "選擇 $label" },
+                    .semantics {
+                        contentDescription = context.getString(R.string.dropdown_select_content_description, label)
+                    },
                 contentPadding = PaddingValues(start = 16.dp, end = 12.dp),
             ) {
                 Row(
@@ -1610,7 +1902,7 @@ private fun DropdownField(
                     }
                     Icon(
                         painter = painterResource(R.drawable.ic_app_chevron_down_24),
-                        contentDescription = "$label 展開箭頭",
+                        contentDescription = context.getString(R.string.dropdown_expand_content_description, label),
                         modifier = Modifier.size(24.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1654,9 +1946,10 @@ private data class ModelOptionLabelParts(
 private fun SearchField(
     value: String,
     onChange: (String) -> Unit,
-    placeholder: String = "搜尋",
+    placeholder: String? = null,
     contentDescription: String? = null,
 ) {
+    val resolvedPlaceholder = placeholder ?: stringResource(R.string.search_placeholder_default)
     val fieldModifier = Modifier
         .fillMaxWidth()
         .height(FormFieldHeight)
@@ -1671,7 +1964,7 @@ private fun SearchField(
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        placeholder = { Text(placeholder) },
+        placeholder = { Text(resolvedPlaceholder) },
         singleLine = true,
         modifier = fieldModifier,
     )
@@ -1697,12 +1990,12 @@ private fun DictionaryScreen(container: VerballyContainer, modifier: Modifier = 
         onSave = { entry ->
             container.dictionaryRepository.save(entry)
             refresh()
-            Toast.makeText(context, "字典已儲存", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.dictionary_saved), Toast.LENGTH_SHORT).show()
         },
         onDelete = { entry ->
             container.dictionaryRepository.delete(entry.id)
             refresh()
-            Toast.makeText(context, "字典詞彙已刪除", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.dictionary_deleted), Toast.LENGTH_SHORT).show()
         },
         modifier = modifier,
     )
@@ -1717,6 +2010,7 @@ fun DictionaryScreenContent(
     onDelete: (DictionaryEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     var editingEntry by remember { mutableStateOf<DictionaryEntry?>(null) }
     var showEditor by remember { mutableStateOf(false) }
 
@@ -1743,14 +2037,14 @@ fun DictionaryScreenContent(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             ScreenHeader(
-                title = "字典",
-                subtitle = "保存常用詞、專有名詞與偏好的寫法，讓之後整理文字時更好找。",
+                title = stringResource(R.string.dictionary_title),
+                subtitle = stringResource(R.string.dictionary_subtitle),
             )
             SearchField(
                 value = query,
                 onChange = onQueryChange,
-                placeholder = "搜尋字典",
-                contentDescription = "搜尋字典輸入",
+                placeholder = stringResource(R.string.dictionary_search_placeholder),
+                contentDescription = stringResource(R.string.dictionary_search_content_description),
             )
             if (entries.isEmpty()) {
                 Box(
@@ -1760,11 +2054,15 @@ fun DictionaryScreenContent(
                     contentAlignment = Alignment.Center,
                 ) {
                     EmptyStateBlock(
-                        title = if (query.isBlank()) "尚未建立字典詞彙" else "找不到符合的字典詞彙",
-                        description = if (query.isBlank()) {
-                            "新增常用詞或專有名詞後，之後可以在這裡快速查找。"
+                        title = if (query.isBlank()) {
+                            stringResource(R.string.dictionary_empty_title)
                         } else {
-                            "換個關鍵字，或新增這個詞彙讓之後整理文字時使用。"
+                            stringResource(R.string.dictionary_empty_search_title)
+                        },
+                        description = if (query.isBlank()) {
+                            stringResource(R.string.dictionary_empty_description)
+                        } else {
+                            stringResource(R.string.dictionary_empty_search_description)
                         },
                     )
                 }
@@ -1797,7 +2095,7 @@ fun DictionaryScreenContent(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 24.dp)
-                .semantics { contentDescription = "新增字典詞彙" },
+                .semantics { contentDescription = context.getString(R.string.dictionary_add_content_description) },
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
         ) {
@@ -1812,6 +2110,7 @@ private fun DictionaryEntryCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -1842,15 +2141,19 @@ private fun DictionaryEntryCard(
             ) {
                 TextButton(
                     onClick = onEdit,
-                    modifier = Modifier.semantics { contentDescription = "編輯 ${entry.term}" },
+                    modifier = Modifier.semantics {
+                        contentDescription = context.getString(R.string.edit_item_content_description, entry.term)
+                    },
                 ) {
-                    Text("編輯")
+                    Text(stringResource(R.string.edit))
                 }
                 TextButton(
                     onClick = onDelete,
-                    modifier = Modifier.semantics { contentDescription = "刪除 ${entry.term}" },
+                    modifier = Modifier.semantics {
+                        contentDescription = context.getString(R.string.delete_item_content_description, entry.term)
+                    },
                 ) {
-                    Text("刪除")
+                    Text(stringResource(R.string.delete))
                 }
             }
         }
@@ -1863,9 +2166,14 @@ private fun DictionaryEntryDialog(
     onDismiss: () -> Unit,
     onSave: (DictionaryEntry) -> Unit,
 ) {
+    val context = LocalContext.current
     var term by remember(entry?.id) { mutableStateOf(entry?.term.orEmpty()) }
     var note by remember(entry?.id) { mutableStateOf(entry?.note.orEmpty()) }
-    val title = if (entry == null) "新增字典詞彙" else "編輯字典詞彙"
+    val title = if (entry == null) {
+        stringResource(R.string.dictionary_dialog_add_title)
+    } else {
+        stringResource(R.string.dictionary_dialog_edit_title)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1875,21 +2183,21 @@ private fun DictionaryEntryDialog(
                 OutlinedTextField(
                     value = term,
                     onValueChange = { term = it },
-                    label = { Text("詞彙") },
+                    label = { Text(stringResource(R.string.dictionary_term_label)) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "字典詞彙輸入" },
+                        .semantics { contentDescription = context.getString(R.string.dictionary_term_input_content_description) },
                 )
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("備註") },
-                    placeholder = { Text("例如：品牌名、姓名、偏好大小寫") },
+                    label = { Text(stringResource(R.string.dictionary_note_label)) },
+                    placeholder = { Text(stringResource(R.string.dictionary_note_placeholder)) },
                     minLines = 2,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "字典備註輸入" },
+                        .semantics { contentDescription = context.getString(R.string.dictionary_note_input_content_description) },
                 )
             }
         },
@@ -1906,12 +2214,12 @@ private fun DictionaryEntryDialog(
                 },
                 enabled = term.trim().isNotEmpty(),
             ) {
-                Text("儲存")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -1937,12 +2245,12 @@ private fun SnippetsScreen(container: VerballyContainer, modifier: Modifier = Mo
         onSave = { entry ->
             container.snippetRepository.save(entry)
             refresh()
-            Toast.makeText(context, "片段已儲存", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.snippets_saved), Toast.LENGTH_SHORT).show()
         },
         onDelete = { entry ->
             container.snippetRepository.delete(entry.id)
             refresh()
-            Toast.makeText(context, "片段已刪除", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.snippets_deleted), Toast.LENGTH_SHORT).show()
         },
         modifier = modifier,
     )
@@ -1957,6 +2265,7 @@ fun SnippetsScreenContent(
     onDelete: (SnippetEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     var editingEntry by remember { mutableStateOf<SnippetEntry?>(null) }
     var showEditor by remember { mutableStateOf(false) }
 
@@ -1983,14 +2292,14 @@ fun SnippetsScreenContent(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             ScreenHeader(
-                title = "片段",
-                subtitle = "保存觸發詞與展開文字；聽寫時說出觸發詞，就會插入完整內容。",
+                title = stringResource(R.string.snippets_title),
+                subtitle = stringResource(R.string.snippets_subtitle),
             )
             SearchField(
                 value = query,
                 onChange = onQueryChange,
-                placeholder = "搜尋片段",
-                contentDescription = "搜尋片段輸入",
+                placeholder = stringResource(R.string.snippets_search_placeholder),
+                contentDescription = stringResource(R.string.snippets_search_content_description),
             )
             if (entries.isEmpty()) {
                 Box(
@@ -2000,11 +2309,15 @@ fun SnippetsScreenContent(
                     contentAlignment = Alignment.Center,
                 ) {
                     EmptyStateBlock(
-                        title = if (query.isBlank()) "尚未建立常用片段" else "找不到符合的常用片段",
-                        description = if (query.isBlank()) {
-                            "新增像「我的地址」或「放射科報告模板」這類觸發詞，之後聽寫會展開成完整文字。"
+                        title = if (query.isBlank()) {
+                            stringResource(R.string.snippets_empty_title)
                         } else {
-                            "換個關鍵字，或新增這個觸發詞讓之後聽寫時展開。"
+                            stringResource(R.string.snippets_empty_search_title)
+                        },
+                        description = if (query.isBlank()) {
+                            stringResource(R.string.snippets_empty_description)
+                        } else {
+                            stringResource(R.string.snippets_empty_search_description)
                         },
                     )
                 }
@@ -2037,7 +2350,7 @@ fun SnippetsScreenContent(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 24.dp)
-                .semantics { contentDescription = "新增常用片段" },
+                .semantics { contentDescription = context.getString(R.string.snippets_add_content_description) },
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
         ) {
@@ -2052,6 +2365,7 @@ private fun SnippetEntryCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2080,15 +2394,19 @@ private fun SnippetEntryCard(
             ) {
                 TextButton(
                     onClick = onEdit,
-                    modifier = Modifier.semantics { contentDescription = "編輯 ${entry.trigger}" },
+                    modifier = Modifier.semantics {
+                        contentDescription = context.getString(R.string.edit_item_content_description, entry.trigger)
+                    },
                 ) {
-                    Text("編輯")
+                    Text(stringResource(R.string.edit))
                 }
                 TextButton(
                     onClick = onDelete,
-                    modifier = Modifier.semantics { contentDescription = "刪除 ${entry.trigger}" },
+                    modifier = Modifier.semantics {
+                        contentDescription = context.getString(R.string.delete_item_content_description, entry.trigger)
+                    },
                 ) {
-                    Text("刪除")
+                    Text(stringResource(R.string.delete))
                 }
             }
         }
@@ -2101,9 +2419,14 @@ private fun SnippetEntryDialog(
     onDismiss: () -> Unit,
     onSave: (SnippetEntry) -> Unit,
 ) {
+    val context = LocalContext.current
     var trigger by remember(entry?.id) { mutableStateOf(entry?.trigger.orEmpty()) }
     var expansion by remember(entry?.id) { mutableStateOf(entry?.expansion.orEmpty()) }
-    val title = if (entry == null) "新增常用片段" else "編輯常用片段"
+    val title = if (entry == null) {
+        stringResource(R.string.snippets_dialog_add_title)
+    } else {
+        stringResource(R.string.snippets_dialog_edit_title)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2113,22 +2436,22 @@ private fun SnippetEntryDialog(
                 OutlinedTextField(
                     value = trigger,
                     onValueChange = { trigger = it },
-                    label = { Text("觸發詞") },
-                    placeholder = { Text("例如：我的地址") },
+                    label = { Text(stringResource(R.string.snippets_trigger_label)) },
+                    placeholder = { Text(stringResource(R.string.snippets_trigger_placeholder)) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "片段觸發詞輸入" },
+                        .semantics { contentDescription = context.getString(R.string.snippets_trigger_input_content_description) },
                 )
                 OutlinedTextField(
                     value = expansion,
                     onValueChange = { expansion = it },
-                    label = { Text("展開內容") },
-                    placeholder = { Text("輸入要插入的完整文字或模板") },
+                    label = { Text(stringResource(R.string.snippets_expansion_label)) },
+                    placeholder = { Text(stringResource(R.string.snippets_expansion_placeholder)) },
                     minLines = 4,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "片段展開內容輸入" },
+                        .semantics { contentDescription = context.getString(R.string.snippets_expansion_input_content_description) },
                 )
             }
         },
@@ -2145,29 +2468,78 @@ private fun SnippetEntryDialog(
                 },
                 enabled = trigger.trim().isNotEmpty() && expansion.trim().isNotEmpty(),
             ) {
-                Text("儲存")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
 }
 
 @Composable
-private fun StyleProfilesScreen(container: VerballyContainer, modifier: Modifier = Modifier) {
-    var profiles by remember { mutableStateOf(container.styleProfileRepository.list()) }
+private fun StyleProfilesScreen(
+    container: VerballyContainer,
+    modifier: Modifier = Modifier,
+    onEditorActiveChange: (Boolean) -> Unit = {},
+) {
     val context = LocalContext.current
+    var profiles by remember { mutableStateOf(container.styleProfileRepository.list()) }
+    val styleRuleLanguage = remember(context) {
+        context.defaultPromptLanguageFor(container.settingsRepository.load().interfaceLanguage)
+            .normalizedStyleRuleLanguage()
+    }
+    var styleRules by remember(styleRuleLanguage) {
+        mutableStateOf(
+            OutputStyle.entries.map { style ->
+                container.styleRuleRepository.ruleFor(styleRuleLanguage, style)
+            },
+        )
+    }
+    var editingStyle by remember { mutableStateOf<OutputStyle?>(null) }
+    fun refreshStyleRules() {
+        styleRules = OutputStyle.entries.map { style ->
+            container.styleRuleRepository.ruleFor(styleRuleLanguage, style)
+        }
+    }
+
+    val currentEditingStyle = editingStyle
+    LaunchedEffect(currentEditingStyle) {
+        onEditorActiveChange(currentEditingStyle != null)
+    }
+    if (currentEditingStyle != null) {
+        val editingRule = styleRules.first { it.style == currentEditingStyle }
+        StyleRuleEditorScreen(
+            language = styleRuleLanguage,
+            rule = editingRule,
+            onBack = { editingStyle = null },
+            onSave = { ruleText ->
+                container.styleRuleRepository.saveCustomRule(styleRuleLanguage, currentEditingStyle, ruleText)
+                refreshStyleRules()
+                Toast.makeText(context, context.getString(R.string.style_rule_saved), Toast.LENGTH_SHORT).show()
+                editingStyle = null
+            },
+            onRestoreDefault = {
+                container.styleRuleRepository.restoreDefault(styleRuleLanguage, currentEditingStyle)
+                refreshStyleRules()
+                Toast.makeText(context, context.getString(R.string.style_rule_restored), Toast.LENGTH_SHORT).show()
+            },
+            modifier = modifier,
+        )
+        return
+    }
 
     StyleProfilesScreenContent(
         profiles = profiles,
+        styleRules = styleRules,
         onProfileChange = { profile ->
             container.styleProfileRepository.save(profile)
             profiles = container.styleProfileRepository.list()
-            Toast.makeText(context, "語氣已更新", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.style_saved), Toast.LENGTH_SHORT).show()
         },
+        onEditRule = { editingStyle = it },
         modifier = modifier,
     )
 }
@@ -2175,7 +2547,9 @@ private fun StyleProfilesScreen(container: VerballyContainer, modifier: Modifier
 @Composable
 fun StyleProfilesScreenContent(
     profiles: List<AppStyleProfile>,
+    styleRules: List<AppStyleRule> = emptyList(),
     onProfileChange: (AppStyleProfile) -> Unit,
+    onEditRule: (OutputStyle) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -2185,14 +2559,235 @@ fun StyleProfilesScreenContent(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         ScreenHeader(
-            title = "語氣風格",
-            subtitle = "不同類型的 App 可以使用不同語氣；基本文字處理會先整理內容，再套用這裡的風格。",
+            title = stringResource(R.string.style_title),
+            subtitle = stringResource(R.string.style_subtitle),
         )
         profiles.forEach { profile ->
             StyleProfileRow(
                 profile = profile,
                 onProfileChange = onProfileChange,
             )
+        }
+        if (styleRules.isNotEmpty()) {
+            StyleRulesSection(
+                rules = styleRules,
+                onEditRule = onEditRule,
+            )
+        }
+        Spacer(modifier = Modifier.height(64.dp))
+    }
+}
+
+@Composable
+private fun StyleRulesSection(
+    rules: List<AppStyleRule>,
+    onEditRule: (OutputStyle) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.style_rules_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = stringResource(R.string.style_rules_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            rules.forEachIndexed { index, rule ->
+                StyleRuleRow(
+                    rule = rule,
+                    onClick = { onEditRule(rule.style) },
+                )
+                if (index < rules.lastIndex) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StyleRuleRow(
+    rule: AppStyleRule,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    val styleLabel = rule.style.localizedLabel()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(68.dp)
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = context.getString(R.string.style_rule_row_content_description, styleLabel)
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.style_rule_row_title, styleLabel),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = if (rule.isCustom) {
+                    stringResource(R.string.style_rule_status_custom)
+                } else {
+                    stringResource(R.string.style_rule_status_default)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            painter = painterResource(R.drawable.ic_app_chevron_down_24),
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+fun StyleRuleEditorScreen(
+    language: AppLanguage,
+    rule: AppStyleRule,
+    onBack: () -> Unit,
+    onSave: (String) -> Unit,
+    onRestoreDefault: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val styleLabel = rule.style.localizedLabel()
+    val backContentDescription = stringResource(R.string.style_rule_back)
+    var ruleText by remember(language, rule.style, rule.rule) { mutableStateOf(rule.rule) }
+    var menuExpanded by remember { mutableStateOf(false) }
+    BackHandler(onBack = onBack)
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = ScreenHorizontalPadding, vertical = ScreenVerticalPadding),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .offset(x = (-16).dp)
+                        .semantics {
+                            contentDescription = backContentDescription
+                        },
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_app_arrow_back_24),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.style_rule_editor_title, styleLabel),
+                    modifier = Modifier
+                        .weight(1f)
+                        .offset(x = (-16).dp),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Box {
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier
+                            .offset(x = 16.dp)
+                            .semantics {
+                                contentDescription = context.getString(
+                                    R.string.style_rule_menu_content_description,
+                                    styleLabel,
+                                )
+                            },
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_app_more_vert_24),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.restore_default)) },
+                            onClick = {
+                                menuExpanded = false
+                                onRestoreDefault()
+                                ruleText = StyleRuleDefaults.defaultRuleFor(language, rule.style)
+                            },
+                        )
+                    }
+                }
+            }
+            Text(
+                text = stringResource(R.string.style_rule_editor_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.style_rule_language_label),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = language.localizedLabel(),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        OutlinedTextField(
+            value = ruleText,
+            onValueChange = { ruleText = it },
+            label = { Text(stringResource(R.string.style_rule_text_label)) },
+            minLines = 8,
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics {
+                    contentDescription = context.getString(R.string.style_rule_text_content_description, styleLabel)
+                },
+        )
+        Button(
+            onClick = { onSave(ruleText) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PrimaryActionHeight),
+            enabled = ruleText.trim().isNotEmpty(),
+        ) {
+            Text(stringResource(R.string.style_rule_save_button, styleLabel))
         }
         Spacer(modifier = Modifier.height(64.dp))
     }
@@ -2203,6 +2798,8 @@ private fun StyleProfileRow(
     profile: AppStyleProfile,
     onProfileChange: (AppStyleProfile) -> Unit,
 ) {
+    val context = LocalContext.current
+    val categoryLabel = profile.category.localizedLabel()
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2214,13 +2811,13 @@ private fun StyleProfileRow(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = profile.category.label,
+                text = categoryLabel,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = styleProfileDescription(profile),
+                text = profile.category.localizedDescription(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -2230,17 +2827,24 @@ private fun StyleProfileRow(
             ) {
                 OutputStyle.entries.forEach { outputStyle ->
                     val selected = profile.style == outputStyle
+                    val styleLabel = outputStyle.localizedLabel()
                     val buttonModifier = Modifier
                         .weight(1f)
                         .height(44.dp)
-                        .semantics { contentDescription = "${profile.category.label} ${outputStyle.label}" }
+                        .semantics {
+                            contentDescription = context.getString(
+                                R.string.style_option_content_description,
+                                categoryLabel,
+                                styleLabel,
+                            )
+                        }
                     if (selected) {
                         Button(
                             onClick = { onProfileChange(profile.copy(style = outputStyle)) },
                             modifier = buttonModifier,
                             contentPadding = PaddingValues(horizontal = 8.dp),
                         ) {
-                            Text(outputStyle.label)
+                            Text(styleLabel)
                         }
                     } else {
                         OutlinedButton(
@@ -2248,7 +2852,7 @@ private fun StyleProfileRow(
                             modifier = buttonModifier,
                             contentPadding = PaddingValues(horizontal = 8.dp),
                         ) {
-                            Text(outputStyle.label)
+                            Text(styleLabel)
                         }
                     }
                 }
@@ -2257,12 +2861,25 @@ private fun StyleProfileRow(
     }
 }
 
-private fun styleProfileDescription(profile: AppStyleProfile): String =
-    when (profile.category.label) {
-        "聊天" -> "LINE、Messenger、WhatsApp 等聊天 App 預設比較自然口語。"
-        "工作" -> "Email、Slack、Teams、文件與筆記 App 預設比較完整正式。"
-        else -> "無法分類或尚未支援的 App 會使用這組預設。"
-    }
+@Composable
+private fun AppCategory.localizedLabel(): String = when (this) {
+    AppCategory.CHAT -> stringResource(R.string.style_category_chat)
+    AppCategory.WORK -> stringResource(R.string.style_category_work)
+    AppCategory.OTHER -> stringResource(R.string.style_category_other)
+}
+
+@Composable
+private fun AppCategory.localizedDescription(): String = when (this) {
+    AppCategory.CHAT -> stringResource(R.string.style_category_chat_description)
+    AppCategory.WORK -> stringResource(R.string.style_category_work_description)
+    AppCategory.OTHER -> stringResource(R.string.style_category_other_description)
+}
+
+@Composable
+private fun OutputStyle.localizedLabel(): String = when (this) {
+    OutputStyle.FORMAL -> stringResource(R.string.output_style_formal)
+    OutputStyle.CASUAL -> stringResource(R.string.output_style_casual)
+}
 
 @Composable
 private fun PlaceholderDataScreen(
@@ -2354,11 +2971,11 @@ private fun HistoryScreen(container: VerballyContainer, modifier: Modifier = Mod
         onClearHistory = {
             container.historyRepository.clear()
             entries = container.historyRepository.search(query)
-            Toast.makeText(context, "歷史已清空", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.history_cleared), Toast.LENGTH_SHORT).show()
         },
         onCopy = { entry ->
             copyText(context, entry.cleanedText)
-            Toast.makeText(context, "已複製", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.copied), Toast.LENGTH_SHORT).show()
         },
         onDelete = { entry ->
             container.historyRepository.delete(entry.id)
@@ -2384,8 +3001,8 @@ fun HistoryScreenContent(
     if (showClearConfirmation) {
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
-            title = { Text("確定刪除歷史？") },
-            text = { Text("這會刪除所有保存在這台裝置上的轉錄歷史，刪除後無法復原。") },
+            title = { Text(stringResource(R.string.history_clear_confirm_title)) },
+            text = { Text(stringResource(R.string.history_clear_confirm_description)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -2393,12 +3010,12 @@ fun HistoryScreenContent(
                         onClearHistory()
                     },
                 ) {
-                    Text("確定刪除")
+                    Text(stringResource(R.string.history_clear_confirm_button))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearConfirmation = false }) {
-                    Text("取消")
+                    Text(stringResource(R.string.cancel))
                 }
             },
         )
@@ -2418,7 +3035,11 @@ fun HistoryScreenContent(
                 showClearConfirmation = true
             },
         )
-        SearchField(value = query, onChange = onQueryChange, placeholder = "搜尋歷史")
+        SearchField(
+            value = query,
+            onChange = onQueryChange,
+            placeholder = stringResource(R.string.history_search_placeholder),
+        )
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -2432,8 +3053,8 @@ fun HistoryScreenContent(
                         contentAlignment = Alignment.Center,
                     ) {
                         EmptyStateBlock(
-                            title = "尚無轉錄歷史",
-                            description = "完成聽寫後，整理好的文字會保存在這裡，最多保留最近 100 筆。",
+                            title = stringResource(R.string.history_empty_title),
+                            description = stringResource(R.string.history_empty_description),
                         )
                     }
                 }
@@ -2458,10 +3079,11 @@ private fun HistoryScreenHeader(
     onOverflowDismiss: () -> Unit,
     onClearHistoryClick: () -> Unit,
 ) {
+    val historyMenuContentDescription = stringResource(R.string.history_menu_content_description)
     Box(modifier = Modifier.fillMaxWidth()) {
         ScreenHeader(
-            title = "歷史",
-            subtitle = "只保留最近 100 筆轉錄紀錄",
+            title = stringResource(R.string.history_title),
+            subtitle = stringResource(R.string.history_subtitle),
         )
         if (showOverflow) {
             Box(
@@ -2471,7 +3093,9 @@ private fun HistoryScreenHeader(
             ) {
                 IconButton(
                     onClick = onOverflowClick,
-                    modifier = Modifier.semantics { contentDescription = "歷史選單" },
+                    modifier = Modifier.semantics {
+                        contentDescription = historyMenuContentDescription
+                    },
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_app_more_vert_24),
@@ -2486,7 +3110,7 @@ private fun HistoryScreenHeader(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = "清空歷史",
+                                text = stringResource(R.string.history_clear_menu_item),
                                 color = MaterialTheme.colorScheme.error,
                             )
                         },
@@ -2515,8 +3139,8 @@ private fun HistoryItem(
             Text(entry.cleanedText, style = MaterialTheme.typography.bodyLarge)
             HorizontalDivider()
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onCopy) { Text("複製") }
-                TextButton(onClick = onDelete) { Text("刪除") }
+                TextButton(onClick = onCopy) { Text(stringResource(R.string.copy)) }
+                TextButton(onClick = onDelete) { Text(stringResource(R.string.delete)) }
             }
         }
     }
@@ -2524,7 +3148,7 @@ private fun HistoryItem(
 
 private fun copyText(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("Verbally", text))
+    clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.app_name), text))
 }
 
 private const val KEY_MICROPHONE_REQUESTED = "microphone_requested"

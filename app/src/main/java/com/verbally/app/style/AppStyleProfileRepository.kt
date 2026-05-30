@@ -2,6 +2,7 @@ package com.verbally.app.style
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.verbally.app.settings.AppLanguage
 
 enum class AppCategory(val label: String) {
     CHAT("聊天"),
@@ -22,6 +23,8 @@ data class AppStyleProfile(
 data class CleanupStyleContext(
     val category: AppCategory,
     val style: OutputStyle,
+    val language: AppLanguage = AppLanguage.TRADITIONAL_CHINESE,
+    val customRule: String? = null,
 ) {
     companion object {
         fun default(): CleanupStyleContext =

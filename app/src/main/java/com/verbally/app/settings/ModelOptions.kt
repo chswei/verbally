@@ -46,7 +46,7 @@ object ModelOptions {
         TranscriptionModelOption(
             provider = TranscriptionProvider.DEEPGRAM,
             model = "nova-3",
-            label = "Deepgram: Real-time Nova-3 (多語言)",
+            label = "Deepgram: Real-time Nova-3",
         ),
     )
 

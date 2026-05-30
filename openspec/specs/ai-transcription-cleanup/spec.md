@@ -44,7 +44,7 @@ The system SHALL clean raw transcript text with either OpenAI or Gemini accordin
 - **THEN** the system uses the returned cleaned text for insertion and history
 
 ### Requirement: Cleanup preserves language and intent
-The built-in default basic text-processing prompt SHALL preserve the user's original language and mixed-language style, remove filler words, prefer local dictionary terms when relevant, avoid translation, and then apply the selected Formal or Casual output style.
+The built-in default basic text-processing prompt SHALL preserve the user's original language and mixed-language style, remove filler words, prefer local dictionary terms when relevant, avoid translation, and then apply the selected Formal or Casual output format without rewriting, shortening, replacing words, translating, or changing the user's tone.
 
 #### Scenario: Mixed Chinese and English transcript
 - **WHEN** the raw transcript contains mixed Traditional Chinese and English
@@ -57,11 +57,13 @@ The built-in default basic text-processing prompt SHALL preserve the user's orig
 
 #### Scenario: Formal style is selected
 - **WHEN** the selected style is Formal
-- **THEN** cleanup instructions ask only to add punctuation marks
+- **THEN** cleanup instructions ask only to add or normalize punctuation, capitalization, spacing, and language-required writing conventions
+- **THEN** cleanup instructions forbid rewriting, shortening, synonym replacement, translation, and tone changes
 
 #### Scenario: Casual style is selected
 - **WHEN** the selected style is Casual
-- **THEN** cleanup instructions ask only to replace punctuation marks with spaces
+- **THEN** cleanup instructions ask only to use a lighter punctuation or spacing format appropriate to the transcript language
+- **THEN** cleanup instructions forbid rewriting, shortening, synonym replacement, translation, and tone changes
 
 ### Requirement: Temporary audio is not retained
 The system SHALL delete temporary audio files after transcription succeeds, fails, or is cancelled.
@@ -71,19 +73,20 @@ The system SHALL delete temporary audio files after transcription succeeds, fail
 - **THEN** the system deletes the temporary recording file
 
 ### Requirement: Cleanup prompt can be customized
-The system SHALL provide a user-editable basic text-processing prompt setting, SHALL default it to the built-in natural cleanup prompt, and SHALL use the configured prompt plus local dictionary context and selected style when cleaning transcript text with OpenAI or Gemini.
+The system SHALL provide a user-editable basic text-processing prompt setting, SHALL default it to the built-in natural cleanup prompt in the selected interface language, and SHALL use the configured prompt plus local dictionary context and selected format-only style when cleaning transcript text with OpenAI or Gemini.
 
 #### Scenario: Default basic text-processing prompt is used
 - **WHEN** no custom basic text-processing prompt has been saved
-- **THEN** the cleanup settings show the built-in natural cleanup prompt
-- **THEN** cleanup requests use the built-in natural cleanup prompt with dictionary context, selected style, and the raw transcript attached
+- **THEN** the cleanup settings show the built-in natural cleanup prompt in the selected interface language
+- **THEN** cleanup requests use the built-in natural cleanup prompt with dictionary context, selected format-only style, and the raw transcript attached
 
 #### Scenario: Custom basic text-processing prompt is used
 - **WHEN** the user saves a custom basic text-processing prompt
-- **THEN** subsequent OpenAI cleanup requests send the custom prompt with dictionary context, selected style, and the raw transcript attached
-- **THEN** subsequent Gemini cleanup requests send the custom prompt with dictionary context, selected style, and the raw transcript attached
+- **THEN** subsequent OpenAI cleanup requests send the custom prompt with dictionary context, selected format-only style, and the raw transcript attached
+- **THEN** subsequent Gemini cleanup requests send the custom prompt with dictionary context, selected format-only style, and the raw transcript attached
+- **THEN** interface language changes do not translate, replace, or otherwise alter the custom prompt
 
 #### Scenario: User restores the default basic text-processing prompt
 - **WHEN** the user chooses to restore the default basic text-processing prompt
-- **THEN** the basic text-processing prompt setting returns to the built-in natural cleanup prompt
+- **THEN** the basic text-processing prompt setting returns to the built-in natural cleanup prompt in the selected interface language
 - **THEN** provider, API key, model, dictionary entries, and style profiles remain unchanged
