@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -748,7 +749,7 @@ class MainActivitySettingsScreenTest {
     @Test
     fun cleanupProviderSelectionSwitchesVisibleModelFields() {
         composeRule.setContent {
-            var settings by mutableStateOf(AppSettings(cleanupProvider = CleanupProvider.OPENAI))
+            var settings by remember { mutableStateOf(AppSettings(cleanupProvider = CleanupProvider.OPENAI)) }
             MaterialTheme {
                 CleanupSettingsScreenContent(
                     settings = settings,
@@ -788,6 +789,7 @@ class MainActivitySettingsScreenTest {
                 cleanupProvider = CleanupProvider.GEMINI,
                 geminiApiKey = "gemini-key",
                 geminiCleanupModel = "gemini-3.1-flash-lite",
+                interfaceLanguage = AppLanguage.TRADITIONAL_CHINESE,
                 cleanupPrompt = "自訂提示詞",
                 cleanupPromptIsCustom = true,
             ),

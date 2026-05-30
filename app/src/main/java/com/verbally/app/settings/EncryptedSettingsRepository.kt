@@ -1,7 +1,10 @@
+@file:Suppress("DEPRECATION")
+
 package com.verbally.app.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.verbally.app.providers.CleanupPromptFactory
@@ -52,22 +55,22 @@ class EncryptedSettingsRepository(
         val promptIsCustom = promptForStorage.isNotBlank() &&
             settings.cleanupPromptIsCustom &&
             !CleanupPromptFactory.isBuiltInDefaultPrompt(promptForStorage)
-        prefs.edit()
-            .putString(KEY_OPENAI, settings.openAiApiKey)
-            .putString(KEY_GEMINI, settings.geminiApiKey)
-            .putString(KEY_SONIOX, settings.sonioxApiKey)
-            .putString(KEY_GROQ, settings.groqApiKey)
-            .putString(KEY_DEEPGRAM, settings.deepgramApiKey)
-            .putString(KEY_TRANSCRIPTION_PROVIDER, settings.transcriptionProvider.name)
-            .putString(KEY_PROVIDER, settings.cleanupProvider.name)
-            .putString(KEY_TRANSCRIPTION_MODEL, settings.transcriptionModel)
-            .putString(KEY_OPENAI_MODEL, settings.openAiCleanupModel)
-            .putString(KEY_GEMINI_MODEL, settings.geminiCleanupModel)
-            .putString(KEY_CLEANUP_PROMPT, promptForStorage)
-            .putBoolean(KEY_CLEANUP_PROMPT_CUSTOM, promptIsCustom)
-            .putString(KEY_THEME_MODE, settings.themeMode.name)
-            .putString(KEY_INTERFACE_LANGUAGE, settings.interfaceLanguage.name)
-            .apply()
+        prefs.edit {
+            putString(KEY_OPENAI, settings.openAiApiKey)
+            putString(KEY_GEMINI, settings.geminiApiKey)
+            putString(KEY_SONIOX, settings.sonioxApiKey)
+            putString(KEY_GROQ, settings.groqApiKey)
+            putString(KEY_DEEPGRAM, settings.deepgramApiKey)
+            putString(KEY_TRANSCRIPTION_PROVIDER, settings.transcriptionProvider.name)
+            putString(KEY_PROVIDER, settings.cleanupProvider.name)
+            putString(KEY_TRANSCRIPTION_MODEL, settings.transcriptionModel)
+            putString(KEY_OPENAI_MODEL, settings.openAiCleanupModel)
+            putString(KEY_GEMINI_MODEL, settings.geminiCleanupModel)
+            putString(KEY_CLEANUP_PROMPT, promptForStorage)
+            putBoolean(KEY_CLEANUP_PROMPT_CUSTOM, promptIsCustom)
+            putString(KEY_THEME_MODE, settings.themeMode.name)
+            putString(KEY_INTERFACE_LANGUAGE, settings.interfaceLanguage.name)
+        }
     }
 
     override fun clearHistoryRequested() = Unit

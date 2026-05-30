@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Verbally</string>
     <string name="accessibility_service_label">Verbally 플로팅 받아쓰기</string>
     <string name="accessibility_service_description">텍스트 입력란에 플로팅 받아쓰기 버튼을 표시하고 전사 결과를 현재 커서 위치에 삽입합니다.</string>
@@ -52,7 +52,7 @@
     <string name="permission_action_microphone">권한 열기</string>
     <string name="permission_action_settings">설정 열기</string>
     <string name="permission_action_complete">설정 완료</string>
-    <string name="permission_step_microphone_progress">1/3단계</string>
+    <string name="permission_step_microphone_progress" tools:ignore="TypographyFractions">1/3단계</string>
     <string name="permission_step_microphone_title">녹음 허용</string>
     <string name="permission_step_microphone_subtitle">Verbally가 음성을 텍스트로 바꿀 수 있게 합니다.</string>
     <string name="permission_step_microphone_description">시스템 권한 창이 표시됩니다. 허용을 선택한 뒤 다음 단계로 돌아오세요.</string>

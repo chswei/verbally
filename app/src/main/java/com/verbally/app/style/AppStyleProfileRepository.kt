@@ -2,6 +2,7 @@ package com.verbally.app.style
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import com.verbally.app.settings.AppLanguage
 
 enum class AppCategory(val label: String) {
@@ -73,9 +74,9 @@ class SharedPreferencesAppStyleProfileRepository(
     }
 
     override fun save(profile: AppStyleProfile) {
-        prefs.edit()
-            .putString(keyFor(profile.category), profile.style.name)
-            .apply()
+        prefs.edit {
+            putString(keyFor(profile.category), profile.style.name)
+        }
     }
 
     private fun keyFor(category: AppCategory): String =

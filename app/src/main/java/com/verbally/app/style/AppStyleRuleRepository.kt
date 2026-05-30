@@ -2,6 +2,7 @@ package com.verbally.app.style
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import com.verbally.app.settings.AppLanguage
 
 data class AppStyleRule(
@@ -78,15 +79,15 @@ class SharedPreferencesAppStyleRuleRepository(
             restoreDefault(normalizedLanguage, style)
             return
         }
-        prefs.edit()
-            .putString(keyFor(normalizedLanguage, style), trimmedRule)
-            .apply()
+        prefs.edit {
+            putString(keyFor(normalizedLanguage, style), trimmedRule)
+        }
     }
 
     override fun restoreDefault(language: AppLanguage, style: OutputStyle) {
-        prefs.edit()
-            .remove(keyFor(language.normalizedStyleRuleLanguage(), style))
-            .apply()
+        prefs.edit {
+            remove(keyFor(language.normalizedStyleRuleLanguage(), style))
+        }
     }
 }
 

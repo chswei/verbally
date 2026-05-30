@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.os.LocaleList
 import android.provider.Settings
@@ -108,7 +107,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -504,8 +505,8 @@ fun VerballyAppScaffold(
     historyContent: @Composable () -> Unit,
     styleContent: @Composable () -> Unit,
     settingsContent: @Composable () -> Unit,
-    showAppChrome: Boolean = true,
     modifier: Modifier = Modifier,
+    showAppChrome: Boolean = true,
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -748,10 +749,12 @@ private fun DrawerItemLabel(
 @Composable
 private fun PermissionScreen(
     onPermissionsChanged: () -> Unit,
-    onComplete: () -> Unit = onPermissionsChanged,
     modifier: Modifier = Modifier,
+    onComplete: () -> Unit = onPermissionsChanged,
 ) {
     val context = LocalContext.current
+    val microphoneGrantedMessage = stringResource(R.string.permission_microphone_granted)
+    val microphoneDeniedMessage = stringResource(R.string.permission_microphone_denied)
     val permissionPrefs = remember {
         context.getSharedPreferences("verbally_permission_state", Context.MODE_PRIVATE)
     }
@@ -773,15 +776,13 @@ private fun PermissionScreen(
     ) { granted ->
         microphoneGranted = granted
         microphoneRequestedBefore = true
-        permissionPrefs.edit().putBoolean(KEY_MICROPHONE_REQUESTED, true).apply()
+        permissionPrefs.edit {
+            putBoolean(KEY_MICROPHONE_REQUESTED, true)
+        }
         refreshLocalPermissions()
         Toast.makeText(
             context,
-            if (granted) {
-                context.getString(R.string.permission_microphone_granted)
-            } else {
-                context.getString(R.string.permission_microphone_denied)
-            },
+            if (granted) microphoneGrantedMessage else microphoneDeniedMessage,
             Toast.LENGTH_LONG,
         ).show()
     }
@@ -793,10 +794,12 @@ private fun PermissionScreen(
             )
         ) {
             PermissionAction.ALREADY_GRANTED -> {
-                Toast.makeText(context, context.getString(R.string.permission_microphone_granted), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, microphoneGrantedMessage, Toast.LENGTH_SHORT).show()
             }
             PermissionAction.REQUEST_RUNTIME_PERMISSION -> {
-                permissionPrefs.edit().putBoolean(KEY_MICROPHONE_REQUESTED, true).apply()
+                permissionPrefs.edit {
+                    putBoolean(KEY_MICROPHONE_REQUESTED, true)
+                }
                 microphoneRequestedBefore = true
                 microphoneLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
@@ -825,7 +828,7 @@ private fun PermissionScreen(
                 context.startActivity(
                     Intent(
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:${context.packageName}"),
+                        "package:${context.packageName}".toUri(),
                     ),
                 )
             }
@@ -837,18 +840,12 @@ private fun PermissionScreen(
             }
         }
     }
-    val primaryActionLabel = when (
-        val nextStep = PermissionGuidance.nextSetupStep(
-            microphoneGranted = microphoneGranted,
-            overlayGranted = overlayGranted,
-            accessibilityGranted = accessibilityGranted,
-        )
-    ) {
-        PermissionSetupStep.MICROPHONE -> context.getString(permissionActionLabelRes(nextStep))
-        PermissionSetupStep.OVERLAY -> context.getString(permissionActionLabelRes(nextStep))
-        PermissionSetupStep.ACCESSIBILITY -> context.getString(permissionActionLabelRes(nextStep))
-        PermissionSetupStep.COMPLETE -> context.getString(permissionActionLabelRes(nextStep))
-    }
+    val nextStep = PermissionGuidance.nextSetupStep(
+        microphoneGranted = microphoneGranted,
+        overlayGranted = overlayGranted,
+        accessibilityGranted = accessibilityGranted,
+    )
+    val primaryActionLabel = stringResource(permissionActionLabelRes(nextStep))
 
     Scaffold(
         modifier = modifier,
@@ -1177,11 +1174,12 @@ private fun SettingsScreen(
 ) {
     var settings by remember(savedSettings) { mutableStateOf(savedSettings.normalizedModelChoices()) }
     val context = LocalContext.current
+    val settingsSavedMessage = stringResource(R.string.settings_saved)
     val saveSettings = {
         val normalizedSettings = settings.normalizedModelChoices()
         container.settingsRepository.save(normalizedSettings)
         onSettingsSaved(normalizedSettings)
-        Toast.makeText(context, context.getString(R.string.settings_saved), Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, settingsSavedMessage, Toast.LENGTH_SHORT).show()
     }
 
     SettingsScreenContent(
@@ -1232,8 +1230,8 @@ private fun AppSettingsScreen(
 fun AppSettingsScreenContent(
     settings: AppSettings,
     onThemeModeSelected: (AppThemeMode) -> Unit,
-    onInterfaceLanguageSelected: (AppLanguage) -> Unit = {},
     modifier: Modifier = Modifier,
+    onInterfaceLanguageSelected: (AppLanguage) -> Unit = {},
 ) {
     var showAppearanceDialog by remember { mutableStateOf(false) }
     var showInterfaceLanguageDialog by remember { mutableStateOf(false) }
@@ -1377,8 +1375,8 @@ private fun ThemeModeRadioOption(
     selected: Boolean,
     onSelected: () -> Unit,
 ) {
-    val context = LocalContext.current
     val label = mode.localizedLabel()
+    val contentDescription = stringResource(R.string.settings_choose_appearance, label)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1389,7 +1387,7 @@ private fun ThemeModeRadioOption(
                 role = Role.RadioButton,
             )
             .semantics {
-                contentDescription = context.getString(R.string.settings_choose_appearance, label)
+                this.contentDescription = contentDescription
             }
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1413,8 +1411,8 @@ private fun InterfaceLanguageRadioOption(
     selected: Boolean,
     onSelected: () -> Unit,
 ) {
-    val context = LocalContext.current
     val label = language.localizedLabel()
+    val contentDescription = stringResource(R.string.settings_choose_interface_language, label)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1425,10 +1423,7 @@ private fun InterfaceLanguageRadioOption(
                 role = Role.RadioButton,
             )
             .semantics {
-                contentDescription = context.getString(
-                    R.string.settings_choose_interface_language,
-                    label,
-                )
+                this.contentDescription = contentDescription
             }
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1764,7 +1759,8 @@ private fun CleanupPromptField(
     onPromptChange: (String) -> Unit,
     onRestoreDefault: () -> Unit,
 ) {
-    val context = LocalContext.current
+    val promptMenuContentDescription = stringResource(R.string.basic_cleanup_prompt_menu)
+    val promptInputContentDescription = stringResource(R.string.basic_cleanup_prompt_input)
     var showPromptMenu by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -1783,7 +1779,7 @@ private fun CleanupPromptField(
                     modifier = Modifier
                         .size(40.dp)
                         .semantics {
-                            contentDescription = context.getString(R.string.basic_cleanup_prompt_menu)
+                            contentDescription = promptMenuContentDescription
                         },
                 ) {
                     Icon(
@@ -1812,7 +1808,7 @@ private fun CleanupPromptField(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp)
-                .semantics { contentDescription = context.getString(R.string.basic_cleanup_prompt_input) },
+                .semantics { contentDescription = promptInputContentDescription },
             textStyle = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -1851,10 +1847,11 @@ private fun DropdownField(
     options: List<String>,
     onSelected: (String) -> Unit,
 ) {
-    val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
     val displayValue = selectedValue.takeIf { it in options } ?: options.firstOrNull().orEmpty()
     val displayParts = ModelOptionLabelParts.from(displayValue)
+    val selectContentDescription = stringResource(R.string.dropdown_select_content_description, label)
+    val expandContentDescription = stringResource(R.string.dropdown_expand_content_description, label)
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
@@ -1870,7 +1867,7 @@ private fun DropdownField(
                     .fillMaxWidth()
                     .height(ModelDropdownHeight)
                     .semantics {
-                        contentDescription = context.getString(R.string.dropdown_select_content_description, label)
+                        contentDescription = selectContentDescription
                     },
                 contentPadding = PaddingValues(start = 16.dp, end = 12.dp),
             ) {
@@ -1902,7 +1899,7 @@ private fun DropdownField(
                     }
                     Icon(
                         painter = painterResource(R.drawable.ic_app_chevron_down_24),
-                        contentDescription = context.getString(R.string.dropdown_expand_content_description, label),
+                        contentDescription = expandContentDescription,
                         modifier = Modifier.size(24.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1975,6 +1972,8 @@ private fun DictionaryScreen(container: VerballyContainer, modifier: Modifier = 
     var query by remember { mutableStateOf("") }
     var entries by remember { mutableStateOf(container.dictionaryRepository.list()) }
     val context = LocalContext.current
+    val savedMessage = stringResource(R.string.dictionary_saved)
+    val deletedMessage = stringResource(R.string.dictionary_deleted)
 
     fun refresh(nextQuery: String = query) {
         entries = container.dictionaryRepository.search(nextQuery)
@@ -1990,12 +1989,12 @@ private fun DictionaryScreen(container: VerballyContainer, modifier: Modifier = 
         onSave = { entry ->
             container.dictionaryRepository.save(entry)
             refresh()
-            Toast.makeText(context, context.getString(R.string.dictionary_saved), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, savedMessage, Toast.LENGTH_SHORT).show()
         },
         onDelete = { entry ->
             container.dictionaryRepository.delete(entry.id)
             refresh()
-            Toast.makeText(context, context.getString(R.string.dictionary_deleted), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, deletedMessage, Toast.LENGTH_SHORT).show()
         },
         modifier = modifier,
     )
@@ -2010,7 +2009,7 @@ fun DictionaryScreenContent(
     onDelete: (DictionaryEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
+    val addContentDescription = stringResource(R.string.dictionary_add_content_description)
     var editingEntry by remember { mutableStateOf<DictionaryEntry?>(null) }
     var showEditor by remember { mutableStateOf(false) }
 
@@ -2095,7 +2094,7 @@ fun DictionaryScreenContent(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 24.dp)
-                .semantics { contentDescription = context.getString(R.string.dictionary_add_content_description) },
+                .semantics { contentDescription = addContentDescription },
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
         ) {
@@ -2110,7 +2109,8 @@ private fun DictionaryEntryCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val context = LocalContext.current
+    val editContentDescription = stringResource(R.string.edit_item_content_description, entry.term)
+    val deleteContentDescription = stringResource(R.string.delete_item_content_description, entry.term)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2142,7 +2142,7 @@ private fun DictionaryEntryCard(
                 TextButton(
                     onClick = onEdit,
                     modifier = Modifier.semantics {
-                        contentDescription = context.getString(R.string.edit_item_content_description, entry.term)
+                        contentDescription = editContentDescription
                     },
                 ) {
                     Text(stringResource(R.string.edit))
@@ -2150,7 +2150,7 @@ private fun DictionaryEntryCard(
                 TextButton(
                     onClick = onDelete,
                     modifier = Modifier.semantics {
-                        contentDescription = context.getString(R.string.delete_item_content_description, entry.term)
+                        contentDescription = deleteContentDescription
                     },
                 ) {
                     Text(stringResource(R.string.delete))
@@ -2166,7 +2166,8 @@ private fun DictionaryEntryDialog(
     onDismiss: () -> Unit,
     onSave: (DictionaryEntry) -> Unit,
 ) {
-    val context = LocalContext.current
+    val termInputContentDescription = stringResource(R.string.dictionary_term_input_content_description)
+    val noteInputContentDescription = stringResource(R.string.dictionary_note_input_content_description)
     var term by remember(entry?.id) { mutableStateOf(entry?.term.orEmpty()) }
     var note by remember(entry?.id) { mutableStateOf(entry?.note.orEmpty()) }
     val title = if (entry == null) {
@@ -2187,7 +2188,7 @@ private fun DictionaryEntryDialog(
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = context.getString(R.string.dictionary_term_input_content_description) },
+                        .semantics { contentDescription = termInputContentDescription },
                 )
                 OutlinedTextField(
                     value = note,
@@ -2197,7 +2198,7 @@ private fun DictionaryEntryDialog(
                     minLines = 2,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = context.getString(R.string.dictionary_note_input_content_description) },
+                        .semantics { contentDescription = noteInputContentDescription },
                 )
             }
         },
@@ -2230,6 +2231,8 @@ private fun SnippetsScreen(container: VerballyContainer, modifier: Modifier = Mo
     var query by remember { mutableStateOf("") }
     var entries by remember { mutableStateOf(container.snippetRepository.list()) }
     val context = LocalContext.current
+    val savedMessage = stringResource(R.string.snippets_saved)
+    val deletedMessage = stringResource(R.string.snippets_deleted)
 
     fun refresh(nextQuery: String = query) {
         entries = container.snippetRepository.search(nextQuery)
@@ -2245,12 +2248,12 @@ private fun SnippetsScreen(container: VerballyContainer, modifier: Modifier = Mo
         onSave = { entry ->
             container.snippetRepository.save(entry)
             refresh()
-            Toast.makeText(context, context.getString(R.string.snippets_saved), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, savedMessage, Toast.LENGTH_SHORT).show()
         },
         onDelete = { entry ->
             container.snippetRepository.delete(entry.id)
             refresh()
-            Toast.makeText(context, context.getString(R.string.snippets_deleted), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, deletedMessage, Toast.LENGTH_SHORT).show()
         },
         modifier = modifier,
     )
@@ -2265,7 +2268,7 @@ fun SnippetsScreenContent(
     onDelete: (SnippetEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
+    val addContentDescription = stringResource(R.string.snippets_add_content_description)
     var editingEntry by remember { mutableStateOf<SnippetEntry?>(null) }
     var showEditor by remember { mutableStateOf(false) }
 
@@ -2350,7 +2353,7 @@ fun SnippetsScreenContent(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 24.dp)
-                .semantics { contentDescription = context.getString(R.string.snippets_add_content_description) },
+                .semantics { contentDescription = addContentDescription },
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
         ) {
@@ -2365,7 +2368,8 @@ private fun SnippetEntryCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val context = LocalContext.current
+    val editContentDescription = stringResource(R.string.edit_item_content_description, entry.trigger)
+    val deleteContentDescription = stringResource(R.string.delete_item_content_description, entry.trigger)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2395,7 +2399,7 @@ private fun SnippetEntryCard(
                 TextButton(
                     onClick = onEdit,
                     modifier = Modifier.semantics {
-                        contentDescription = context.getString(R.string.edit_item_content_description, entry.trigger)
+                        contentDescription = editContentDescription
                     },
                 ) {
                     Text(stringResource(R.string.edit))
@@ -2403,7 +2407,7 @@ private fun SnippetEntryCard(
                 TextButton(
                     onClick = onDelete,
                     modifier = Modifier.semantics {
-                        contentDescription = context.getString(R.string.delete_item_content_description, entry.trigger)
+                        contentDescription = deleteContentDescription
                     },
                 ) {
                     Text(stringResource(R.string.delete))
@@ -2419,7 +2423,8 @@ private fun SnippetEntryDialog(
     onDismiss: () -> Unit,
     onSave: (SnippetEntry) -> Unit,
 ) {
-    val context = LocalContext.current
+    val triggerInputContentDescription = stringResource(R.string.snippets_trigger_input_content_description)
+    val expansionInputContentDescription = stringResource(R.string.snippets_expansion_input_content_description)
     var trigger by remember(entry?.id) { mutableStateOf(entry?.trigger.orEmpty()) }
     var expansion by remember(entry?.id) { mutableStateOf(entry?.expansion.orEmpty()) }
     val title = if (entry == null) {
@@ -2441,7 +2446,7 @@ private fun SnippetEntryDialog(
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = context.getString(R.string.snippets_trigger_input_content_description) },
+                        .semantics { contentDescription = triggerInputContentDescription },
                 )
                 OutlinedTextField(
                     value = expansion,
@@ -2451,7 +2456,7 @@ private fun SnippetEntryDialog(
                     minLines = 4,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = context.getString(R.string.snippets_expansion_input_content_description) },
+                        .semantics { contentDescription = expansionInputContentDescription },
                 )
             }
         },
@@ -2486,6 +2491,9 @@ private fun StyleProfilesScreen(
     onEditorActiveChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val ruleSavedMessage = stringResource(R.string.style_rule_saved)
+    val ruleRestoredMessage = stringResource(R.string.style_rule_restored)
+    val styleSavedMessage = stringResource(R.string.style_saved)
     var profiles by remember { mutableStateOf(container.styleProfileRepository.list()) }
     val styleRuleLanguage = remember(context) {
         context.defaultPromptLanguageFor(container.settingsRepository.load().interfaceLanguage)
@@ -2518,13 +2526,13 @@ private fun StyleProfilesScreen(
             onSave = { ruleText ->
                 container.styleRuleRepository.saveCustomRule(styleRuleLanguage, currentEditingStyle, ruleText)
                 refreshStyleRules()
-                Toast.makeText(context, context.getString(R.string.style_rule_saved), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, ruleSavedMessage, Toast.LENGTH_SHORT).show()
                 editingStyle = null
             },
             onRestoreDefault = {
                 container.styleRuleRepository.restoreDefault(styleRuleLanguage, currentEditingStyle)
                 refreshStyleRules()
-                Toast.makeText(context, context.getString(R.string.style_rule_restored), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, ruleRestoredMessage, Toast.LENGTH_SHORT).show()
             },
             modifier = modifier,
         )
@@ -2537,7 +2545,7 @@ private fun StyleProfilesScreen(
         onProfileChange = { profile ->
             container.styleProfileRepository.save(profile)
             profiles = container.styleProfileRepository.list()
-            Toast.makeText(context, context.getString(R.string.style_saved), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, styleSavedMessage, Toast.LENGTH_SHORT).show()
         },
         onEditRule = { editingStyle = it },
         modifier = modifier,
@@ -2547,10 +2555,10 @@ private fun StyleProfilesScreen(
 @Composable
 fun StyleProfilesScreenContent(
     profiles: List<AppStyleProfile>,
-    styleRules: List<AppStyleRule> = emptyList(),
     onProfileChange: (AppStyleProfile) -> Unit,
-    onEditRule: (OutputStyle) -> Unit = {},
     modifier: Modifier = Modifier,
+    styleRules: List<AppStyleRule> = emptyList(),
+    onEditRule: (OutputStyle) -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -2617,15 +2625,15 @@ private fun StyleRuleRow(
     rule: AppStyleRule,
     onClick: () -> Unit,
 ) {
-    val context = LocalContext.current
     val styleLabel = rule.style.localizedLabel()
+    val contentDescription = stringResource(R.string.style_rule_row_content_description, styleLabel)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(68.dp)
             .clickable(onClick = onClick)
             .semantics {
-                contentDescription = context.getString(R.string.style_rule_row_content_description, styleLabel)
+                this.contentDescription = contentDescription
             },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -2671,9 +2679,10 @@ fun StyleRuleEditorScreen(
     onRestoreDefault: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     val styleLabel = rule.style.localizedLabel()
     val backContentDescription = stringResource(R.string.style_rule_back)
+    val menuContentDescription = stringResource(R.string.style_rule_menu_content_description, styleLabel)
+    val textContentDescription = stringResource(R.string.style_rule_text_content_description, styleLabel)
     var ruleText by remember(language, rule.style, rule.rule) { mutableStateOf(rule.rule) }
     var menuExpanded by remember { mutableStateOf(false) }
     BackHandler(onBack = onBack)
@@ -2721,10 +2730,7 @@ fun StyleRuleEditorScreen(
                         modifier = Modifier
                             .offset(x = 16.dp)
                             .semantics {
-                                contentDescription = context.getString(
-                                    R.string.style_rule_menu_content_description,
-                                    styleLabel,
-                                )
+                                contentDescription = menuContentDescription
                             },
                     ) {
                         Icon(
@@ -2777,7 +2783,7 @@ fun StyleRuleEditorScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics {
-                    contentDescription = context.getString(R.string.style_rule_text_content_description, styleLabel)
+                    contentDescription = textContentDescription
                 },
         )
         Button(
@@ -2798,7 +2804,6 @@ private fun StyleProfileRow(
     profile: AppStyleProfile,
     onProfileChange: (AppStyleProfile) -> Unit,
 ) {
-    val context = LocalContext.current
     val categoryLabel = profile.category.localizedLabel()
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -2828,15 +2833,16 @@ private fun StyleProfileRow(
                 OutputStyle.entries.forEach { outputStyle ->
                     val selected = profile.style == outputStyle
                     val styleLabel = outputStyle.localizedLabel()
+                    val contentDescription = stringResource(
+                        R.string.style_option_content_description,
+                        categoryLabel,
+                        styleLabel,
+                    )
                     val buttonModifier = Modifier
                         .weight(1f)
                         .height(44.dp)
                         .semantics {
-                            contentDescription = context.getString(
-                                R.string.style_option_content_description,
-                                categoryLabel,
-                                styleLabel,
-                            )
+                            this.contentDescription = contentDescription
                         }
                     if (selected) {
                         Button(
@@ -2960,6 +2966,8 @@ private fun HistoryScreen(container: VerballyContainer, modifier: Modifier = Mod
     var query by remember { mutableStateOf("") }
     var entries by remember { mutableStateOf(container.historyRepository.list()) }
     val context = LocalContext.current
+    val historyClearedMessage = stringResource(R.string.history_cleared)
+    val copiedMessage = stringResource(R.string.copied)
 
     HistoryScreenContent(
         query = query,
@@ -2971,11 +2979,11 @@ private fun HistoryScreen(container: VerballyContainer, modifier: Modifier = Mod
         onClearHistory = {
             container.historyRepository.clear()
             entries = container.historyRepository.search(query)
-            Toast.makeText(context, context.getString(R.string.history_cleared), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, historyClearedMessage, Toast.LENGTH_SHORT).show()
         },
         onCopy = { entry ->
             copyText(context, entry.cleanedText)
-            Toast.makeText(context, context.getString(R.string.copied), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
         },
         onDelete = { entry ->
             container.historyRepository.delete(entry.id)
@@ -3182,7 +3190,7 @@ private fun openAppDetails(context: Context) {
     context.startActivity(
         Intent(
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.parse("package:${context.packageName}"),
+            "package:${context.packageName}".toUri(),
         ),
     )
 }

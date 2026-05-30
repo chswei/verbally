@@ -9,7 +9,6 @@ import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
@@ -24,6 +23,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.annotation.ColorInt
 import androidx.annotation.ColorRes
+import androidx.core.content.edit
 import com.verbally.app.R
 import kotlin.math.abs
 import kotlin.math.max
@@ -297,11 +297,14 @@ class FloatingDictationOverlay(
     }
 
     private fun bindDragAndClick(target: View, clickAction: (() -> Unit)? = null) {
-        target.setOnTouchListener(DragTouchListener(clickAction))
+        target.setOnClickListener {
+            haptics.tap()
+            clickAction?.invoke()
+        }
+        target.setOnTouchListener(DragTouchListener())
     }
 
     private fun View.hideWithInputMethodAnimation() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         setWindowInsetsAnimationCallback(
             object : WindowInsetsAnimation.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
                 override fun onProgress(
@@ -377,11 +380,11 @@ class FloatingDictationOverlay(
             edgeMargin = edgeMargin,
         )
         applyAnchoredPosition(view, position)
-        preferences.edit()
-            .putBoolean(KEY_HAS_POSITION, true)
-            .putString(KEY_EDGE, position.edge?.name)
-            .putInt(KEY_Y, position.y)
-            .apply()
+        preferences.edit {
+            putBoolean(KEY_HAS_POSITION, true)
+            putString(KEY_EDGE, position.edge?.name)
+            putInt(KEY_Y, position.y)
+        }
     }
 
     private fun realignToRememberedEdge(view: View) {
@@ -413,12 +416,7 @@ class FloatingDictationOverlay(
     }
 
     private fun screenWidth(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            windowManager.currentWindowMetrics.bounds.width()
-        } else {
-            @Suppress("DEPRECATION")
-            context.resources.displayMetrics.widthPixels
-        }
+        windowManager.currentWindowMetrics.bounds.width()
 
     private fun View.resolvedWidth(): Int {
         measure(
@@ -449,9 +447,7 @@ class FloatingDictationOverlay(
         OverlayUiState.PROCESSING -> context.getString(R.string.overlay_processing)
     }
 
-    private inner class DragTouchListener(
-        private val clickAction: (() -> Unit)? = null,
-    ) : View.OnTouchListener {
+    private inner class DragTouchListener : View.OnTouchListener {
         private var downRawX = 0f
         private var downRawY = 0f
         private var startX = 0
@@ -497,8 +493,7 @@ class FloatingDictationOverlay(
                             haptics.snap()
                         }
                     } else {
-                        haptics.tap()
-                        clickAction?.invoke()
+                        view.performClick()
                     }
                     return true
                 }
@@ -517,6 +512,7 @@ class FloatingDictationOverlay(
             color = context.getColor(OverlayColorDefaults.ACTIVE_WAVEFORM_COLOR_RES)
             style = Paint.Style.FILL
         }
+        private val barBounds = RectF()
         private val amplitudes = floatArrayOf(0.14f, 0.34f, 0.56f, 0.78f, 0.78f, 0.56f, 0.34f, 0.14f)
         private var phase = 0f
         private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -556,13 +552,13 @@ class FloatingDictationOverlay(
                     min(height * 0.6f, height * amplitudes[index] * animatedScale * liveScale)
                 }
                 val centerX = horizontalInset + spacing * (index + 1)
-                val rect = RectF(
+                barBounds.set(
                     centerX - barWidth / 2f,
                     centerY - barHeight / 2f,
                     centerX + barWidth / 2f,
                     centerY + barHeight / 2f,
                 )
-                canvas.drawRoundRect(rect, barWidth, barWidth, paint)
+                canvas.drawRoundRect(barBounds, barWidth, barWidth, paint)
             }
         }
 

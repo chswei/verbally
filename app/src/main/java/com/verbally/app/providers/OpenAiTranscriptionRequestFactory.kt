@@ -131,10 +131,19 @@ internal fun jsonString(value: String): String = buildString {
         when (char) {
             '\\' -> append("\\\\")
             '"' -> append("\\\"")
+            '\b' -> append("\\b")
+            '\u000C' -> append("\\f")
             '\n' -> append("\\n")
             '\r' -> append("\\r")
             '\t' -> append("\\t")
-            else -> append(char)
+            else -> {
+                if (char < ' ') {
+                    append("\\u")
+                    append(char.code.toString(16).padStart(4, '0'))
+                } else {
+                    append(char)
+                }
+            }
         }
     }
     append('"')

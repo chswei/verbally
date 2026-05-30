@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Verbally</string>
     <string name="accessibility_service_label">Verbally schwebendes Diktat</string>
     <string name="accessibility_service_description">Zeigt die schwebende Diktat-Schaltfläche in Textfeldern und fügt Transkriptionen an der Cursorposition ein.</string>
@@ -52,7 +52,7 @@
     <string name="permission_action_microphone">Berechtigung öffnen</string>
     <string name="permission_action_settings">Einstellungen öffnen</string>
     <string name="permission_action_complete">Einrichtung abschließen</string>
-    <string name="permission_step_microphone_progress">Schritt 1/3</string>
+    <string name="permission_step_microphone_progress" tools:ignore="TypographyFractions">Schritt 1/3</string>
     <string name="permission_step_microphone_title">Aufnahme erlauben</string>
     <string name="permission_step_microphone_subtitle">Erlaube Verbally, deine Sprache in Text umzuwandeln.</string>
     <string name="permission_step_microphone_description">Der Systemdialog für Berechtigungen erscheint. Wähle Zulassen und kehre dann zum nächsten Schritt zurück.</string>

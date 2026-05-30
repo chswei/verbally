@@ -42,6 +42,15 @@ class DictionaryRepositoryTest {
     }
 
     @Test
+    fun blankSearchReturnsAllEntriesNewestFirst() {
+        val repository = InMemoryDictionaryRepository(limit = 10)
+        repository.save(DictionaryEntry(term = "Gemini", note = null, id = 1L))
+        repository.save(DictionaryEntry(term = "OpenAI", note = null, id = 2L))
+
+        assertEquals(listOf("OpenAI", "Gemini"), repository.search("   ").map { it.term })
+    }
+
+    @Test
     fun deletesEntryById() {
         val repository = InMemoryDictionaryRepository(limit = 10)
         repository.save(DictionaryEntry(term = "Gemini", note = null, id = 1L))

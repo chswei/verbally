@@ -44,6 +44,15 @@ class SnippetRepositoryTest {
     }
 
     @Test
+    fun blankSearchReturnsAllEntriesNewestFirst() {
+        val repository = InMemorySnippetRepository()
+        repository.save(SnippetEntry(trigger = "放射科報告模板", expansion = "Findings:\nImpression:", id = 1L))
+        repository.save(SnippetEntry(trigger = "我的地址", expansion = "台北市信義區一號", id = 2L))
+
+        assertEquals(listOf("我的地址", "放射科報告模板"), repository.search("   ").map { it.trigger })
+    }
+
+    @Test
     fun deleteRemovesEntryById() {
         val repository = InMemorySnippetRepository()
         repository.save(SnippetEntry(trigger = "我的地址", expansion = "台北市信義區一號", id = 1L))

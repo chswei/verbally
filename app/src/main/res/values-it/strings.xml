@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Verbally</string>
     <string name="accessibility_service_label">Dettatura flottante Verbally</string>
     <string name="accessibility_service_description">Mostra il pulsante flottante di dettatura nei campi di testo e inserisce i risultati nella posizione del cursore.</string>
@@ -52,7 +52,7 @@
     <string name="permission_action_microphone">Apri permesso</string>
     <string name="permission_action_settings">Apri impostazioni</string>
     <string name="permission_action_complete">Completa configurazione</string>
-    <string name="permission_step_microphone_progress">Passo 1/3</string>
+    <string name="permission_step_microphone_progress" tools:ignore="TypographyFractions">Passo 1/3</string>
     <string name="permission_step_microphone_title">Consenti registrazione</string>
     <string name="permission_step_microphone_subtitle">Permetti a Verbally di trasformare la voce in testo.</string>
     <string name="permission_step_microphone_description">Apparirà la finestra di permesso del sistema. Scegli Consenti e torna al passo successivo.</string>

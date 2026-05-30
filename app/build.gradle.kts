@@ -20,19 +20,25 @@ android {
     buildFeatures {
         compose = true
     }
+
+    packaging {
+        jniLibs {
+            keepDebugSymbols += "**/libandroidx.graphics.path.so"
+        }
+    }
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2026.05.00"))
-    implementation("androidx.activity:activity-compose:1.12.0")
-    implementation("androidx.core:core-ktx:1.17.0")
+    implementation(platform("androidx.compose:compose-bom:2026.05.01"))
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.core:core-ktx:1.18.0")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.navigation:navigation-compose:2.9.6")
+    implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("androidx.security:security-crypto:1.1.0")
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
@@ -40,6 +46,6 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.3.2")
 
-    androidTestImplementation(platform("androidx.compose:compose-bom:2026.05.00"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2026.05.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }

@@ -48,4 +48,35 @@ class DictationHistoryRepositoryTest {
         assertEquals(1, repository.search("email").size)
         assertEquals(0, repository.search("不存在").size)
     }
+
+    @Test
+    fun blankSearchReturnsAllEntriesNewestFirst() {
+        val repository = InMemoryDictationHistoryRepository(limit = 100)
+        repository.save(
+            DictationHistoryEntry(
+                rawTranscript = "first raw",
+                cleanedText = "first clean",
+                createdAtMillis = 1L,
+                transcriptionProvider = "openai",
+                transcriptionModel = "gpt-4o-transcribe",
+                cleanupProvider = "openai",
+                cleanupModel = "gpt-5.4-mini",
+                appLabel = null,
+            ),
+        )
+        repository.save(
+            DictationHistoryEntry(
+                rawTranscript = "second raw",
+                cleanedText = "second clean",
+                createdAtMillis = 2L,
+                transcriptionProvider = "openai",
+                transcriptionModel = "gpt-4o-transcribe",
+                cleanupProvider = "openai",
+                cleanupModel = "gpt-5.4-mini",
+                appLabel = null,
+            ),
+        )
+
+        assertEquals(listOf("second raw", "first raw"), repository.search("   ").map { it.rawTranscript })
+    }
 }

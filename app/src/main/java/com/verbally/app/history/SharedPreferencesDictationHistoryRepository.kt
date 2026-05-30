@@ -2,6 +2,7 @@ package com.verbally.app.history
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -77,7 +78,9 @@ class SharedPreferencesDictationHistoryRepository(
                     .put("appLabel", entry.appLabel.orEmpty()),
             )
         }
-        prefs.edit().putString(KEY_ENTRIES, array.toString()).apply()
+        prefs.edit {
+            putString(KEY_ENTRIES, array.toString())
+        }
     }
 
     private companion object {
