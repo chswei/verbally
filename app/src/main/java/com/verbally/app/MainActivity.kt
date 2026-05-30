@@ -116,6 +116,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.dictionary.DictionaryEntry
+import com.verbally.app.providers.ProviderKeyTestResult
+import com.verbally.app.providers.ProviderKeyTester
 import com.verbally.app.permissions.PermissionAction
 import com.verbally.app.permissions.PermissionGuidance
 import com.verbally.app.permissions.PermissionSetupStep
@@ -362,6 +364,12 @@ private fun Context.defaultPromptLanguageFor(language: AppLanguage): AppLanguage
         selectedInterfaceLanguage = language,
         systemLanguageTag = getSystemService(LocaleManager::class.java).systemLocales[0]?.toLanguageTag(),
     )
+
+data class ApiKeyTestUiState(
+    val isTesting: Boolean = false,
+    val message: String? = null,
+    val isSuccess: Boolean? = null,
+)
 
 internal enum class PermissionScreenOpenReason {
     REQUIRED_SETUP,
@@ -1174,21 +1182,63 @@ private fun SettingsScreen(
 ) {
     var settings by remember(savedSettings) { mutableStateOf(savedSettings.normalizedModelChoices()) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val settingsSavedMessage = stringResource(R.string.settings_saved)
+    var transcriptionTestState by remember { mutableStateOf(ApiKeyTestUiState()) }
+    var cleanupTestState by remember { mutableStateOf(ApiKeyTestUiState()) }
     val saveSettings = {
         val normalizedSettings = settings.normalizedModelChoices()
         container.settingsRepository.save(normalizedSettings)
         onSettingsSaved(normalizedSettings)
         Toast.makeText(context, settingsSavedMessage, Toast.LENGTH_SHORT).show()
     }
+    fun updateSettings(next: AppSettings) {
+        settings = next
+        transcriptionTestState = ApiKeyTestUiState()
+        cleanupTestState = ApiKeyTestUiState()
+    }
+    fun testTranscriptionKey(tester: ProviderKeyTester) {
+        transcriptionTestState = ApiKeyTestUiState(isTesting = true)
+        scope.launch {
+            val result = tester.testTranscription(settings.normalizedModelChoices())
+            transcriptionTestState = result.toApiKeyTestUiState(context)
+        }
+    }
+    fun testCleanupKey(tester: ProviderKeyTester) {
+        cleanupTestState = ApiKeyTestUiState(isTesting = true)
+        scope.launch {
+            val result = tester.testCleanup(settings.normalizedModelChoices())
+            cleanupTestState = result.toApiKeyTestUiState(context)
+        }
+    }
 
     SettingsScreenContent(
         settings = settings,
-        onSettingsChange = { settings = it },
+        onSettingsChange = ::updateSettings,
         onSave = saveSettings,
+        transcriptionTestState = transcriptionTestState,
+        cleanupTestState = cleanupTestState,
+        onTestTranscriptionApiKey = { testTranscriptionKey(container.providerKeyTester) },
+        onTestCleanupApiKey = { testCleanupKey(container.providerKeyTester) },
         modifier = modifier,
     )
 }
+
+private fun ProviderKeyTestResult.toApiKeyTestUiState(context: Context): ApiKeyTestUiState =
+    when (this) {
+        is ProviderKeyTestResult.Success -> ApiKeyTestUiState(
+            message = context.getString(R.string.api_key_test_success, provider),
+            isSuccess = true,
+        )
+        is ProviderKeyTestResult.MissingKey -> ApiKeyTestUiState(
+            message = context.getString(R.string.api_key_test_missing, provider),
+            isSuccess = false,
+        )
+        is ProviderKeyTestResult.Failure -> ApiKeyTestUiState(
+            message = context.getString(R.string.api_key_test_failed, provider, detail),
+            isSuccess = false,
+        )
+    }
 
 @Composable
 private fun AppSettingsScreen(
@@ -1459,6 +1509,10 @@ fun SettingsScreenContent(
     settings: AppSettings,
     onSettingsChange: (AppSettings) -> Unit,
     onSave: () -> Unit,
+    transcriptionTestState: ApiKeyTestUiState = ApiKeyTestUiState(),
+    cleanupTestState: ApiKeyTestUiState = ApiKeyTestUiState(),
+    onTestTranscriptionApiKey: () -> Unit = {},
+    onTestCleanupApiKey: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -1492,6 +1546,11 @@ fun SettingsScreenContent(
             ) {
                 Text(stringResource(R.string.save_transcription_api_key))
             }
+            ApiKeyTestAction(
+                label = stringResource(R.string.test_transcription_api_key),
+                state = transcriptionTestState,
+                onClick = onTestTranscriptionApiKey,
+            )
         }
         ApiSettingsBlock(
             title = stringResource(R.string.cleanup_settings_title),
@@ -1509,8 +1568,47 @@ fun SettingsScreenContent(
             ) {
                 Text(stringResource(R.string.save_cleanup_settings))
             }
+            ApiKeyTestAction(
+                label = stringResource(R.string.test_cleanup_api_key),
+                state = cleanupTestState,
+                onClick = onTestCleanupApiKey,
+            )
         }
         Spacer(modifier = Modifier.height(64.dp))
+    }
+}
+
+@Composable
+private fun ApiKeyTestAction(
+    label: String,
+    state: ApiKeyTestUiState,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = !state.isTesting,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(PrimaryActionHeight),
+    ) {
+        Text(
+            if (state.isTesting) {
+                stringResource(R.string.api_key_test_in_progress)
+            } else {
+                label
+            },
+        )
+    }
+    state.message?.let { message ->
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (state.isSuccess == true) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.error
+            },
+        )
     }
 }
 
@@ -2485,6 +2583,30 @@ private fun SnippetEntryDialog(
 }
 
 @Composable
+private fun ConfirmDeleteDialog(
+    title: String,
+    description: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(description) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.delete_confirm_button))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
 private fun StyleProfilesScreen(
     container: VerballyContainer,
     modifier: Modifier = Modifier,
@@ -3005,6 +3127,7 @@ fun HistoryScreenContent(
 ) {
     var showClearConfirmation by remember { mutableStateOf(false) }
     var showHistoryMenu by remember { mutableStateOf(false) }
+    var pendingDeleteEntry by remember { mutableStateOf<DictationHistoryEntry?>(null) }
 
     if (showClearConfirmation) {
         AlertDialog(
@@ -3025,6 +3148,17 @@ fun HistoryScreenContent(
                 TextButton(onClick = { showClearConfirmation = false }) {
                     Text(stringResource(R.string.cancel))
                 }
+            },
+        )
+    }
+    pendingDeleteEntry?.let { entry ->
+        ConfirmDeleteDialog(
+            title = stringResource(R.string.history_entry_delete_confirm_title),
+            description = stringResource(R.string.history_entry_delete_confirm_description),
+            onDismiss = { pendingDeleteEntry = null },
+            onConfirm = {
+                pendingDeleteEntry = null
+                onDelete(entry)
             },
         )
     }
@@ -3071,7 +3205,7 @@ fun HistoryScreenContent(
                     HistoryItem(
                         entry = entry,
                         onCopy = { onCopy(entry) },
-                        onDelete = { onDelete(entry) },
+                        onDelete = { pendingDeleteEntry = entry },
                     )
                 }
             }
@@ -3136,6 +3270,7 @@ private fun HistoryItem(
     onCopy: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val deleteContentDescription = stringResource(R.string.delete_item_content_description, entry.cleanedText)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -3148,7 +3283,14 @@ private fun HistoryItem(
             HorizontalDivider()
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onCopy) { Text(stringResource(R.string.copy)) }
-                TextButton(onClick = onDelete) { Text(stringResource(R.string.delete)) }
+                TextButton(
+                    onClick = onDelete,
+                    modifier = Modifier.semantics {
+                        contentDescription = deleteContentDescription
+                    },
+                ) {
+                    Text(stringResource(R.string.delete))
+                }
             }
         }
     }

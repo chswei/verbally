@@ -225,6 +225,47 @@ class MainActivitySettingsScreenTest {
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("儲存外觀設定")
             .assertCountEquals(0)
+        composeRule.onAllNodesWithText("權限都完成了")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("補開權限")
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun settingsOverviewSupportsApiKeyTestActions() {
+        var transcriptionTests = 0
+        var cleanupTests = 0
+        composeRule.setContent {
+            MaterialTheme {
+                SettingsScreenContent(
+                    settings = AppSettings(),
+                    onSettingsChange = {},
+                    onSave = {},
+                    transcriptionTestState = ApiKeyTestUiState(message = "OpenAI API Key 可使用", isSuccess = true),
+                    cleanupTestState = ApiKeyTestUiState(message = "OpenAI API Key 測試失敗：HTTP 401", isSuccess = false),
+                    onTestTranscriptionApiKey = { transcriptionTests++ },
+                    onTestCleanupApiKey = { cleanupTests++ },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("測試語音轉錄 API Key")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText("OpenAI API Key 可使用")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("測試文字處理 API Key")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText("OpenAI API Key 測試失敗：HTTP 401")
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            assertEquals(1, transcriptionTests)
+            assertEquals(1, cleanupTests)
+        }
     }
 
     @Test
@@ -334,6 +375,7 @@ class MainActivitySettingsScreenTest {
 
     @Test
     fun historyScreenShowsRetentionCopyAndDeleteControls() {
+        var deletedEntry: DictationHistoryEntry? = null
         val entries = listOf(
             DictationHistoryEntry(
                 rawTranscript = "raw 1",
@@ -365,7 +407,7 @@ class MainActivitySettingsScreenTest {
                     onQueryChange = {},
                     onClearHistory = {},
                     onCopy = {},
-                    onDelete = {},
+                    onDelete = { deletedEntry = it },
                 )
             }
         }
@@ -380,6 +422,24 @@ class MainActivitySettingsScreenTest {
             .assertCountEquals(2)
         composeRule.onAllNodesWithText("刪除")
             .assertCountEquals(2)
+        composeRule.onNodeWithContentDescription("刪除 第一筆")
+            .performClick()
+
+        composeRule.onNodeWithText("確定刪除這筆歷史？")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("取消")
+            .performClick()
+        composeRule.runOnIdle {
+            assertEquals(null, deletedEntry)
+        }
+
+        composeRule.onNodeWithContentDescription("刪除 第一筆")
+            .performClick()
+        composeRule.onNodeWithText("確定刪除")
+            .performClick()
+        composeRule.runOnIdle {
+            assertEquals(entries.first(), deletedEntry)
+        }
     }
 
     @Test
@@ -1067,14 +1127,18 @@ class MainActivitySettingsScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("其他")
             .assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("聊天 Casual")
+        composeRule.onNodeWithContentDescription("聊天 口語")
             .assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("工作 Formal")
+        composeRule.onNodeWithContentDescription("工作 正式")
             .assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("其他 Formal")
+        composeRule.onNodeWithContentDescription("其他 正式")
             .assertIsDisplayed()
+        composeRule.onAllNodesWithText("Formal")
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithText("Casual")
+            .assertCountEquals(0)
 
-        composeRule.onNodeWithContentDescription("聊天 Formal")
+        composeRule.onNodeWithContentDescription("聊天 正式")
             .performClick()
 
         composeRule.runOnIdle {
@@ -1114,13 +1178,13 @@ class MainActivitySettingsScreenTest {
         composeRule.onNodeWithText("自訂語氣規則")
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Casual 規則")
+        composeRule.onNodeWithText("口語 規則")
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithText("自訂規則")
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("開啟 Casual 規則")
+        composeRule.onNodeWithContentDescription("開啟 口語 規則")
             .performScrollTo()
             .performClick()
 
@@ -1153,12 +1217,12 @@ class MainActivitySettingsScreenTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("Casual 規則")
+        composeRule.onNodeWithText("口語 規則")
             .assertIsDisplayed()
-        val ruleTextField = composeRule.onNodeWithContentDescription("Casual 規則輸入")
+        val ruleTextField = composeRule.onNodeWithContentDescription("口語 規則輸入")
         ruleTextField.performTextClearance()
         ruleTextField.performTextInput("Only punctuation and spacing.")
-        composeRule.onNodeWithText("儲存 Casual 規則")
+        composeRule.onNodeWithText("儲存 口語 規則")
             .performScrollTo()
             .performClick()
 
@@ -1166,7 +1230,7 @@ class MainActivitySettingsScreenTest {
             assertEquals("Only punctuation and spacing.", savedRule)
         }
 
-        composeRule.onNodeWithContentDescription("Casual 規則選單")
+        composeRule.onNodeWithContentDescription("口語 規則選單")
             .performClick()
         composeRule.onNodeWithText("還原預設")
             .performClick()

@@ -9,6 +9,7 @@ import com.verbally.app.providers.GeminiTextCleanupClient
 import com.verbally.app.providers.GroqTranscriptionClient
 import com.verbally.app.providers.OpenAiTextCleanupClient
 import com.verbally.app.providers.OpenAiTranscriptionClient
+import com.verbally.app.providers.ProviderApiKeyTester
 import com.verbally.app.providers.SonioxRealtimeTranscriptionClient
 import com.verbally.app.providers.TranscriptionClientRouter
 import com.verbally.app.settings.EncryptedSettingsRepository
@@ -42,4 +43,5 @@ class VerballyContainer(application: Application) {
     )
     val openAiCleanupClient = OpenAiTextCleanupClient(messages = providerMessages)
     val geminiCleanupClient = GeminiTextCleanupClient(messages = providerMessages)
+    val providerKeyTester = ProviderApiKeyTester()
 }

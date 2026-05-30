@@ -131,12 +131,36 @@ class VerballyAccessibilityService : AccessibilityService() {
         scope.launch {
             runCatching { coordinator.confirmRecording(appLabel) }
                 .onSuccess { result ->
-                    overlay?.completeProcessing(result.message)
+                    if (result.pasted) {
+                        reportProcessingSuccess()
+                    } else {
+                        reportProcessingFailure(result.message)
+                    }
                 }
                 .onFailure { error ->
-                    overlay?.completeProcessing(error.message ?: getString(R.string.error_generic))
+                    reportProcessingFailure(error.message ?: getString(R.string.error_generic))
                 }
         }
+    }
+
+    private fun reportProcessingSuccess() {
+        val currentOverlay = overlay ?: return
+        DictationFeedbackReporter(
+            overlay = FloatingDictationOverlayFeedback(currentOverlay),
+            userMessages = ToastUserMessageSink(this),
+        ).reportSuccess()
+    }
+
+    private fun reportProcessingFailure(message: String) {
+        val currentOverlay = overlay
+        if (currentOverlay == null) {
+            ToastUserMessageSink(this).show(message)
+            return
+        }
+        DictationFeedbackReporter(
+            overlay = FloatingDictationOverlayFeedback(currentOverlay),
+            userMessages = ToastUserMessageSink(this),
+        ).reportFailure(message)
     }
 
     private fun startWaveformUpdates() {
