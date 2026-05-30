@@ -84,7 +84,7 @@ class AppLanguageTest {
             ),
         )
         assertEquals(
-            AppLanguage.TRADITIONAL_CHINESE,
+            AppLanguage.ENGLISH,
             AppLanguage.defaultPromptLanguageFor(
                 selectedInterfaceLanguage = AppLanguage.SYSTEM,
                 systemLanguageTag = "nl-NL",

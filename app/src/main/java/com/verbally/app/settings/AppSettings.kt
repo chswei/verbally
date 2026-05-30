@@ -66,7 +66,7 @@ enum class AppLanguage(val label: String, val languageTag: String) {
             if (selectedInterfaceLanguage != SYSTEM) {
                 selectedInterfaceLanguage
             } else {
-                fromLanguageTag(systemLanguageTag).takeIf { it != SYSTEM } ?: TRADITIONAL_CHINESE
+                fromLanguageTag(systemLanguageTag).takeIf { it != SYSTEM } ?: ENGLISH
             }
     }
 }

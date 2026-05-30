@@ -11,6 +11,12 @@ The system SHALL provide an interface language setting with `Follow system` as t
 - **THEN** the system uses the Android system language for supported localized UI resources
 - **THEN** the settings page shows `Follow system` as the selected interface language
 
+#### Scenario: Unsupported system language falls back to English
+- **WHEN** no interface language has been saved
+- **AND** the Android system language is not supported by Verbally
+- **THEN** first-party UI copy falls back to English
+- **THEN** built-in default prompt and style-rule language defaults resolve to English
+
 #### Scenario: User selects a manual interface language
 - **WHEN** the user selects a supported manual interface language in Settings
 - **THEN** the selected language is saved locally

@@ -730,5 +730,5 @@ object CleanupPromptFactory {
     )
 
     private fun AppLanguage.normalizedPromptLanguage(): AppLanguage =
-        if (this == AppLanguage.SYSTEM) AppLanguage.TRADITIONAL_CHINESE else this
+        if (this == AppLanguage.SYSTEM) AppLanguage.ENGLISH else this
 }

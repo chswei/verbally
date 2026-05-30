@@ -37,7 +37,7 @@ class DictationCoordinator(
     private val insertionFactory: () -> ClipboardPasteInserter,
     private val noRecordingMessage: String = "沒有可處理的錄音。",
     private val defaultPromptLanguageFor: (AppLanguage) -> AppLanguage = { language ->
-        if (language == AppLanguage.SYSTEM) AppLanguage.TRADITIONAL_CHINESE else language
+        if (language == AppLanguage.SYSTEM) AppLanguage.ENGLISH else language
     },
 ) {
     constructor(
@@ -54,7 +54,7 @@ class DictationCoordinator(
         insertionFactory: () -> ClipboardPasteInserter,
         noRecordingMessage: String = "沒有可處理的錄音。",
         defaultPromptLanguageFor: (AppLanguage) -> AppLanguage = { language ->
-            if (language == AppLanguage.SYSTEM) AppLanguage.TRADITIONAL_CHINESE else language
+            if (language == AppLanguage.SYSTEM) AppLanguage.ENGLISH else language
         },
     ) : this(
         settingsRepository = settingsRepository,

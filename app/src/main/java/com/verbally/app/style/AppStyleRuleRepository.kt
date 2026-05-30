@@ -364,7 +364,7 @@ object StyleRuleDefaults {
 }
 
 fun AppLanguage.normalizedStyleRuleLanguage(): AppLanguage =
-    if (this == AppLanguage.SYSTEM) AppLanguage.TRADITIONAL_CHINESE else this
+    if (this == AppLanguage.SYSTEM) AppLanguage.ENGLISH else this
 
 private fun keyFor(language: AppLanguage, style: OutputStyle): String =
     "${language.normalizedStyleRuleLanguage().name.lowercase()}_${style.name.lowercase()}_rule"
