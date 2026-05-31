@@ -34,7 +34,6 @@
     <string name="api_key_test_success">%1$s API Key は使用できます</string>
     <string name="api_key_test_missing">テスト前に %1$s API Key を入力してください。</string>
     <string name="api_key_test_failed">%1$s API Key のテストに失敗しました：%2$s</string>
-    <string name="save_settings">設定を保存</string>
     <string name="transcription_model_label">音声文字起こしモデル</string>
     <string name="cleanup_model_label">文字処理モデル</string>
     <string name="basic_cleanup_prompt_label">基本文字処理プロンプト</string>

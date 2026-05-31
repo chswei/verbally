@@ -73,8 +73,6 @@ class EncryptedSettingsRepository(
         }
     }
 
-    override fun clearHistoryRequested() = Unit
-
     private fun encryptedPrefsOrFallback(context: Context): SharedPreferences {
         return runCatching {
             val masterKey = MasterKey.Builder(context)

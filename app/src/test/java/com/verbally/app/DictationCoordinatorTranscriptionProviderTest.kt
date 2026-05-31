@@ -85,7 +85,6 @@ class DictationCoordinatorTranscriptionProviderTest {
     private class FakeSettingsRepository(private val settings: AppSettings) : SettingsRepository {
         override fun load(): AppSettings = settings
         override fun save(settings: AppSettings) = Unit
-        override fun clearHistoryRequested() = Unit
     }
 
     private class CapturingHistoryRepository : DictationHistoryRepository {

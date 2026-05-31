@@ -12,9 +12,10 @@ import org.junit.Test
 
 class CleanupPromptFactoryTest {
     @Test
-    fun naturalCleanupPromptPreservesMixedLanguageAndForbidsTranslation() {
-        val prompt = CleanupPromptFactory.naturalCleanupPrompt(
-            "我等一下要 send 給 Alex 然後 uh 補一下 deadline",
+    fun defaultCleanupPromptPreservesMixedLanguageAndForbidsTranslation() {
+        val prompt = CleanupPromptFactory.cleanupPrompt(
+            promptTemplate = CleanupPromptFactory.defaultCleanupPrompt,
+            rawTranscript = "我等一下要 send 給 Alex 然後 uh 補一下 deadline",
         )
 
         assertTrue(prompt.contains("保留原本語言"))

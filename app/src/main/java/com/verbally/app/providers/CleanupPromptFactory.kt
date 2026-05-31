@@ -335,9 +335,6 @@ object CleanupPromptFactory {
         """.trimIndent(),
     )
 
-    fun naturalCleanupPrompt(rawTranscript: String): String =
-        cleanupPrompt(defaultCleanupPrompt, rawTranscript)
-
     fun cleanupPrompt(
         promptTemplate: String,
         rawTranscript: String,
