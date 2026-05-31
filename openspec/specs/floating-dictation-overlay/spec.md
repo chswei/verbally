@@ -108,7 +108,7 @@ The system SHALL insert cleaned dictation text at the active cursor by first usi
 #### Scenario: Accessibility service supports IME-style insertion
 - **WHEN** the Verbally accessibility service is enabled
 - **THEN** the service requests interactive windows, reported view IDs, key-event filtering, and input-method-editor support
-- **THEN** the service remains marked as an accessibility tool
+- **THEN** the service is not declared as an accessibility tool
 
 ### Requirement: Permission status is visible
 The system SHALL guide the user through microphone, overlay, and accessibility permissions one step at a time before the bubble workflow is considered ready, and SHALL refresh permission state when the app returns from Android settings.
