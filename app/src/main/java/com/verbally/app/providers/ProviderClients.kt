@@ -141,7 +141,6 @@ class OpenAiTranscriptionClient(
                 val body = it.body.string()
                 if (!it.isSuccessful) throw ProviderException(messages.transcriptionFailed("OpenAI", it.code.toString()))
                 val text = JSONObject(body).optString("text")
-                if (text.isBlank()) throw ProviderException(messages.noTranscriptionText("OpenAI"))
                 RawTranscript(text = text, model = model, provider = "openai")
             }
         }
@@ -160,7 +159,6 @@ class GroqTranscriptionClient(
                 val body = it.body.string()
                 if (!it.isSuccessful) throw ProviderException(messages.transcriptionFailed("Groq", it.code.toString()))
                 val text = JSONObject(body).optString("text")
-                if (text.isBlank()) throw ProviderException(messages.noTranscriptionText("Groq"))
                 RawTranscript(text = text, model = model, provider = "groq")
             }
         }
@@ -186,7 +184,6 @@ class DeepgramTranscriptionClient(
                     ?.optJSONObject(0)
                     ?.optString("transcript")
                     .orEmpty()
-                if (text.isBlank()) throw ProviderException(messages.noTranscriptionText("Deepgram"))
                 RawTranscript(text = text, model = model, provider = "deepgram")
             }
         }
@@ -216,11 +213,7 @@ class SonioxRealtimeTranscriptionClient(
         fun complete(text: String, webSocket: WebSocket) {
             if (completed.compareAndSet(false, true)) {
                 webSocket.close(1000, null)
-                if (text.isBlank()) {
-                    continuation.resumeWithException(ProviderException(messages.noTranscriptionText("Soniox")))
-                } else {
-                    continuation.resume(text)
-                }
+                continuation.resume(text)
             }
         }
 

@@ -124,6 +124,17 @@ class CleanupPromptFactoryTest {
     }
 
     @Test
+    fun cleanupPromptIncludesNoDictationSentinelInstructionBeforeTranscript() {
+        val prompt = CleanupPromptFactory.cleanupPrompt(
+            promptTemplate = CleanupPromptFactory.defaultCleanupPrompt,
+            rawTranscript = "鳥叫聲和背景雜音",
+        )
+
+        assertTrue(prompt.contains("<NO_DICTATION_CONTENT>"))
+        assertTrue(prompt.indexOf("<NO_DICTATION_CONTENT>") < prompt.indexOf("原始轉錄："))
+    }
+
+    @Test
     fun customCleanupPromptIncludesDictionaryContext() {
         val prompt = CleanupPromptFactory.cleanupPrompt(
             promptTemplate = "整理成 Slack 訊息：${CleanupPromptFactory.TranscriptPlaceholder}",

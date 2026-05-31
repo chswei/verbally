@@ -1,5 +1,6 @@
 package com.verbally.app.providers
 
+import com.verbally.app.DictationContentGuard
 import com.verbally.app.dictionary.DictionaryEntry
 import com.verbally.app.settings.AppLanguage
 import com.verbally.app.style.AppCategory
@@ -357,21 +358,25 @@ object CleanupPromptFactory {
                 $rawTranscript
             """.trimIndent()
         }
+        val promptWithNoDictationRule = insertBeforeTranscriptLabel(
+            prompt = prompt,
+            block = noDictationInstruction(AppLanguage.TRADITIONAL_CHINESE),
+        )
         val dictionaryContext = dictionaryContext(dictionaryEntries)
-        if (dictionaryContext.isBlank()) return prompt
+        if (dictionaryContext.isBlank()) return promptWithNoDictationRule
 
-        val transcriptLabelIndex = prompt.indexOf("原始轉錄：")
+        val transcriptLabelIndex = promptWithNoDictationRule.indexOf("原始轉錄：")
         return if (transcriptLabelIndex >= 0) {
             buildString {
-                append(prompt.substring(0, transcriptLabelIndex).trimEnd())
+                append(promptWithNoDictationRule.substring(0, transcriptLabelIndex).trimEnd())
                 append("\n\n")
                 append(dictionaryContext)
                 append("\n\n")
-                append(prompt.substring(transcriptLabelIndex))
+                append(promptWithNoDictationRule.substring(transcriptLabelIndex))
             }
         } else {
             """
-                $prompt
+                $promptWithNoDictationRule
 
                 $dictionaryContext
             """.trimIndent()
@@ -393,6 +398,8 @@ object CleanupPromptFactory {
             appendLine(labels.basicPrompt)
             appendLine(basicPrompt)
             appendLine()
+            appendLine(noDictationInstruction(styleContext.language))
+            appendLine()
             if (dictionaryContext.isNotBlank()) {
                 appendLine(dictionaryContext)
                 appendLine()
@@ -411,6 +418,51 @@ object CleanupPromptFactory {
         return withoutDefaultTranscriptBlock
             .replace(TranscriptPlaceholder, transcriptReference(language))
             .trim()
+    }
+
+    private fun insertBeforeTranscriptLabel(prompt: String, block: String): String {
+        val transcriptLabelIndex = transcriptFooterLabels()
+            .map { prompt.indexOf(it) }
+            .filter { it >= 0 }
+            .minOrNull()
+
+        return if (transcriptLabelIndex == null) {
+            """
+                $prompt
+
+                $block
+            """.trimIndent()
+        } else {
+            buildString {
+                append(prompt.substring(0, transcriptLabelIndex).trimEnd())
+                append("\n\n")
+                append(block)
+                append("\n\n")
+                append(prompt.substring(transcriptLabelIndex))
+            }
+        }
+    }
+
+    private fun noDictationInstruction(language: AppLanguage): String {
+        val sentinel = DictationContentGuard.NoDictationSentinel
+        return when (language.normalizedPromptLanguage()) {
+            AppLanguage.SIMPLIFIED_CHINESE -> """
+                没有可听写内容规则：
+                - 如果原始转录没有使用者说出的内容，或只有背景声、音乐、鸟叫、杂音、字幕署名，或常见空白幻觉（例如 you、the、I'm going to go to the next video），请只输出 $sentinel。
+                - 不要输出「请输入内容」之类的提示文字。
+            """.trimIndent()
+            AppLanguage.SYSTEM,
+            AppLanguage.TRADITIONAL_CHINESE -> """
+                沒有可聽寫內容規則：
+                - 如果原始轉錄沒有使用者說出的內容，或只有背景聲、音樂、鳥叫、雜音、字幕署名，或常見空白幻覺（例如 you、the、I'm going to go to the next video），請只輸出 $sentinel。
+                - 不要輸出「請輸入內容」之類的提示文字。
+            """.trimIndent()
+            else -> """
+                No-dictation rule:
+                - If the original transcript contains no user-spoken content, or only background sound, music, bird sounds, noise, subtitle credits, or common empty-audio hallucinations such as "you", "the", or "I'm going to go to the next video", output only $sentinel.
+                - Do not output prompts such as "please enter content".
+            """.trimIndent()
+        }
     }
 
     private fun stripTranscriptPlaceholderBlock(template: String): String {

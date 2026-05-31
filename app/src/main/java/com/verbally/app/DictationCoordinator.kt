@@ -5,7 +5,6 @@ import com.verbally.app.dictionary.DictionaryRepository
 import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.history.DictationHistoryRepository
 import com.verbally.app.insertion.ClipboardPasteInserter
-import com.verbally.app.insertion.InsertResult
 import com.verbally.app.providers.TextCleanupClient
 import com.verbally.app.providers.TranscriptionClient
 import com.verbally.app.providers.TranscriptionClientRouter
@@ -73,24 +72,38 @@ class DictationCoordinator(
     )
 
     private var currentRecording: File? = null
+    private val recordingActivityTracker = RecordingActivityTracker()
 
     fun startRecording() {
+        recordingActivityTracker.reset()
         currentRecording = audioRecorder.start()
     }
 
     fun cancelRecording() {
         audioRecorder.stopAndDelete()
         currentRecording = null
+        recordingActivityTracker.reset()
     }
 
-    fun currentAmplitude(): Int = audioRecorder.currentAmplitude()
+    fun currentAmplitude(): Int =
+        audioRecorder.currentAmplitude().also { recordingActivityTracker.record(it) }
 
-    suspend fun confirmRecording(appLabel: String?): InsertResult {
+    suspend fun confirmRecording(appLabel: String?): DictationOutcome {
+        val recordingWasStarted = currentRecording != null
+        if (recordingWasStarted) {
+            recordingActivityTracker.record(audioRecorder.currentAmplitude())
+        }
+        val noAudioSamples = recordingWasStarted && recordingActivityTracker.sampledOnlyZeroAmplitude()
         val audioFile = audioRecorder.stop() ?: currentRecording
         currentRecording = null
-        if (audioFile == null) return InsertResult(false, noRecordingMessage)
+        if (audioFile == null) {
+            recordingActivityTracker.reset()
+            return DictationOutcome.Failure(noRecordingMessage)
+        }
 
         return try {
+            if (noAudioSamples) return DictationOutcome.NoDictatedContent
+
             val storedSettings = settingsRepository.load()
             val styleRuleLanguage = defaultPromptLanguageFor(storedSettings.interfaceLanguage)
                 .normalizedStyleRuleLanguage()
@@ -106,6 +119,9 @@ class DictationCoordinator(
                 customRule = styleRuleRepository.customRuleFor(styleRuleLanguage, outputStyle),
             )
             val raw = transcriptionRouter.transcribe(settings, audioFile)
+            if (DictationContentGuard.rawTranscriptHasNoContent(raw.text)) {
+                return DictationOutcome.NoDictatedContent
+            }
             val cleaned = when (settings.cleanupProvider) {
                 CleanupProvider.OPENAI -> openAiCleanupClient.clean(
                     apiKey = settings.openAiApiKey,
@@ -124,7 +140,13 @@ class DictationCoordinator(
                     styleContext = styleContext,
                 )
             }
+            if (DictationContentGuard.cleanedTextHasNoContent(cleaned.text)) {
+                return DictationOutcome.NoDictatedContent
+            }
             val expandedText = SnippetExpander.expand(cleaned.text, snippetEntries)
+            if (DictationContentGuard.cleanedTextHasNoContent(expandedText)) {
+                return DictationOutcome.NoDictatedContent
+            }
             val insertResult = insertionFactory().insert(expandedText)
             historyRepository.save(
                 DictationHistoryEntry(
@@ -138,9 +160,33 @@ class DictationCoordinator(
                     appLabel = appLabel,
                 ),
             )
-            insertResult
+            if (insertResult.pasted) {
+                DictationOutcome.Inserted(insertResult.message)
+            } else {
+                DictationOutcome.ClipboardFallback(insertResult.message)
+            }
         } finally {
             audioRecorder.delete(audioFile)
+            recordingActivityTracker.reset()
+        }
+    }
+
+    private class RecordingActivityTracker {
+        private var sampled = false
+        private var nonZeroAmplitudeObserved = false
+
+        fun record(amplitude: Int) {
+            sampled = true
+            if (amplitude > 0) {
+                nonZeroAmplitudeObserved = true
+            }
+        }
+
+        fun sampledOnlyZeroAmplitude(): Boolean = sampled && !nonZeroAmplitudeObserved
+
+        fun reset() {
+            sampled = false
+            nonZeroAmplitudeObserved = false
         }
     }
 }

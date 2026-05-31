@@ -13,6 +13,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.verbally.app.DictationCoordinator
+import com.verbally.app.DictationOutcome
 import com.verbally.app.R
 import com.verbally.app.VerballyApplication
 import com.verbally.app.audio.TemporaryAudioRecorder
@@ -131,10 +132,11 @@ class VerballyAccessibilityService : AccessibilityService() {
         scope.launch {
             runCatching { coordinator.confirmRecording(appLabel) }
                 .onSuccess { result ->
-                    if (result.pasted) {
-                        reportProcessingSuccess()
-                    } else {
-                        reportProcessingFailure(result.message)
+                    when (result) {
+                        is DictationOutcome.Inserted,
+                        DictationOutcome.NoDictatedContent -> reportProcessingSuccess()
+                        is DictationOutcome.ClipboardFallback -> reportProcessingFailure(result.message)
+                        is DictationOutcome.Failure -> reportProcessingFailure(result.message)
                     }
                 }
                 .onFailure { error ->

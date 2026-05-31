@@ -97,17 +97,19 @@ class FloatingDictationOverlay(
 
     fun setState(next: OverlayUiState) {
         customContentDescription = null
+        val previous = session.state
         session.forceState(next)
         if (rootView != null) {
-            replaceAttachedRoot()
+            updateAttachedRoot(previous, session.state)
         }
     }
 
     fun completeProcessing(message: String? = null) {
+        val previous = session.state
         session.onProcessingFinished()
         customContentDescription = message
         if (rootView != null) {
-            replaceAttachedRoot()
+            updateAttachedRoot(previous, session.state)
         }
     }
 
@@ -122,16 +124,24 @@ class FloatingDictationOverlay(
     }
 
     private fun renderState(root: FrameLayout) {
-        root.removeAllViews()
+        recordingWaveformView = null
         val content = when (session.state) {
             OverlayUiState.READY -> createReadyBubble()
             OverlayUiState.RECORDING -> createRecordingControls()
             OverlayUiState.PROCESSING -> createProcessingControls()
         }
+        if (rootView === root) {
+            val width = content.resolvedWidth()
+            val height = content.resolvedHeight()
+            root.removeAllViews()
+            // In-place transitions resize while empty so active-state swaps do not briefly
+            // draw new controls inside stale window bounds.
+            realignToRememberedEdge(root, width, height)
+        } else {
+            root.removeAllViews()
+        }
         root.addView(content)
         root.contentDescription = customContentDescription ?: contentDescriptionFor(session.state)
-        // Re-anchor immediately so right-edge bubbles do not shift under a new touch.
-        realignToRememberedEdge(root)
     }
 
     private fun createReadyBubble(): View =
@@ -267,26 +277,29 @@ class FloatingDictationOverlay(
         }
 
     private fun handleReadyTap() {
+        val previous = session.state
         session.onReadyBubbleTapped()
         customContentDescription = null
-        replaceAttachedRoot()
+        updateAttachedRoot(previous, session.state)
         onStart()
     }
 
     private fun handleCancelTap() {
         if (session.state != OverlayUiState.RECORDING) return
+        val previous = session.state
         onCancel()
         session.onCancelTapped()
         waveformLevel = 0f
         customContentDescription = null
-        replaceAttachedRoot()
+        updateAttachedRoot(previous, session.state)
     }
 
     private fun handleConfirmTap() {
         if (session.state != OverlayUiState.RECORDING) return
+        val previous = session.state
         session.onConfirmTapped()
         customContentDescription = null
-        replaceAttachedRoot()
+        updateAttachedRoot(previous, session.state)
         onConfirm()
     }
 
@@ -298,9 +311,23 @@ class FloatingDictationOverlay(
         rootView = view
     }
 
+    private fun refreshAttachedRoot() {
+        val existing = rootView ?: return
+        renderState(existing)
+    }
+
+    private fun updateAttachedRoot(previous: OverlayUiState, next: OverlayUiState) {
+        when (OverlayRootTransitionPolicy.mode(previous, next)) {
+            OverlayRootUpdateMode.REBUILD_WINDOW -> replaceAttachedRoot()
+            OverlayRootUpdateMode.REFRESH_IN_PLACE -> refreshAttachedRoot()
+        }
+    }
+
     private fun replaceAttachedRoot() {
         val existing = rootView ?: return
         runCatching { windowManager.removeViewImmediate(existing) }
+        rootView = null
+        currentLayoutParams = null
         attachFreshRoot()
     }
 
@@ -418,9 +445,13 @@ class FloatingDictationOverlay(
     }
 
     private fun realignToRememberedEdge(view: View) {
-        val params = currentLayoutParams ?: return
         val width = view.resolvedWidth()
         val height = view.resolvedHeight()
+        realignToRememberedEdge(view, width, height)
+    }
+
+    private fun realignToRememberedEdge(view: View, width: Int, height: Int) {
+        val params = currentLayoutParams ?: return
         val position = positionMemory.currentPosition(
             screenWidth = screenWidth(),
             screenHeight = screenHeight(),
