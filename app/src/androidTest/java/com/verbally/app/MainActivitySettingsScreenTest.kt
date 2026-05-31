@@ -6,7 +6,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -16,6 +15,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -60,12 +60,6 @@ class MainActivitySettingsScreenTest {
             .targetContext
             .getSystemService(LocaleManager::class.java)
             .applicationLocales = LocaleList.forLanguageTags("zh-TW")
-    }
-
-    private fun assertLabelAppearsBefore(first: String, second: String) {
-        val firstTop = composeRule.onNodeWithText(first).fetchSemanticsNode().positionInRoot.y
-        val secondTop = composeRule.onNodeWithText(second).fetchSemanticsNode().positionInRoot.y
-        assertTrue("$first should appear before $second", firstTop < secondTop)
     }
 
     @Test
@@ -694,10 +688,10 @@ class MainActivitySettingsScreenTest {
     }
 
     @Test
-    fun transcriptionSettingsOnlyShowsTranscriptionFields() {
+    fun settingsContentShowsCompactTranscriptionFields() {
         composeRule.setContent {
             MaterialTheme {
-                TranscriptionSettingsScreenContent(
+                SettingsScreenContent(
                     settings = AppSettings(),
                     onSettingsChange = {},
                     onSave = {},
@@ -705,12 +699,12 @@ class MainActivitySettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("API Key")
-            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("API Key")
+            .assertCountEquals(2)
         composeRule.onNodeWithText("語音轉錄模型")
             .assertIsDisplayed()
-        composeRule.onAllNodesWithText("Gemini API Key")
-            .assertCountEquals(0)
+        composeRule.onNodeWithText("儲存語音轉錄 API Key")
+            .assertIsDisplayed()
         composeRule.onAllNodesWithText("OpenAI 轉錄模型")
             .assertCountEquals(0)
     }
@@ -720,7 +714,7 @@ class MainActivitySettingsScreenTest {
         var settings by mutableStateOf(AppSettings(openAiApiKey = "openai-key"))
         composeRule.setContent {
             MaterialTheme {
-                TranscriptionSettingsScreenContent(
+                SettingsScreenContent(
                     settings = settings,
                     onSettingsChange = { settings = it },
                     onSave = {},
@@ -732,9 +726,8 @@ class MainActivitySettingsScreenTest {
             .performClick()
         composeRule.onNodeWithText("Groq: whisper-large-v3-turbo")
             .performClick()
-        composeRule.onNodeWithText("API Key")
-            .assertIsDisplayed()
-        composeRule.onNode(hasSetTextAction())
+        composeRule.onAllNodes(hasSetTextAction())
+            .onFirst()
             .performTextInput("groq-key")
 
         composeRule.runOnIdle {
@@ -749,7 +742,7 @@ class MainActivitySettingsScreenTest {
     fun cleanupSettingsShowsOnlySelectedOpenAiProviderFields() {
         composeRule.setContent {
             MaterialTheme {
-                CleanupSettingsScreenContent(
+                SettingsScreenContent(
                     settings = AppSettings(cleanupProvider = CleanupProvider.OPENAI),
                     onSettingsChange = {},
                     onSave = {},
@@ -759,9 +752,12 @@ class MainActivitySettingsScreenTest {
 
         composeRule.onNodeWithText("文字處理模型")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("API Key")
-            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("API Key")
+            .assertCountEquals(2)
         composeRule.onNodeWithText("基本文字處理提示詞")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("儲存文字處理設定")
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("整理 Provider")
@@ -778,7 +774,7 @@ class MainActivitySettingsScreenTest {
     fun cleanupSettingsShowsOnlySelectedGeminiProviderFields() {
         composeRule.setContent {
             MaterialTheme {
-                CleanupSettingsScreenContent(
+                SettingsScreenContent(
                     settings = AppSettings(cleanupProvider = CleanupProvider.GEMINI),
                     onSettingsChange = {},
                     onSave = {},
@@ -787,10 +783,8 @@ class MainActivitySettingsScreenTest {
         }
 
         composeRule.onNodeWithText("文字處理模型")
+            .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithText("API Key")
-            .assertIsDisplayed()
-        assertLabelAppearsBefore("文字處理模型", "API Key")
         composeRule.onNodeWithText("基本文字處理提示詞")
             .performScrollTo()
             .assertIsDisplayed()
@@ -808,10 +802,10 @@ class MainActivitySettingsScreenTest {
 
     @Test
     fun cleanupProviderSelectionSwitchesVisibleModelFields() {
+        var settings by mutableStateOf(AppSettings(cleanupProvider = CleanupProvider.OPENAI))
         composeRule.setContent {
-            var settings by remember { mutableStateOf(AppSettings(cleanupProvider = CleanupProvider.OPENAI)) }
             MaterialTheme {
-                CleanupSettingsScreenContent(
+                SettingsScreenContent(
                     settings = settings,
                     onSettingsChange = { settings = it },
                     onSave = {},
@@ -820,26 +814,27 @@ class MainActivitySettingsScreenTest {
         }
 
         composeRule.onNodeWithText("文字處理模型")
+            .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithText("API Key")
-            .assertIsDisplayed()
-        assertLabelAppearsBefore("文字處理模型", "API Key")
         composeRule.onAllNodesWithText("Gemini API Key")
             .assertCountEquals(0)
 
         composeRule.onNodeWithContentDescription("選擇 文字處理模型")
+            .performScrollTo()
             .performClick()
         composeRule.onNodeWithText("Gemini: gemini-3.1-flash-lite")
             .performClick()
 
-        composeRule.onNodeWithText("API Key")
-            .assertIsDisplayed()
         composeRule.onAllNodesWithText("OpenAI 整理模型")
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("Gemini API Key")
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("Gemini 整理模型")
             .assertCountEquals(0)
+        composeRule.runOnIdle {
+            assertEquals(CleanupProvider.GEMINI, settings.cleanupProvider)
+            assertEquals("gemini-3.1-flash-lite", settings.geminiCleanupModel)
+        }
     }
 
     @Test
@@ -857,7 +852,7 @@ class MainActivitySettingsScreenTest {
 
         composeRule.setContent {
             MaterialTheme {
-                CleanupSettingsScreenContent(
+                SettingsScreenContent(
                     settings = settings,
                     onSettingsChange = { settings = it },
                     onSave = {},
@@ -906,7 +901,7 @@ class MainActivitySettingsScreenTest {
 
         composeRule.setContent {
             MaterialTheme {
-                CleanupSettingsScreenContent(
+                SettingsScreenContent(
                     settings = settings,
                     onSettingsChange = { settings = it },
                     onSave = {},

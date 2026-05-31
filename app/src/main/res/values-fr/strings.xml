@@ -34,7 +34,6 @@
     <string name="api_key_test_success">La clé API %1$s fonctionne</string>
     <string name="api_key_test_missing">Renseignez la clé API %1$s avant de tester.</string>
     <string name="api_key_test_failed">Le test de la clé API %1$s a échoué : %2$s</string>
-    <string name="save_settings">Enregistrer</string>
     <string name="transcription_model_label">Modèle de transcription</string>
     <string name="cleanup_model_label">Modèle de traitement du texte</string>
     <string name="basic_cleanup_prompt_label">Prompt de base de traitement du texte</string>

@@ -34,7 +34,6 @@
     <string name="api_key_test_success">%1$s API Key 可使用</string>
     <string name="api_key_test_missing">请先填入 %1$s API Key 后再测试。</string>
     <string name="api_key_test_failed">%1$s API Key 测试失败：%2$s</string>
-    <string name="save_settings">保存设置</string>
     <string name="transcription_model_label">语音转录模型</string>
     <string name="cleanup_model_label">文字处理模型</string>
     <string name="basic_cleanup_prompt_label">基本文字处理提示词</string>

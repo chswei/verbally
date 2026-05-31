@@ -34,7 +34,6 @@
     <string name="api_key_test_success">A API Key de %1$s funciona</string>
     <string name="api_key_test_missing">Insira a API Key de %1$s antes de testar.</string>
     <string name="api_key_test_failed">Falha no teste da API Key de %1$s: %2$s</string>
-    <string name="save_settings">Salvar configurações</string>
     <string name="transcription_model_label">Modelo de transcrição</string>
     <string name="cleanup_model_label">Modelo de processamento de texto</string>
     <string name="basic_cleanup_prompt_label">Prompt básico de processamento de texto</string>

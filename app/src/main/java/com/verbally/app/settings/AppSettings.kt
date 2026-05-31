@@ -134,5 +134,4 @@ fun AppSettings.withDefaultCleanupPromptLanguage(language: AppLanguage): AppSett
 interface SettingsRepository {
     fun load(): AppSettings
     fun save(settings: AppSettings)
-    fun clearHistoryRequested()
 }
