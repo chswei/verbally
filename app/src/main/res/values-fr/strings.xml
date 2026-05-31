@@ -28,6 +28,12 @@
     <string name="cleanup_settings_subtitle">Choisissez le modèle de nettoyage du texte. Changer de service affiche seulement la clé API correspondante.</string>
     <string name="save_transcription_api_key">Enregistrer la clé API de transcription</string>
     <string name="save_cleanup_settings">Enregistrer le traitement du texte</string>
+    <string name="test_transcription_api_key">Tester la clé API de transcription</string>
+    <string name="test_cleanup_api_key">Tester la clé API de traitement du texte</string>
+    <string name="api_key_test_in_progress">Test en cours…</string>
+    <string name="api_key_test_success">La clé API %1$s fonctionne</string>
+    <string name="api_key_test_missing">Renseignez la clé API %1$s avant de tester.</string>
+    <string name="api_key_test_failed">Le test de la clé API %1$s a échoué : %2$s</string>
     <string name="save_settings">Enregistrer</string>
     <string name="transcription_model_label">Modèle de transcription</string>
     <string name="cleanup_model_label">Modèle de traitement du texte</string>
@@ -163,6 +169,9 @@
     <string name="history_clear_confirm_title">Supprimer l’historique ?</string>
     <string name="history_clear_confirm_description">Cela supprimera tout l’historique de dictée enregistré sur cet appareil. Cette action est irréversible.</string>
     <string name="history_clear_confirm_button">Supprimer</string>
+    <string name="history_entry_delete_confirm_title">Supprimer cette entrée de l’historique ?</string>
+    <string name="history_entry_delete_confirm_description">Cela retirera de cet appareil l’historique de dictée sélectionné. Cette action est irréversible.</string>
+    <string name="delete_confirm_button">Supprimer</string>
     <string name="history_cleared">Historique effacé</string>
     <string name="overlay_start_dictation">Commencer la dictée</string>
     <string name="overlay_recording">Enregistrement en cours</string>

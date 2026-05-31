@@ -1509,11 +1509,11 @@ fun SettingsScreenContent(
     settings: AppSettings,
     onSettingsChange: (AppSettings) -> Unit,
     onSave: () -> Unit,
+    modifier: Modifier = Modifier,
     transcriptionTestState: ApiKeyTestUiState = ApiKeyTestUiState(),
     cleanupTestState: ApiKeyTestUiState = ApiKeyTestUiState(),
     onTestTranscriptionApiKey: () -> Unit = {},
     onTestCleanupApiKey: () -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
