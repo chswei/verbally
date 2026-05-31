@@ -12,9 +12,14 @@ interface AudioRecorder {
     fun delete(file: File?)
 }
 
+internal object TemporaryAudioRecorderDefaults {
+    const val SPEECH_RECOGNITION_AUDIO_SOURCE: Int = MediaRecorder.AudioSource.VOICE_RECOGNITION
+}
+
 class TemporaryAudioRecorder(
     private val context: Context,
     private val maxDurationMillis: Int = 5 * 60 * 1000,
+    private val audioSource: Int = TemporaryAudioRecorderDefaults.SPEECH_RECOGNITION_AUDIO_SOURCE,
 ) : AudioRecorder {
     private var recorder: MediaRecorder? = null
     private var currentFile: File? = null
@@ -23,7 +28,7 @@ class TemporaryAudioRecorder(
         stopAndDelete()
         val output = File.createTempFile("verbally-", ".m4a", context.cacheDir)
         val mediaRecorder = MediaRecorder(context).apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setAudioSource(audioSource)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             setAudioEncodingBitRate(128_000)
