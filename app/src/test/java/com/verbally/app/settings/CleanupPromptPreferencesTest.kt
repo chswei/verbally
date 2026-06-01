@@ -71,16 +71,28 @@ class CleanupPromptPreferencesTest {
     }
 
     @Test
-    fun customPromptSurvivesInterfaceLanguageChanges() {
+    fun interfaceLanguageChangeResetsCustomPromptToNewDefault() {
         val customSettings = AppSettings()
             .withCleanupPromptEdited("整理成我自己的格式：${CleanupPromptFactory.TranscriptPlaceholder}")
             .withInterfaceLanguage(AppLanguage.JAPANESE)
 
-        assertTrue(customSettings.cleanupPromptIsCustom)
+        assertFalse(customSettings.cleanupPromptIsCustom)
         assertEquals(
-            "整理成我自己的格式：${CleanupPromptFactory.TranscriptPlaceholder}",
+            CleanupPromptFactory.defaultCleanupPromptFor(AppLanguage.JAPANESE),
             customSettings.cleanupPromptForDisplay(),
         )
+        assertTrue(customSettings.cleanupPromptForDisplay().contains("翻訳しない"))
+    }
+
+    @Test
+    fun resolvedDefaultPromptLanguageRefreshKeepsExistingCustomPrompt() {
+        val customPrompt = "整理成我自己的格式：${CleanupPromptFactory.TranscriptPlaceholder}"
+        val customSettings = AppSettings(interfaceLanguage = AppLanguage.SYSTEM)
+            .withCleanupPromptEdited(customPrompt)
+            .withDefaultCleanupPromptLanguage(AppLanguage.ENGLISH)
+
+        assertTrue(customSettings.cleanupPromptIsCustom)
+        assertEquals(customPrompt, customSettings.cleanupPromptForDisplay())
     }
 
     @Test

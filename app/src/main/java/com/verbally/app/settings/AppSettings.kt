@@ -117,11 +117,8 @@ fun AppSettings.withDefaultCleanupPromptRestored(defaultPromptLanguage: AppLangu
 fun AppSettings.withInterfaceLanguage(language: AppLanguage): AppSettings =
     copy(
         interfaceLanguage = language,
-        cleanupPrompt = if (cleanupPromptIsCustom) {
-            cleanupPrompt
-        } else {
-            CleanupPromptFactory.defaultCleanupPromptFor(language)
-        },
+        cleanupPrompt = CleanupPromptFactory.defaultCleanupPromptFor(language),
+        cleanupPromptIsCustom = false,
     )
 
 fun AppSettings.withDefaultCleanupPromptLanguage(language: AppLanguage): AppSettings =
