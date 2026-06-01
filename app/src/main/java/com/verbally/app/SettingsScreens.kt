@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.verbally.app.providers.ProviderKeyTestResult
 import com.verbally.app.providers.ProviderKeyTester
+import com.verbally.app.history.HistoryRetentionMode
 import com.verbally.app.settings.AppLanguage
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.AppThemeMode
@@ -161,10 +162,22 @@ internal fun AppSettingsScreen(
         context.findActivity()?.recreate()
         Unit
     }
+    val selectHistoryRetentionMode = { mode: HistoryRetentionMode ->
+        val updatedSettings = settings.copy(historyRetentionMode = mode)
+        settings = updatedSettings
+        container.settingsRepository.save(updatedSettings)
+        if (mode == HistoryRetentionMode.NONE) {
+            container.historyRepository.clear()
+        } else {
+            container.historyRepository.list()
+        }
+        onSettingsSaved(updatedSettings)
+    }
     AppSettingsScreenContent(
         settings = settings,
         onThemeModeSelected = selectThemeMode,
         onInterfaceLanguageSelected = selectInterfaceLanguage,
+        onHistoryRetentionModeSelected = selectHistoryRetentionMode,
         modifier = modifier,
     )
 }
@@ -175,9 +188,12 @@ fun AppSettingsScreenContent(
     onThemeModeSelected: (AppThemeMode) -> Unit,
     modifier: Modifier = Modifier,
     onInterfaceLanguageSelected: (AppLanguage) -> Unit = {},
+    onHistoryRetentionModeSelected: (HistoryRetentionMode) -> Unit = {},
 ) {
     var showAppearanceDialog by remember { mutableStateOf(false) }
     var showInterfaceLanguageDialog by remember { mutableStateOf(false) }
+    var showHistoryRetentionDialog by remember { mutableStateOf(false) }
+    var pendingHistoryRetentionMode by remember { mutableStateOf<HistoryRetentionMode?>(null) }
     if (showAppearanceDialog) {
         SettingsChoiceDialog(
             title = { Text(stringResource(R.string.settings_appearance_mode)) },
@@ -212,6 +228,50 @@ fun AppSettingsScreenContent(
             }
         }
     }
+    if (showHistoryRetentionDialog) {
+        SettingsChoiceDialog(
+            title = { Text(stringResource(R.string.settings_history_retention)) },
+            onDismiss = { showHistoryRetentionDialog = false },
+        ) {
+            HistoryRetentionMode.entries.forEach { mode ->
+                HistoryRetentionModeRadioOption(
+                    mode = mode,
+                    selected = settings.historyRetentionMode == mode,
+                    onSelected = {
+                        showHistoryRetentionDialog = false
+                        if (mode == settings.historyRetentionMode) return@HistoryRetentionModeRadioOption
+                        if (mode.requiresConfirmation()) {
+                            pendingHistoryRetentionMode = mode
+                        } else {
+                            onHistoryRetentionModeSelected(mode)
+                        }
+                    },
+                )
+            }
+        }
+    }
+    pendingHistoryRetentionMode?.let { mode ->
+        AlertDialog(
+            onDismissRequest = { pendingHistoryRetentionMode = null },
+            title = { Text(stringResource(R.string.settings_history_retention_confirm_title)) },
+            text = { Text(mode.confirmationDescription()) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingHistoryRetentionMode = null
+                        onHistoryRetentionModeSelected(mode)
+                    },
+                ) {
+                    Text(stringResource(R.string.settings_history_retention_confirm_button))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingHistoryRetentionMode = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -235,6 +295,13 @@ fun AppSettingsScreenContent(
                 value = settings.interfaceLanguage.localizedLabel(),
                 contentDescription = stringResource(R.string.settings_open_interface_language_picker),
                 onClick = { showInterfaceLanguageDialog = true },
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsPickerRow(
+                title = stringResource(R.string.settings_history_retention),
+                value = settings.historyRetentionMode.localizedLabel(),
+                contentDescription = stringResource(R.string.settings_open_history_retention_picker),
+                onClick = { showHistoryRetentionDialog = true },
             )
         }
         Spacer(modifier = Modifier.height(64.dp))
@@ -383,11 +450,66 @@ private fun InterfaceLanguageRadioOption(
 }
 
 @Composable
+private fun HistoryRetentionModeRadioOption(
+    mode: HistoryRetentionMode,
+    selected: Boolean,
+    onSelected: () -> Unit,
+) {
+    val label = mode.localizedLabel()
+    val contentDescription = stringResource(R.string.settings_choose_history_retention, label)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(SettingsChoiceRowHeight)
+            .selectable(
+                selected = selected,
+                onClick = onSelected,
+                role = Role.RadioButton,
+            )
+            .semantics {
+                this.contentDescription = contentDescription
+            }
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+@Composable
 private fun AppThemeMode.localizedLabel(): String = when (this) {
     AppThemeMode.SYSTEM -> stringResource(R.string.settings_theme_system)
     AppThemeMode.LIGHT -> stringResource(R.string.settings_theme_light)
     AppThemeMode.DARK -> stringResource(R.string.settings_theme_dark)
 }
+
+@Composable
+private fun HistoryRetentionMode.localizedLabel(): String = when (this) {
+    HistoryRetentionMode.LATEST_100 -> stringResource(R.string.settings_history_retention_latest_100)
+    HistoryRetentionMode.AUTO_DELETE_24_HOURS -> stringResource(R.string.settings_history_retention_auto_delete_24h)
+    HistoryRetentionMode.NONE -> stringResource(R.string.settings_history_retention_none)
+}
+
+@Composable
+private fun HistoryRetentionMode.confirmationDescription(): String = when (this) {
+    HistoryRetentionMode.AUTO_DELETE_24_HOURS ->
+        stringResource(R.string.settings_history_retention_confirm_auto_delete_description)
+    HistoryRetentionMode.NONE ->
+        stringResource(R.string.settings_history_retention_confirm_none_description)
+    HistoryRetentionMode.LATEST_100 -> ""
+}
+
+private fun HistoryRetentionMode.requiresConfirmation(): Boolean =
+    this == HistoryRetentionMode.AUTO_DELETE_24_HOURS || this == HistoryRetentionMode.NONE
 
 
 @Composable

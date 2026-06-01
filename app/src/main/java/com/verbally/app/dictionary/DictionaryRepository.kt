@@ -3,6 +3,8 @@ package com.verbally.app.dictionary
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.verbally.app.LocalEntrySaveResult
+import com.verbally.app.normalizedLocalEntryKey
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -13,7 +15,7 @@ data class DictionaryEntry(
 )
 
 interface DictionaryRepository {
-    fun save(entry: DictionaryEntry)
+    fun save(entry: DictionaryEntry): LocalEntrySaveResult
     fun list(): List<DictionaryEntry>
     fun search(query: String): List<DictionaryEntry>
     fun delete(id: Long)
@@ -21,14 +23,20 @@ interface DictionaryRepository {
 
 class InMemoryDictionaryRepository(
     private val limit: Int = DEFAULT_LIMIT,
+    initialEntries: List<DictionaryEntry> = emptyList(),
 ) : DictionaryRepository {
-    private val entries = mutableListOf<DictionaryEntry>()
+    private val entries = dedupeEntries(initialEntries).toMutableList()
 
-    override fun save(entry: DictionaryEntry) {
-        val normalized = entry.normalized() ?: return
+    override fun save(entry: DictionaryEntry): LocalEntrySaveResult {
+        val normalized = entry.normalized() ?: return LocalEntrySaveResult.Invalid
+        val normalizedKey = normalizedLocalEntryKey(normalized.term) ?: return LocalEntrySaveResult.Invalid
+        if (entries.any { it.id != normalized.id && normalizedLocalEntryKey(it.term) == normalizedKey }) {
+            return LocalEntrySaveResult.Duplicate
+        }
         entries.removeAll { it.id == normalized.id }
         entries.add(0, normalized)
         trimToLimit()
+        return LocalEntrySaveResult.Saved
     }
 
     override fun list(): List<DictionaryEntry> = entries.toList()
@@ -60,10 +68,16 @@ class SharedPreferencesDictionaryRepository(
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences("verbally_dictionary", Context.MODE_PRIVATE)
 
-    override fun save(entry: DictionaryEntry) {
-        val normalized = entry.normalized() ?: return
-        val updated = listOf(normalized) + list().filterNot { it.id == normalized.id }
+    override fun save(entry: DictionaryEntry): LocalEntrySaveResult {
+        val normalized = entry.normalized() ?: return LocalEntrySaveResult.Invalid
+        val normalizedKey = normalizedLocalEntryKey(normalized.term) ?: return LocalEntrySaveResult.Invalid
+        val current = list()
+        if (current.any { it.id != normalized.id && normalizedLocalEntryKey(it.term) == normalizedKey }) {
+            return LocalEntrySaveResult.Duplicate
+        }
+        val updated = listOf(normalized) + current.filterNot { it.id == normalized.id }
         persist(updated.take(limit))
+        return LocalEntrySaveResult.Saved
     }
 
     override fun list(): List<DictionaryEntry> {
@@ -81,7 +95,9 @@ class SharedPreferencesDictionaryRepository(
                     if (entry != null) add(entry)
                 }
             }
-        }.getOrDefault(emptyList()).take(limit)
+        }.getOrDefault(emptyList())
+            .let(::dedupeEntries)
+            .take(limit)
     }
 
     override fun search(query: String): List<DictionaryEntry> {
@@ -125,5 +141,11 @@ private fun DictionaryEntry.normalized(): DictionaryEntry? {
         note = note?.trim()?.ifBlank { null },
     )
 }
+
+private fun dedupeEntries(entries: List<DictionaryEntry>): List<DictionaryEntry> =
+    entries
+        .mapNotNull { it.normalized() }
+        .sortedByDescending { it.id }
+        .distinctBy { normalizedLocalEntryKey(it.term) }
 
 private const val DEFAULT_LIMIT = 200

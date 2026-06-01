@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
+import com.verbally.app.history.HistoryRetentionMode
 import com.verbally.app.settings.AppLanguage
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.AppThemeMode
@@ -159,6 +160,60 @@ class AppPreferencesScreenTest {
 
         assertEquals(AppLanguage.ENGLISH, settings.interfaceLanguage)
         composeRule.onNodeWithText("English")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun appSettingsContentConfirmsDestructiveHistoryRetentionChanges() {
+        var settings by mutableStateOf(AppSettings())
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        composeRule.setContent {
+            MaterialTheme {
+                AppSettingsScreenContent(
+                    settings = settings,
+                    onThemeModeSelected = { settings = settings.copy(themeMode = it) },
+                    onHistoryRetentionModeSelected = { settings = settings.copy(historyRetentionMode = it) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.settings_open_history_retention_picker))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithContentDescription(
+            context.getString(
+                R.string.settings_choose_history_retention,
+                context.getString(R.string.settings_history_retention_none),
+            ),
+        )
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.onNodeWithText(context.getString(R.string.settings_history_retention_confirm_title))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.cancel))
+            .performClick()
+
+        assertEquals(HistoryRetentionMode.LATEST_100, settings.historyRetentionMode)
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.settings_open_history_retention_picker))
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithContentDescription(
+            context.getString(
+                R.string.settings_choose_history_retention,
+                context.getString(R.string.settings_history_retention_none),
+            ),
+        )
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText(context.getString(R.string.settings_history_retention_confirm_button))
+            .performClick()
+
+        assertEquals(HistoryRetentionMode.NONE, settings.historyRetentionMode)
+        composeRule.onNodeWithText(context.getString(R.string.settings_history_retention_none))
             .assertIsDisplayed()
     }
 

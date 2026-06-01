@@ -43,4 +43,14 @@ class OverlayRootTransitionPolicyTest {
 
         assertEquals(OverlayRootUpdateMode.REFRESH_IN_PLACE, mode)
     }
+
+    @Test
+    fun `refreshes in place between ready and repair bubble states`() {
+        val mode = OverlayRootTransitionPolicy.mode(
+            previous = OverlayUiState.READY,
+            next = OverlayUiState.REPAIR,
+        )
+
+        assertEquals(OverlayRootUpdateMode.REFRESH_IN_PLACE, mode)
+    }
 }

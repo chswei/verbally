@@ -13,5 +13,6 @@ object OverlayRootTransitionPolicy {
             OverlayRootUpdateMode.REFRESH_IN_PLACE
         }
 
-    private fun OverlayUiState.isReadyLayout(): Boolean = this == OverlayUiState.READY
+    private fun OverlayUiState.isReadyLayout(): Boolean =
+        this == OverlayUiState.READY || this == OverlayUiState.REPAIR
 }

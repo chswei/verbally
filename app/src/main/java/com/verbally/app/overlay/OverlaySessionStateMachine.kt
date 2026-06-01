@@ -4,6 +4,7 @@ enum class OverlayUiState {
     READY,
     RECORDING,
     PROCESSING,
+    REPAIR,
 }
 
 class OverlaySessionStateMachine(
