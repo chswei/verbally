@@ -4,7 +4,6 @@ import android.app.Application
 import com.verbally.app.dictionary.SharedPreferencesDictionaryRepository
 import com.verbally.app.history.SharedPreferencesDictationHistoryRepository
 import com.verbally.app.providers.AndroidProviderMessages
-import com.verbally.app.providers.DeepgramTranscriptionClient
 import com.verbally.app.providers.GeminiTextCleanupClient
 import com.verbally.app.providers.GroqTranscriptionClient
 import com.verbally.app.providers.OpenAiTextCleanupClient
@@ -39,7 +38,6 @@ class VerballyContainer(application: Application) {
         openAiClient = OpenAiTranscriptionClient(messages = providerMessages),
         sonioxClient = SonioxRealtimeTranscriptionClient(messages = providerMessages),
         groqClient = GroqTranscriptionClient(messages = providerMessages),
-        deepgramClient = DeepgramTranscriptionClient(messages = providerMessages),
     )
     val openAiCleanupClient = OpenAiTextCleanupClient(messages = providerMessages)
     val geminiCleanupClient = GeminiTextCleanupClient(messages = providerMessages)

@@ -62,7 +62,6 @@ import com.verbally.app.settings.ModelOptions
 import com.verbally.app.settings.TranscriptionProvider
 import com.verbally.app.settings.cleanupModelOptionLabel
 import com.verbally.app.settings.cleanupPromptForDisplay
-import com.verbally.app.settings.normalizedModelChoices
 import com.verbally.app.settings.transcriptionModelOptionLabel
 import com.verbally.app.settings.withCleanupModelOption
 import com.verbally.app.settings.withCleanupPromptEdited
@@ -79,16 +78,15 @@ internal fun SettingsScreen(
     onSettingsSaved: (AppSettings) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var settings by remember(savedSettings) { mutableStateOf(savedSettings.normalizedModelChoices()) }
+    var settings by remember(savedSettings) { mutableStateOf(savedSettings) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settingsSavedMessage = stringResource(R.string.settings_saved)
     var transcriptionTestState by remember { mutableStateOf(ApiKeyTestUiState()) }
     var cleanupTestState by remember { mutableStateOf(ApiKeyTestUiState()) }
     val saveSettings = {
-        val normalizedSettings = settings.normalizedModelChoices()
-        container.settingsRepository.save(normalizedSettings)
-        onSettingsSaved(normalizedSettings)
+        container.settingsRepository.save(settings)
+        onSettingsSaved(settings)
         Toast.makeText(context, settingsSavedMessage, Toast.LENGTH_SHORT).show()
     }
     fun updateSettings(next: AppSettings) {
@@ -99,14 +97,14 @@ internal fun SettingsScreen(
     fun testTranscriptionKey(tester: ProviderKeyTester) {
         transcriptionTestState = ApiKeyTestUiState(isTesting = true)
         scope.launch {
-            val result = tester.testTranscription(settings.normalizedModelChoices())
+            val result = tester.testTranscription(settings)
             transcriptionTestState = result.toApiKeyTestUiState(context)
         }
     }
     fun testCleanupKey(tester: ProviderKeyTester) {
         cleanupTestState = ApiKeyTestUiState(isTesting = true)
         scope.launch {
-            val result = tester.testCleanup(settings.normalizedModelChoices())
+            val result = tester.testCleanup(settings)
             cleanupTestState = result.toApiKeyTestUiState(context)
         }
     }
@@ -144,10 +142,10 @@ internal fun AppSettingsScreen(
     onSettingsSaved: (AppSettings) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var settings by remember(savedSettings) { mutableStateOf(savedSettings.normalizedModelChoices()) }
+    var settings by remember(savedSettings) { mutableStateOf(savedSettings) }
     val context = LocalContext.current
     val selectThemeMode = { themeMode: AppThemeMode ->
-        val updatedSettings = settings.copy(themeMode = themeMode).normalizedModelChoices()
+        val updatedSettings = settings.copy(themeMode = themeMode)
         settings = updatedSettings
         container.settingsRepository.save(updatedSettings)
         onSettingsSaved(updatedSettings)
@@ -156,7 +154,6 @@ internal fun AppSettingsScreen(
         val updatedSettings = settings
             .withInterfaceLanguage(language)
             .withDefaultCleanupPromptLanguage(context.defaultPromptLanguageFor(language))
-            .normalizedModelChoices()
         settings = updatedSettings
         container.settingsRepository.save(updatedSettings)
         onSettingsSaved(updatedSettings)
@@ -558,11 +555,6 @@ private fun TranscriptionSettingsFields(
         TranscriptionProvider.GROQ -> {
             SecretField(stringResource(R.string.api_key_label), settings.groqApiKey) {
                 onSettingsChange(settings.copy(groqApiKey = it))
-            }
-        }
-        TranscriptionProvider.DEEPGRAM -> {
-            SecretField(stringResource(R.string.api_key_label), settings.deepgramApiKey) {
-                onSettingsChange(settings.copy(deepgramApiKey = it))
             }
         }
     }

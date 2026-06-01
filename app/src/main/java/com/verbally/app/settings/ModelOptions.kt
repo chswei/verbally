@@ -1,12 +1,9 @@
 package com.verbally.app.settings
 
-import com.verbally.app.providers.CleanupPromptFactory
-
 enum class TranscriptionProvider {
     OPENAI,
     SONIOX,
     GROQ,
-    DEEPGRAM,
 }
 
 data class TranscriptionModelOption(
@@ -43,11 +40,6 @@ object ModelOptions {
             model = "whisper-large-v3-turbo",
             label = "Groq: whisper-large-v3-turbo",
         ),
-        TranscriptionModelOption(
-            provider = TranscriptionProvider.DEEPGRAM,
-            model = "nova-3",
-            label = "Deepgram: Real-time Nova-3",
-        ),
     )
 
     val CleanupOptions = listOf(
@@ -76,26 +68,6 @@ object ModelOptions {
             model = "gemini-3.1-pro-preview",
             label = "Gemini: gemini-3.1-pro-preview",
         ),
-    )
-}
-
-fun AppSettings.normalizedModelChoices(): AppSettings {
-    val transcriptionOption = ModelOptions.TranscriptionOptions.firstOrNull {
-        it.provider == transcriptionProvider && it.model == transcriptionModel
-    } ?: ModelOptions.TranscriptionOptions.first()
-    val openAiCleanupModel = openAiCleanupModel.takeIf { model ->
-        ModelOptions.CleanupOptions.any { it.provider == CleanupProvider.OPENAI && it.model == model }
-    } ?: ModelOptions.CleanupOptions.first { it.provider == CleanupProvider.OPENAI }.model
-    val geminiCleanupModel = geminiCleanupModel.takeIf { model ->
-        ModelOptions.CleanupOptions.any { it.provider == CleanupProvider.GEMINI && it.model == model }
-    } ?: ModelOptions.CleanupOptions.first { it.provider == CleanupProvider.GEMINI }.model
-
-    return copy(
-        transcriptionProvider = transcriptionOption.provider,
-        transcriptionModel = transcriptionOption.model,
-        openAiCleanupModel = openAiCleanupModel,
-        geminiCleanupModel = geminiCleanupModel,
-        cleanupPrompt = cleanupPrompt.ifBlank { CleanupPromptFactory.defaultCleanupPrompt },
     )
 }
 

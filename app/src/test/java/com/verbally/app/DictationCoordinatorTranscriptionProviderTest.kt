@@ -41,7 +41,6 @@ class DictationCoordinatorTranscriptionProviderTest {
                 openAiClient = CapturingTranscriptionClient(provider = "openai"),
                 sonioxClient = CapturingTranscriptionClient(provider = "soniox"),
                 groqClient = groq,
-                deepgramClient = CapturingTranscriptionClient(provider = "deepgram"),
             ),
             historyRepository = history,
         )

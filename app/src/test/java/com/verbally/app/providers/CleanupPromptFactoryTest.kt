@@ -51,62 +51,6 @@ class CleanupPromptFactoryTest {
     }
 
     @Test
-    fun legacyBuiltInDefaultPromptsStillCountAsDefaults() {
-        val legacyTraditionalChinesePrompt = """
-            請將以下語音轉錄整理成可以直接貼到目前文字框的自然文字。
-
-            規則：
-            - 保留原本語言、語氣與中英混用比例。
-            - 不要翻譯，不要把中英混用改成單一語言。
-            - 去除口頭禪、重複詞與明顯語音辨識雜訊。
-            - 修正常見錯字。
-            - 不要新增原文沒有的事實。
-            - 只輸出整理後文字，不要加說明。
-
-            原始轉錄：
-            ${CleanupPromptFactory.TranscriptPlaceholder}
-        """.trimIndent()
-        val legacyEnglishPrompt = """
-            Please turn the following voice transcript into natural text that can be pasted directly into the current text field.
-
-            Rules:
-            - Preserve the original language, tone, and any mixed-language/code-switching ratio.
-            - Do not translate, and do not convert mixed-language text into a single language.
-            - Remove filler words, repeated words, and obvious speech-recognition noise.
-            - Correct clear transcription mistakes.
-            - Do not add facts that are not in the original transcript.
-            - Output only the cleaned text, with no explanation.
-
-            Original transcript:
-            ${CleanupPromptFactory.TranscriptPlaceholder}
-        """.trimIndent()
-
-        assertTrue(CleanupPromptFactory.isBuiltInDefaultPrompt(legacyTraditionalChinesePrompt))
-        assertTrue(CleanupPromptFactory.isBuiltInDefaultPrompt(legacyEnglishPrompt))
-    }
-
-    @Test
-    fun customizedPromptThatMentionsLegacyDefaultTextDoesNotCountAsBuiltInDefault() {
-        val customizedLegacyLikePrompt = """
-            請將以下語音轉錄整理成可以直接貼到目前文字框的自然文字。
-
-            規則：
-            - 保留原本語言、語氣與中英混用比例。
-            - 不要翻譯，不要把中英混用改成單一語言。
-            - 去除口頭禪、重複詞與明顯語音辨識雜訊。
-            - 修正常見錯字。
-            - 不要新增原文沒有的事實。
-            - 只輸出整理後文字，不要加說明。
-            - 額外規則：請保留我的自訂格式。
-
-            原始轉錄：
-            ${CleanupPromptFactory.TranscriptPlaceholder}
-        """.trimIndent()
-
-        assertFalse(CleanupPromptFactory.isBuiltInDefaultPrompt(customizedLegacyLikePrompt))
-    }
-
-    @Test
     fun cleanupPromptIncludesDictionaryContextBeforeTranscript() {
         val prompt = CleanupPromptFactory.cleanupPrompt(
             promptTemplate = CleanupPromptFactory.defaultCleanupPrompt,

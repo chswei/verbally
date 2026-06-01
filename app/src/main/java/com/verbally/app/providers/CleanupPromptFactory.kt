@@ -20,7 +20,7 @@ object CleanupPromptFactory {
         val normalizedPrompt = prompt.trim()
         return AppLanguage.entries.any { language ->
             normalizedPrompt == defaultCleanupPromptFor(language).trim()
-        } || DefaultCleanupPrompts.isLegacyBuiltInDefault(normalizedPrompt)
+        }
     }
 
     fun cleanupPrompt(

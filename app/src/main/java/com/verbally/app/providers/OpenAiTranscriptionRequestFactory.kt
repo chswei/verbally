@@ -99,22 +99,6 @@ class GroqTranscriptionRequestFactory(
     }
 }
 
-class DeepgramTranscriptionRequestFactory(
-    private val baseUrl: String = "https://api.deepgram.com",
-) {
-    fun create(
-        apiKey: String,
-        model: String,
-        audioFile: File,
-    ): Request {
-        return Request.Builder()
-            .url("${baseUrl.trimEnd('/')}/v1/listen?model=${escapeJson(model)}&language=multi&smart_format=true")
-            .header("Authorization", "Token $apiKey")
-            .post(audioFile.asRequestBody(mediaTypeFor(audioFile).toMediaType()))
-            .build()
-    }
-}
-
 class SonioxRealtimeConfigFactory {
     fun create(apiKey: String, model: String): String =
         "{" +

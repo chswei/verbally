@@ -6,14 +6,13 @@ import org.junit.Test
 
 class ModelOptionsTest {
     @Test
-    fun transcriptionOptionsExposeFiveCuratedChoices() {
+    fun transcriptionOptionsExposeFourCuratedChoices() {
         assertEquals(
             listOf(
                 "OpenAI: gpt-4o-mini-transcribe",
                 "OpenAI: gpt-4o-transcribe",
                 "Soniox: Soniox Realtime",
                 "Groq: whisper-large-v3-turbo",
-                "Deepgram: Real-time Nova-3",
             ),
             ModelOptions.TranscriptionOptions.map { it.label },
         )
@@ -41,21 +40,6 @@ class ModelOptionsTest {
         assertEquals("gpt-4o-mini-transcribe", settings.transcriptionModel)
         assertEquals(CleanupProvider.OPENAI, settings.cleanupProvider)
         assertEquals("gpt-5.4-nano", settings.openAiCleanupModel)
-    }
-
-    @Test
-    fun normalizesUnsupportedModelsToSupportedDefaults() {
-        val settings = AppSettings(
-            transcriptionProvider = TranscriptionProvider.DEEPGRAM,
-            transcriptionModel = "not-a-real-model",
-            openAiCleanupModel = "old-openai-model",
-            geminiCleanupModel = "old-gemini-model",
-        ).normalizedModelChoices()
-
-        assertEquals(TranscriptionProvider.OPENAI, settings.transcriptionProvider)
-        assertEquals("gpt-4o-mini-transcribe", settings.transcriptionModel)
-        assertEquals("gpt-5.4-nano", settings.openAiCleanupModel)
-        assertEquals("gemini-3.1-flash-lite", settings.geminiCleanupModel)
     }
 
     @Test
