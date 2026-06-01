@@ -203,6 +203,86 @@ class DictationCoordinatorEmptyRecordingTest {
         assertEquals("請寄到我的地址。", history.list().single().cleanedText)
     }
 
+    @Test
+    fun confirmRecordingFallsBackToRawTranscriptWhenCleanupAsksForMissingOriginalContent() = runBlocking {
+        val history = InMemoryDictationHistoryRepository()
+        val audioRecorder = FakeAudioRecorder(amplitudes = listOf(1_400, 1_800, 1_600))
+        val transcription = CapturingTranscriptionClient(rawText = "中文請使用繁體中文")
+        val cleanup = CapturingCleanupClient(cleanedText = "請提供您需要處理的原始轉入內容")
+        val insertion = CapturingDirectTextTarget()
+        val coordinator = coordinator(
+            history = history,
+            audioRecorder = audioRecorder,
+            transcription = transcription,
+            cleanup = cleanup,
+            insertion = insertion,
+        )
+
+        coordinator.startRecording()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        val result = coordinator.confirmRecording(appLabel = "Test")
+
+        assertTrue(result is DictationOutcome.Inserted)
+        assertEquals(1, transcription.calls)
+        assertEquals(1, cleanup.calls)
+        assertEquals("中文請使用繁體中文", insertion.insertedText)
+        assertEquals("中文請使用繁體中文", history.list().single().cleanedText)
+    }
+
+    @Test
+    fun confirmRecordingFallsBackToRawTranscriptWhenCleanupRespondsLikeAssistant() = runBlocking {
+        val history = InMemoryDictationHistoryRepository()
+        val audioRecorder = FakeAudioRecorder(amplitudes = listOf(1_400, 1_800, 1_600))
+        val transcription = CapturingTranscriptionClient(rawText = "中文請使用繁體中文")
+        val cleanup = CapturingCleanupClient(cleanedText = "好的，我會使用繁體中文。")
+        val insertion = CapturingDirectTextTarget()
+        val coordinator = coordinator(
+            history = history,
+            audioRecorder = audioRecorder,
+            transcription = transcription,
+            cleanup = cleanup,
+            insertion = insertion,
+        )
+
+        coordinator.startRecording()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        val result = coordinator.confirmRecording(appLabel = "Test")
+
+        assertTrue(result is DictationOutcome.Inserted)
+        assertEquals("中文請使用繁體中文", insertion.insertedText)
+        assertEquals("中文請使用繁體中文", history.list().single().cleanedText)
+    }
+
+    @Test
+    fun confirmRecordingKeepsAssistantLikeTextWhenItMatchesWhatUserSaid() = runBlocking {
+        val history = InMemoryDictationHistoryRepository()
+        val audioRecorder = FakeAudioRecorder(amplitudes = listOf(1_400, 1_800, 1_600))
+        val transcription = CapturingTranscriptionClient(rawText = "好的 我會使用繁體中文")
+        val cleanup = CapturingCleanupClient(cleanedText = "好的，我會使用繁體中文。")
+        val insertion = CapturingDirectTextTarget()
+        val coordinator = coordinator(
+            history = history,
+            audioRecorder = audioRecorder,
+            transcription = transcription,
+            cleanup = cleanup,
+            insertion = insertion,
+        )
+
+        coordinator.startRecording()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        val result = coordinator.confirmRecording(appLabel = "Test")
+
+        assertTrue(result is DictationOutcome.Inserted)
+        assertEquals("好的，我會使用繁體中文。", insertion.insertedText)
+        assertEquals("好的，我會使用繁體中文。", history.list().single().cleanedText)
+    }
+
     private fun coordinator(
         history: InMemoryDictationHistoryRepository,
         audioRecorder: FakeAudioRecorder,

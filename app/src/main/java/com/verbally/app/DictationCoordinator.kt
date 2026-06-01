@@ -143,7 +143,12 @@ class DictationCoordinator(
             if (DictationContentGuard.cleanedTextHasNoContent(cleaned.text)) {
                 return DictationOutcome.NoDictatedContent
             }
-            val expandedText = SnippetExpander.expand(cleaned.text, snippetEntries)
+            val insertionText = if (DictationContentGuard.cleanedTextShouldFallBackToRawTranscript(raw.text, cleaned.text)) {
+                raw.text
+            } else {
+                cleaned.text
+            }
+            val expandedText = SnippetExpander.expand(insertionText, snippetEntries)
             if (DictationContentGuard.cleanedTextHasNoContent(expandedText)) {
                 return DictationOutcome.NoDictatedContent
             }
