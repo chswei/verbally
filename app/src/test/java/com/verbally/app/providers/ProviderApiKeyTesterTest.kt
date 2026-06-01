@@ -88,26 +88,6 @@ class ProviderApiKeyTesterTest {
     }
 
     @Test
-    fun testsDeepgramTranscriptionKeyWithProjectsRequest() = runBlocking {
-        server.enqueue(MockResponse.Builder().code(200).body("{}").build())
-        val tester = ProviderApiKeyTester(
-            endpoints = ProviderKeyTestEndpoints(deepgramBaseUrl = server.url("/").toString()),
-        )
-
-        val result = tester.testTranscription(
-            AppSettings(
-                deepgramApiKey = "deepgram-test",
-                transcriptionProvider = TranscriptionProvider.DEEPGRAM,
-            ),
-        )
-
-        assertEquals(ProviderKeyTestResult.Success("Deepgram"), result)
-        val request = server.takeRequest()
-        assertEquals("/v1/projects", request.target)
-        assertEquals("Token deepgram-test", request.headers["Authorization"])
-    }
-
-    @Test
     fun testsOpenAiCleanupKeyWithModelRequest() = runBlocking {
         server.enqueue(MockResponse.Builder().code(200).body("{}").build())
         val tester = ProviderApiKeyTester(

@@ -7,14 +7,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.verbally.app.settings.normalizedModelChoices
 import com.verbally.app.settings.withDefaultCleanupPromptLanguage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val container = (application as VerballyApplication).container
-        val savedSettings = container.settingsRepository.load().normalizedModelChoices()
+        val savedSettings = container.settingsRepository.load()
         applyAppLanguage(savedSettings.interfaceLanguage)
         val loadedSettings = savedSettings.withDefaultCleanupPromptLanguage(
             defaultPromptLanguageFor(savedSettings.interfaceLanguage),
@@ -25,7 +24,7 @@ class MainActivity : ComponentActivity() {
                 VerballyApp(
                     container = container,
                     appSettings = appSettings,
-                    onSettingsSaved = { appSettings = it.normalizedModelChoices() },
+                    onSettingsSaved = { appSettings = it },
                 )
             }
         }

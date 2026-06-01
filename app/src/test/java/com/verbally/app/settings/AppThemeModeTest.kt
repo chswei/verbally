@@ -17,10 +17,4 @@ class AppThemeModeTest {
         assertEquals(AppThemeMode.SYSTEM, AppSettings().themeMode)
     }
 
-    @Test
-    fun storedThemeModeNamesFallBackToSystemWhenInvalid() {
-        assertEquals(AppThemeMode.DARK, AppThemeMode.fromStoredName("DARK"))
-        assertEquals(AppThemeMode.SYSTEM, AppThemeMode.fromStoredName(null))
-        assertEquals(AppThemeMode.SYSTEM, AppThemeMode.fromStoredName("missing"))
-    }
 }

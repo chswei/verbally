@@ -29,22 +29,6 @@ class AdditionalTranscriptionRequestFactoryTest {
     }
 
     @Test
-    fun createsDeepgramNova3MultilingualRequest() {
-        val audio = tempAudio()
-
-        val request = DeepgramTranscriptionRequestFactory("https://api.deepgram.com")
-            .create(apiKey = "deepgram-test", model = "nova-3", audioFile = audio)
-
-        assertEquals("POST", request.method)
-        assertEquals(
-            "https://api.deepgram.com/v1/listen?model=nova-3&language=multi&smart_format=true",
-            request.url.toString(),
-        )
-        assertEquals("Token deepgram-test", request.header("Authorization"))
-        assertEquals("audio/mp4", request.body!!.contentType().toString())
-    }
-
-    @Test
     fun createsSonioxRealtimeConfigForRecordedAudioStream() {
         val json = SonioxRealtimeConfigFactory()
             .create(apiKey = "soniox-test", model = "stt-rt-v4")

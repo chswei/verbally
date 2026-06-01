@@ -13,9 +13,6 @@ enum class AppThemeMode(val label: String) {
     DARK("深色");
 
     companion object {
-        fun fromStoredName(name: String?): AppThemeMode =
-            runCatching { valueOf(name.orEmpty()) }.getOrDefault(SYSTEM)
-
         fun fromLabel(label: String): AppThemeMode =
             entries.firstOrNull { it.label == label } ?: SYSTEM
     }
@@ -35,9 +32,6 @@ enum class AppLanguage(val label: String, val languageTag: String) {
     SIMPLIFIED_CHINESE("简体中文", "zh-CN");
 
     companion object {
-        fun fromStoredName(name: String?): AppLanguage =
-            runCatching { valueOf(name.orEmpty()) }.getOrDefault(SYSTEM)
-
         fun fromLabel(label: String): AppLanguage =
             entries.firstOrNull { it.label == label } ?: SYSTEM
 
@@ -76,7 +70,6 @@ data class AppSettings(
     val geminiApiKey: String = "",
     val sonioxApiKey: String = "",
     val groqApiKey: String = "",
-    val deepgramApiKey: String = "",
     val transcriptionProvider: TranscriptionProvider = TranscriptionProvider.OPENAI,
     val cleanupProvider: CleanupProvider = CleanupProvider.OPENAI,
     val transcriptionModel: String = "gpt-4o-mini-transcribe",

@@ -27,25 +27,25 @@ class EncryptedSettingsRepository(
             geminiApiKey = prefs.getString(KEY_GEMINI, "").orEmpty(),
             sonioxApiKey = prefs.getString(KEY_SONIOX, "").orEmpty(),
             groqApiKey = prefs.getString(KEY_GROQ, "").orEmpty(),
-            deepgramApiKey = prefs.getString(KEY_DEEPGRAM, "").orEmpty(),
-            transcriptionProvider = runCatching {
-                TranscriptionProvider.valueOf(
-                    prefs.getString(KEY_TRANSCRIPTION_PROVIDER, TranscriptionProvider.OPENAI.name).orEmpty(),
-                )
-            }.getOrDefault(TranscriptionProvider.OPENAI),
-            cleanupProvider = runCatching {
-                CleanupProvider.valueOf(prefs.getString(KEY_PROVIDER, CleanupProvider.OPENAI.name).orEmpty())
-            }.getOrDefault(CleanupProvider.OPENAI),
+            transcriptionProvider = TranscriptionProvider.valueOf(
+                prefs.getString(KEY_TRANSCRIPTION_PROVIDER, TranscriptionProvider.OPENAI.name)
+                    ?: TranscriptionProvider.OPENAI.name,
+            ),
+            cleanupProvider = CleanupProvider.valueOf(
+                prefs.getString(KEY_PROVIDER, CleanupProvider.OPENAI.name) ?: CleanupProvider.OPENAI.name,
+            ),
             transcriptionModel = prefs.getString(KEY_TRANSCRIPTION_MODEL, "gpt-4o-mini-transcribe").orEmpty(),
             openAiCleanupModel = prefs.getString(KEY_OPENAI_MODEL, "gpt-5.4-nano").orEmpty(),
             geminiCleanupModel = prefs.getString(KEY_GEMINI_MODEL, "gemini-3.1-flash-lite").orEmpty(),
             cleanupPrompt = cleanupPrompt,
             cleanupPromptIsCustom = promptIsCustom,
-            themeMode = AppThemeMode.fromStoredName(prefs.getString(KEY_THEME_MODE, AppThemeMode.SYSTEM.name)),
-            interfaceLanguage = AppLanguage.fromStoredName(
-                prefs.getString(KEY_INTERFACE_LANGUAGE, AppLanguage.SYSTEM.name),
+            themeMode = AppThemeMode.valueOf(
+                prefs.getString(KEY_THEME_MODE, AppThemeMode.SYSTEM.name) ?: AppThemeMode.SYSTEM.name,
             ),
-        ).normalizedModelChoices()
+            interfaceLanguage = AppLanguage.valueOf(
+                prefs.getString(KEY_INTERFACE_LANGUAGE, AppLanguage.SYSTEM.name) ?: AppLanguage.SYSTEM.name,
+            ),
+        )
     }
 
     override fun save(settings: AppSettings) {
@@ -60,7 +60,6 @@ class EncryptedSettingsRepository(
             putString(KEY_GEMINI, settings.geminiApiKey)
             putString(KEY_SONIOX, settings.sonioxApiKey)
             putString(KEY_GROQ, settings.groqApiKey)
-            putString(KEY_DEEPGRAM, settings.deepgramApiKey)
             putString(KEY_TRANSCRIPTION_PROVIDER, settings.transcriptionProvider.name)
             putString(KEY_PROVIDER, settings.cleanupProvider.name)
             putString(KEY_TRANSCRIPTION_MODEL, settings.transcriptionModel)
@@ -95,7 +94,6 @@ class EncryptedSettingsRepository(
         const val KEY_GEMINI = "gemini_api_key"
         const val KEY_SONIOX = "soniox_api_key"
         const val KEY_GROQ = "groq_api_key"
-        const val KEY_DEEPGRAM = "deepgram_api_key"
         const val KEY_TRANSCRIPTION_PROVIDER = "transcription_provider"
         const val KEY_PROVIDER = "cleanup_provider"
         const val KEY_TRANSCRIPTION_MODEL = "transcription_model"

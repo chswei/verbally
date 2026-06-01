@@ -45,13 +45,6 @@ class AppLanguageTest {
     }
 
     @Test
-    fun storedLanguageNamesFallBackToSystemWhenInvalid() {
-        assertEquals(AppLanguage.JAPANESE, AppLanguage.fromStoredName("JAPANESE"))
-        assertEquals(AppLanguage.SYSTEM, AppLanguage.fromStoredName(null))
-        assertEquals(AppLanguage.SYSTEM, AppLanguage.fromStoredName("missing"))
-    }
-
-    @Test
     fun languageLabelsFallBackToSystemWhenInvalid() {
         assertEquals(AppLanguage.ENGLISH, AppLanguage.fromLabel("English"))
         assertEquals(AppLanguage.SYSTEM, AppLanguage.fromLabel("missing"))
