@@ -1,5 +1,6 @@
 package com.verbally.app.snippets
 
+import com.verbally.app.LocalEntrySaveResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,12 +25,42 @@ class SnippetRepositoryTest {
         val repository = InMemorySnippetRepository()
 
         repository.save(SnippetEntry(trigger = "My Address", expansion = "old", id = 1L))
-        repository.save(SnippetEntry(trigger = "my address", expansion = "new", id = 2L))
+        val result = repository.save(SnippetEntry(trigger = "my address", expansion = "new", id = 1L))
 
+        assertEquals(LocalEntrySaveResult.Saved, result)
         assertEquals(
-            listOf(SnippetEntry(trigger = "my address", expansion = "new", id = 2L)),
+            listOf(SnippetEntry(trigger = "my address", expansion = "new", id = 1L)),
             repository.list(),
         )
+    }
+
+    @Test
+    fun rejectsRenamingSnippetToExistingNormalizedTrigger() {
+        val repository = InMemorySnippetRepository()
+        repository.save(SnippetEntry(trigger = "address", expansion = "one", id = 1L))
+        repository.save(SnippetEntry(trigger = "report", expansion = "two", id = 2L))
+
+        val result = repository.save(SnippetEntry(trigger = " ADDRESS ", expansion = "duplicate", id = 2L))
+
+        assertEquals(LocalEntrySaveResult.Duplicate, result)
+        assertEquals(listOf("report", "address"), repository.list().map { it.trigger })
+    }
+
+    @Test
+    fun loadedDuplicateSnippetDataIsDeduplicated() {
+        val repository = InMemorySnippetRepository(
+            initialEntries = listOf(
+                SnippetEntry(trigger = "address", expansion = "old", id = 1L),
+                SnippetEntry(trigger = " ADDRESS ", expansion = "new", id = 2L),
+            ),
+        )
+
+        val entries = repository.list()
+
+        assertEquals(1, entries.size)
+        assertEquals(2L, entries.single().id)
+        assertEquals("ADDRESS", entries.single().trigger)
+        assertEquals("new", entries.single().expansion)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.verbally.app.system
 
+import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.app.LocaleManager
 import android.content.BroadcastReceiver
@@ -7,11 +8,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.verbally.app.DictationCoordinator
 import com.verbally.app.DictationOutcome
 import com.verbally.app.R
@@ -22,6 +26,7 @@ import com.verbally.app.insertion.AndroidClipboardGateway
 import com.verbally.app.insertion.ClipboardPasteInserter
 import com.verbally.app.overlay.FloatingDictationOverlay
 import com.verbally.app.overlay.LiveWaveformLevelSmoother
+import com.verbally.app.overlay.OverlayUiState
 import com.verbally.app.settings.AppLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +39,8 @@ import kotlinx.coroutines.launch
 class VerballyAccessibilityService : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val visibilityPolicy = OverlayVisibilityPolicy()
+    private val sensitiveInputPolicy = SensitiveInputPolicy()
+    private val runtimeReadinessPolicy = DictationRuntimeReadinessPolicy()
     private val waveformSmoother = LiveWaveformLevelSmoother()
     private var overlay: FloatingDictationOverlay? = null
     private var appLabel: String? = null
@@ -80,6 +87,7 @@ class VerballyAccessibilityService : AccessibilityService() {
                 stopWaveformUpdates()
                 processRecording()
             },
+            onRepair = ::openRuntimeRepair,
         )
         registerDebugInsertReceiver()
     }
@@ -88,26 +96,32 @@ class VerballyAccessibilityService : AccessibilityService() {
         event ?: return
         val focused = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
         val source = event.source
+        val packageName = event.packageName?.toString()
         val defaultInputMethodPackage = defaultInputMethodPackage()
+        val sensitiveInput = sensitiveInputPolicy.isSensitive(
+            SensitiveInputContext(
+                packageName = packageName,
+                isPassword = focused?.isPassword ?: source?.isPassword ?: false,
+                inputType = focused?.inputType ?: source?.inputType ?: 0,
+            ),
+        )
         val decision = visibilityPolicy.decide(
             event = OverlayVisibilityEvent(
                 eventType = event.eventType,
-                packageName = event.packageName?.toString(),
+                packageName = packageName,
                 eventTime = event.eventTime,
                 sourceEditable = source?.isEditable,
                 sourceFocused = source?.isFocused,
                 focusedEditable = focused?.isEditable,
-                inputMethodEvent = event.packageName?.toString() == defaultInputMethodPackage,
+                inputMethodEvent = packageName == defaultInputMethodPackage,
                 inputMethodVisible = isInputMethodVisible(),
+                sensitiveInput = sensitiveInput,
             ),
             overlayShown = overlay?.isShown == true,
         )
 
         when (decision) {
-            OverlayVisibilityDecision.SHOW -> {
-                appLabel = event.packageName?.toString()
-                overlay?.show()
-            }
+            OverlayVisibilityDecision.SHOW -> handleShowDecision(packageName)
             OverlayVisibilityDecision.HIDE -> overlay?.hide()
             OverlayVisibilityDecision.KEEP -> Unit
         }
@@ -163,6 +177,54 @@ class VerballyAccessibilityService : AccessibilityService() {
             overlay = FloatingDictationOverlayFeedback(currentOverlay),
             userMessages = ToastUserMessageSink(this),
         ).reportFailure(message)
+    }
+
+    private fun handleShowDecision(packageName: String?) {
+        appLabel = packageName
+        when (
+            val readiness = runtimeReadinessPolicy.decide(
+                microphoneGranted = hasRecordAudioPermission(),
+                overlayGranted = Settings.canDrawOverlays(this),
+                accessibilityEnabled = true,
+            )
+        ) {
+            DictationRuntimeReadinessDecision.Ready -> {
+                if (overlay?.currentState == OverlayUiState.REPAIR) {
+                    overlay?.setState(OverlayUiState.READY)
+                }
+                overlay?.show()
+            }
+            is DictationRuntimeReadinessDecision.RepairBubble -> {
+                overlay?.showRepair(readiness.target, repairMessageFor(readiness.target))
+            }
+            is DictationRuntimeReadinessDecision.MainAppRecovery -> overlay?.hide()
+        }
+    }
+
+    private fun hasRecordAudioPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun repairMessageFor(target: RuntimeRepairTarget): String =
+        when (target) {
+            RuntimeRepairTarget.MICROPHONE -> getString(R.string.overlay_repair_microphone)
+            RuntimeRepairTarget.OVERLAY -> getString(R.string.overlay_repair_overlay)
+            RuntimeRepairTarget.ACCESSIBILITY -> getString(R.string.overlay_repair_accessibility)
+        }
+
+    private fun openRuntimeRepair(target: RuntimeRepairTarget) {
+        val intent = when (target) {
+            RuntimeRepairTarget.MICROPHONE -> Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                "package:$packageName".toUri(),
+            )
+            RuntimeRepairTarget.OVERLAY -> Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                "package:$packageName".toUri(),
+            )
+            RuntimeRepairTarget.ACCESSIBILITY -> Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { startActivity(intent) }
     }
 
     private fun startWaveformUpdates() {

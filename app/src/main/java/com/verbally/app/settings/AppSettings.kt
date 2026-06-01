@@ -1,5 +1,6 @@
 package com.verbally.app.settings
 
+import com.verbally.app.history.HistoryRetentionMode
 import com.verbally.app.providers.CleanupPromptFactory
 
 enum class CleanupProvider {
@@ -79,6 +80,7 @@ data class AppSettings(
     val cleanupPromptIsCustom: Boolean = false,
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val interfaceLanguage: AppLanguage = AppLanguage.SYSTEM,
+    val historyRetentionMode: HistoryRetentionMode = HistoryRetentionMode.LATEST_100,
 )
 
 fun AppSettings.cleanupPromptForDisplay(): String =

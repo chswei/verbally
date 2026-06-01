@@ -38,17 +38,20 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.verbally.app.history.DictationHistoryEntry
+import com.verbally.app.history.HistoryRetentionMode
 
 @Composable
 internal fun HistoryScreen(container: VerballyContainer, modifier: Modifier = Modifier) {
     var query by remember { mutableStateOf("") }
     var entries by remember { mutableStateOf(container.historyRepository.list()) }
+    val historyRetentionMode = container.settingsRepository.load().historyRetentionMode
     val context = LocalContext.current
     val historyClearedMessage = stringResource(R.string.history_cleared)
     val copiedMessage = stringResource(R.string.copied)
     HistoryScreenContent(
         query = query,
         entries = entries,
+        historyRetentionMode = historyRetentionMode,
         onQueryChange = {
             query = it
             entries = container.historyRepository.search(it)
@@ -79,6 +82,7 @@ fun HistoryScreenContent(
     onCopy: (DictationHistoryEntry) -> Unit,
     onDelete: (DictationHistoryEntry) -> Unit,
     modifier: Modifier = Modifier,
+    historyRetentionMode: HistoryRetentionMode = HistoryRetentionMode.LATEST_100,
 ) {
     var showClearConfirmation by remember { mutableStateOf(false) }
     var showHistoryMenu by remember { mutableStateOf(false) }
@@ -121,6 +125,7 @@ fun HistoryScreenContent(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         HistoryScreenHeader(
+            historyRetentionMode = historyRetentionMode,
             showOverflow = entries.isNotEmpty(),
             overflowExpanded = showHistoryMenu,
             onOverflowClick = { showHistoryMenu = true },
@@ -148,8 +153,16 @@ fun HistoryScreenContent(
                         contentAlignment = Alignment.Center,
                     ) {
                         EmptyStateBlock(
-                            title = stringResource(R.string.history_empty_title),
-                            description = stringResource(R.string.history_empty_description),
+                            title = if (historyRetentionMode == HistoryRetentionMode.NONE) {
+                                stringResource(R.string.history_disabled_title)
+                            } else {
+                                stringResource(R.string.history_empty_title)
+                            },
+                            description = if (historyRetentionMode == HistoryRetentionMode.NONE) {
+                                stringResource(R.string.history_disabled_description)
+                            } else {
+                                stringResource(R.string.history_empty_description)
+                            },
                         )
                     }
                 }
@@ -168,6 +181,7 @@ fun HistoryScreenContent(
 
 @Composable
 private fun HistoryScreenHeader(
+    historyRetentionMode: HistoryRetentionMode,
     showOverflow: Boolean,
     overflowExpanded: Boolean,
     onOverflowClick: () -> Unit,
@@ -178,7 +192,7 @@ private fun HistoryScreenHeader(
     Box(modifier = Modifier.fillMaxWidth()) {
         ScreenHeader(
             title = stringResource(R.string.history_title),
-            subtitle = stringResource(R.string.history_subtitle),
+            subtitle = historySubtitle(historyRetentionMode),
         )
         if (showOverflow) {
             Box(
@@ -216,6 +230,14 @@ private fun HistoryScreenHeader(
         }
     }
 }
+
+@Composable
+private fun historySubtitle(historyRetentionMode: HistoryRetentionMode): String =
+    when (historyRetentionMode) {
+        HistoryRetentionMode.LATEST_100 -> stringResource(R.string.history_subtitle)
+        HistoryRetentionMode.AUTO_DELETE_24_HOURS -> stringResource(R.string.history_subtitle_auto_delete_24h)
+        HistoryRetentionMode.NONE -> stringResource(R.string.history_subtitle_none)
+    }
 
 @Composable
 private fun HistoryItem(

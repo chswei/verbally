@@ -29,7 +29,10 @@ class VerballyApplication : Application() {
 class VerballyContainer(application: Application) {
     private val providerMessages = AndroidProviderMessages(application)
     val settingsRepository = EncryptedSettingsRepository(application)
-    val historyRepository = SharedPreferencesDictationHistoryRepository(application)
+    val historyRepository = SharedPreferencesDictationHistoryRepository(
+        context = application,
+        retentionModeProvider = { settingsRepository.load().historyRetentionMode },
+    )
     val dictionaryRepository = SharedPreferencesDictionaryRepository(application)
     val snippetRepository = SharedPreferencesSnippetRepository(application)
     val styleProfileRepository = SharedPreferencesAppStyleProfileRepository(application)

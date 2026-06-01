@@ -7,6 +7,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.verbally.app.history.HistoryRetentionMode
 import com.verbally.app.providers.CleanupPromptFactory
 
 class EncryptedSettingsRepository(
@@ -45,6 +46,10 @@ class EncryptedSettingsRepository(
             interfaceLanguage = AppLanguage.valueOf(
                 prefs.getString(KEY_INTERFACE_LANGUAGE, AppLanguage.SYSTEM.name) ?: AppLanguage.SYSTEM.name,
             ),
+            historyRetentionMode = HistoryRetentionMode.valueOf(
+                prefs.getString(KEY_HISTORY_RETENTION_MODE, HistoryRetentionMode.LATEST_100.name)
+                    ?: HistoryRetentionMode.LATEST_100.name,
+            ),
         )
     }
 
@@ -69,6 +74,7 @@ class EncryptedSettingsRepository(
             putBoolean(KEY_CLEANUP_PROMPT_CUSTOM, promptIsCustom)
             putString(KEY_THEME_MODE, settings.themeMode.name)
             putString(KEY_INTERFACE_LANGUAGE, settings.interfaceLanguage.name)
+            putString(KEY_HISTORY_RETENTION_MODE, settings.historyRetentionMode.name)
         }
     }
 
@@ -103,5 +109,6 @@ class EncryptedSettingsRepository(
         const val KEY_CLEANUP_PROMPT_CUSTOM = "cleanup_prompt_custom"
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_INTERFACE_LANGUAGE = "interface_language"
+        const val KEY_HISTORY_RETENTION_MODE = "history_retention_mode"
     }
 }

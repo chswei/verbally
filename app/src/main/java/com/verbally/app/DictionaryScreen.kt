@@ -53,9 +53,21 @@ internal fun DictionaryScreen(container: VerballyContainer, modifier: Modifier =
             refresh(it)
         },
         onSave = { entry ->
-            container.dictionaryRepository.save(entry)
-            refresh()
-            Toast.makeText(context, savedMessage, Toast.LENGTH_SHORT).show()
+            val validationResult = LocalEntryConflictValidator.validateDictionary(
+                candidate = entry,
+                dictionaries = container.dictionaryRepository.list(),
+                snippets = container.snippetRepository.list(),
+            )
+            val saveResult = if (validationResult == LocalEntrySaveResult.Saved) {
+                container.dictionaryRepository.save(entry)
+            } else {
+                validationResult
+            }
+            if (saveResult == LocalEntrySaveResult.Saved) {
+                refresh()
+                Toast.makeText(context, savedMessage, Toast.LENGTH_SHORT).show()
+            }
+            saveResult
         },
         onDelete = { entry ->
             container.dictionaryRepository.delete(entry.id)
@@ -71,7 +83,7 @@ fun DictionaryScreenContent(
     query: String,
     entries: List<DictionaryEntry>,
     onQueryChange: (String) -> Unit,
-    onSave: (DictionaryEntry) -> Unit,
+    onSave: (DictionaryEntry) -> LocalEntrySaveResult,
     onDelete: (DictionaryEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -86,9 +98,12 @@ fun DictionaryScreenContent(
                 editingEntry = null
             },
             onSave = { entry ->
-                onSave(entry)
-                showEditor = false
-                editingEntry = null
+                val result = onSave(entry)
+                if (result == LocalEntrySaveResult.Saved) {
+                    showEditor = false
+                    editingEntry = null
+                }
+                result
             },
         )
     }
@@ -206,12 +221,13 @@ private fun DictionaryEntryCard(
 private fun DictionaryEntryDialog(
     entry: DictionaryEntry?,
     onDismiss: () -> Unit,
-    onSave: (DictionaryEntry) -> Unit,
+    onSave: (DictionaryEntry) -> LocalEntrySaveResult,
 ) {
     val termInputContentDescription = stringResource(R.string.dictionary_term_input_content_description)
     val noteInputContentDescription = stringResource(R.string.dictionary_note_input_content_description)
     var term by remember(entry?.id) { mutableStateOf(entry?.term.orEmpty()) }
     var note by remember(entry?.id) { mutableStateOf(entry?.note.orEmpty()) }
+    var validationResult by remember(entry?.id) { mutableStateOf<LocalEntrySaveResult?>(null) }
     val title = if (entry == null) {
         stringResource(R.string.dictionary_dialog_add_title)
     } else {
@@ -241,18 +257,28 @@ private fun DictionaryEntryDialog(
                         .fillMaxWidth()
                         .semantics { contentDescription = noteInputContentDescription },
                 )
+                validationResult
+                    ?.validationMessageRes()
+                    ?.let { messageRes ->
+                        Text(
+                            text = stringResource(messageRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    onSave(
+                    val result = onSave(
                         DictionaryEntry(
                             id = entry?.id ?: System.currentTimeMillis(),
                             term = term,
                             note = note,
                         ),
                     )
+                    validationResult = result.takeIf { it != LocalEntrySaveResult.Saved }
                 },
                 enabled = term.trim().isNotEmpty(),
             ) {

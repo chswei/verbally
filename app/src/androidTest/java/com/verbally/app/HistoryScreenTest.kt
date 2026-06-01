@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.verbally.app.history.DictationHistoryEntry
+import com.verbally.app.history.HistoryRetentionMode
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -202,6 +203,30 @@ class HistoryScreenTest {
         composeRule.onAllNodesWithContentDescription("歷史選單")
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("清空歷史")
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun historyScreenShowsDisabledCopyWhenRetentionIsOff() {
+        composeRule.setContent {
+            MaterialTheme {
+                HistoryScreenContent(
+                    query = "",
+                    entries = emptyList(),
+                    historyRetentionMode = HistoryRetentionMode.NONE,
+                    onQueryChange = {},
+                    onClearHistory = {},
+                    onCopy = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("歷史紀錄已關閉")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Verbally 不會保存新的聽寫紀錄。")
+            .assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("歷史選單")
             .assertCountEquals(0)
     }
 

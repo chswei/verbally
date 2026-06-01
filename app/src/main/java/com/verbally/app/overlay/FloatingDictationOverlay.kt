@@ -21,6 +21,7 @@ import androidx.annotation.ColorInt
 import androidx.annotation.ColorRes
 import androidx.core.content.edit
 import com.verbally.app.R
+import com.verbally.app.system.RuntimeRepairTarget
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -29,6 +30,7 @@ class FloatingDictationOverlay(
     private val onStart: () -> Unit,
     private val onCancel: () -> Unit,
     private val onConfirm: () -> Unit,
+    private val onRepair: (RuntimeRepairTarget) -> Unit = {},
 ) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val haptics = OverlayHaptics(context)
@@ -51,6 +53,8 @@ class FloatingDictationOverlay(
     private var rootView: FrameLayout? = null
     private var currentLayoutParams: WindowManager.LayoutParams? = null
     private var customContentDescription: String? = null
+    private var repairTarget: RuntimeRepairTarget? = null
+    private var repairMessage: String? = null
     private var recordingWaveformView: RecordingWaveformView? = null
     private val configurationCallbacks = object : ComponentCallbacks {
         override fun onConfigurationChanged(newConfig: Configuration) {
@@ -69,6 +73,9 @@ class FloatingDictationOverlay(
     val isShown: Boolean
         get() = rootView != null
 
+    val currentState: OverlayUiState
+        get() = session.state
+
     fun show() {
         if (!Settings.canDrawOverlays(context) || rootView != null) return
         attachFreshRoot()
@@ -79,6 +86,8 @@ class FloatingDictationOverlay(
         rootView = null
         currentLayoutParams = null
         customContentDescription = null
+        repairTarget = null
+        repairMessage = null
         session.forceState(OverlayUiState.READY)
     }
 
@@ -93,6 +102,18 @@ class FloatingDictationOverlay(
         session.forceState(next)
         if (rootView != null) {
             updateAttachedRoot(previous, session.state)
+        }
+    }
+
+    fun showRepair(target: RuntimeRepairTarget, message: String) {
+        repairTarget = target
+        repairMessage = message
+        customContentDescription = message
+        session.forceState(OverlayUiState.REPAIR)
+        if (rootView == null) {
+            show()
+        } else {
+            refreshAttachedRoot()
         }
     }
 
@@ -121,6 +142,7 @@ class FloatingDictationOverlay(
             OverlayUiState.READY -> createReadyBubble()
             OverlayUiState.RECORDING -> createRecordingControls()
             OverlayUiState.PROCESSING -> createProcessingControls()
+            OverlayUiState.REPAIR -> createRepairBubble()
         }
         if (rootView === root) {
             val width = content.resolvedWidth()
@@ -193,6 +215,31 @@ class FloatingDictationOverlay(
             centerContentDescription = context.getString(R.string.overlay_processing_transcription),
             trailingContentDescription = context.getString(R.string.overlay_processing),
         )
+
+    private fun createRepairBubble(): View =
+        FrameLayout(context).apply {
+            minimumWidth = bubbleSize
+            minimumHeight = bubbleSize
+            background = roundedBackground(
+                color = context.getColor(android.R.color.white),
+                cornerRadius = bubbleCornerRadius,
+            )
+            elevation = 8f
+            isClickable = true
+            isFocusable = true
+            contentDescription = repairMessage ?: context.getString(R.string.overlay_repair_required)
+            bindDragAndClick(this) {
+                repairTarget?.let(onRepair)
+            }
+            addView(
+                ImageView(context).apply {
+                    setImageResource(R.drawable.ic_verbally_warning)
+                    setColorFilter(context.getColor(android.R.color.holo_orange_dark))
+                    scaleType = ImageView.ScaleType.CENTER
+                },
+                FrameLayout.LayoutParams(iconSize, iconSize, Gravity.CENTER),
+            )
+        }
 
     private fun createActiveControls(
         centerView: View,
@@ -505,6 +552,7 @@ class FloatingDictationOverlay(
         OverlayUiState.READY -> context.getString(R.string.overlay_start_dictation)
         OverlayUiState.RECORDING -> context.getString(R.string.overlay_recording)
         OverlayUiState.PROCESSING -> context.getString(R.string.overlay_processing)
+        OverlayUiState.REPAIR -> repairMessage ?: context.getString(R.string.overlay_repair_required)
     }
 
     private inner class DragTouchListener : View.OnTouchListener {

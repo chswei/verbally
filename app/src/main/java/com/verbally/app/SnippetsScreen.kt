@@ -53,9 +53,21 @@ internal fun SnippetsScreen(container: VerballyContainer, modifier: Modifier = M
             refresh(it)
         },
         onSave = { entry ->
-            container.snippetRepository.save(entry)
-            refresh()
-            Toast.makeText(context, savedMessage, Toast.LENGTH_SHORT).show()
+            val validationResult = LocalEntryConflictValidator.validateSnippet(
+                candidate = entry,
+                snippets = container.snippetRepository.list(),
+                dictionaries = container.dictionaryRepository.list(),
+            )
+            val saveResult = if (validationResult == LocalEntrySaveResult.Saved) {
+                container.snippetRepository.save(entry)
+            } else {
+                validationResult
+            }
+            if (saveResult == LocalEntrySaveResult.Saved) {
+                refresh()
+                Toast.makeText(context, savedMessage, Toast.LENGTH_SHORT).show()
+            }
+            saveResult
         },
         onDelete = { entry ->
             container.snippetRepository.delete(entry.id)
@@ -71,7 +83,7 @@ fun SnippetsScreenContent(
     query: String,
     entries: List<SnippetEntry>,
     onQueryChange: (String) -> Unit,
-    onSave: (SnippetEntry) -> Unit,
+    onSave: (SnippetEntry) -> LocalEntrySaveResult,
     onDelete: (SnippetEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -86,9 +98,12 @@ fun SnippetsScreenContent(
                 editingEntry = null
             },
             onSave = { entry ->
-                onSave(entry)
-                showEditor = false
-                editingEntry = null
+                val result = onSave(entry)
+                if (result == LocalEntrySaveResult.Saved) {
+                    showEditor = false
+                    editingEntry = null
+                }
+                result
             },
         )
     }
@@ -204,12 +219,13 @@ private fun SnippetEntryCard(
 private fun SnippetEntryDialog(
     entry: SnippetEntry?,
     onDismiss: () -> Unit,
-    onSave: (SnippetEntry) -> Unit,
+    onSave: (SnippetEntry) -> LocalEntrySaveResult,
 ) {
     val triggerInputContentDescription = stringResource(R.string.snippets_trigger_input_content_description)
     val expansionInputContentDescription = stringResource(R.string.snippets_expansion_input_content_description)
     var trigger by remember(entry?.id) { mutableStateOf(entry?.trigger.orEmpty()) }
     var expansion by remember(entry?.id) { mutableStateOf(entry?.expansion.orEmpty()) }
+    var validationResult by remember(entry?.id) { mutableStateOf<LocalEntrySaveResult?>(null) }
     val title = if (entry == null) {
         stringResource(R.string.snippets_dialog_add_title)
     } else {
@@ -240,18 +256,28 @@ private fun SnippetEntryDialog(
                         .fillMaxWidth()
                         .semantics { contentDescription = expansionInputContentDescription },
                 )
+                validationResult
+                    ?.validationMessageRes()
+                    ?.let { messageRes ->
+                        Text(
+                            text = stringResource(messageRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    onSave(
+                    val result = onSave(
                         SnippetEntry(
                             id = entry?.id ?: System.currentTimeMillis(),
                             trigger = trigger,
                             expansion = expansion,
                         ),
                     )
+                    validationResult = result.takeIf { it != LocalEntrySaveResult.Saved }
                 },
                 enabled = trigger.trim().isNotEmpty() && expansion.trim().isNotEmpty(),
             ) {

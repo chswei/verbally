@@ -15,6 +15,7 @@ data class OverlayVisibilityEvent(
     val focusedEditable: Boolean?,
     val inputMethodEvent: Boolean = false,
     val inputMethodVisible: Boolean = false,
+    val sensitiveInput: Boolean = false,
 )
 
 class OverlayVisibilityPolicy {
@@ -22,7 +23,9 @@ class OverlayVisibilityPolicy {
         event: OverlayVisibilityEvent,
         overlayShown: Boolean,
     ): OverlayVisibilityDecision =
-        if (event.inputMethodVisible) {
+        if (event.sensitiveInput) {
+            if (overlayShown) OverlayVisibilityDecision.HIDE else OverlayVisibilityDecision.KEEP
+        } else if (event.inputMethodVisible) {
             if (overlayShown) OverlayVisibilityDecision.KEEP else OverlayVisibilityDecision.SHOW
         } else {
             if (overlayShown) OverlayVisibilityDecision.HIDE else OverlayVisibilityDecision.KEEP

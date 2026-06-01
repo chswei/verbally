@@ -100,6 +100,46 @@ class OverlayVisibilityPolicyTest {
         assertEquals(OverlayVisibilityDecision.KEEP, decision)
     }
 
+    @Test
+    fun sensitiveContextHidesShownBubbleEvenWhenInputMethodIsVisible() {
+        val policy = OverlayVisibilityPolicy()
+
+        val decision = policy.decide(
+            event = event(
+                type = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                packageName = "com.chase.sig.android",
+                sourceEditable = true,
+                sourceFocused = true,
+                focusedEditable = true,
+                inputMethodVisible = true,
+                sensitiveInput = true,
+            ),
+            overlayShown = true,
+        )
+
+        assertEquals(OverlayVisibilityDecision.HIDE, decision)
+    }
+
+    @Test
+    fun sensitiveContextKeepsHiddenBubbleHiddenWhenInputMethodIsVisible() {
+        val policy = OverlayVisibilityPolicy()
+
+        val decision = policy.decide(
+            event = event(
+                type = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                packageName = "com.chase.sig.android",
+                sourceEditable = true,
+                sourceFocused = true,
+                focusedEditable = true,
+                inputMethodVisible = true,
+                sensitiveInput = true,
+            ),
+            overlayShown = false,
+        )
+
+        assertEquals(OverlayVisibilityDecision.KEEP, decision)
+    }
+
     private fun event(
         type: Int,
         packageName: String,
@@ -109,6 +149,7 @@ class OverlayVisibilityPolicyTest {
         focusedEditable: Boolean? = false,
         inputMethodEvent: Boolean = false,
         inputMethodVisible: Boolean = false,
+        sensitiveInput: Boolean = false,
     ) = OverlayVisibilityEvent(
         eventType = type,
         packageName = packageName,
@@ -118,5 +159,6 @@ class OverlayVisibilityPolicyTest {
         focusedEditable = focusedEditable,
         inputMethodEvent = inputMethodEvent,
         inputMethodVisible = inputMethodVisible,
+        sensitiveInput = sensitiveInput,
     )
 }

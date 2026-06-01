@@ -3,6 +3,8 @@ package com.verbally.app.snippets
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.verbally.app.LocalEntrySaveResult
+import com.verbally.app.normalizedLocalEntryKey
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -13,7 +15,7 @@ data class SnippetEntry(
 )
 
 interface SnippetRepository {
-    fun save(entry: SnippetEntry)
+    fun save(entry: SnippetEntry): LocalEntrySaveResult
     fun list(): List<SnippetEntry>
     fun search(query: String): List<SnippetEntry>
     fun delete(id: Long)
@@ -21,14 +23,20 @@ interface SnippetRepository {
 
 class InMemorySnippetRepository(
     private val limit: Int = DEFAULT_LIMIT,
+    initialEntries: List<SnippetEntry> = emptyList(),
 ) : SnippetRepository {
-    private val entries = mutableListOf<SnippetEntry>()
+    private val entries = dedupeEntries(initialEntries).toMutableList()
 
-    override fun save(entry: SnippetEntry) {
-        val normalized = entry.normalized() ?: return
-        entries.removeAll { it.id == normalized.id || it.trigger.equals(normalized.trigger, ignoreCase = true) }
+    override fun save(entry: SnippetEntry): LocalEntrySaveResult {
+        val normalized = entry.normalized() ?: return LocalEntrySaveResult.Invalid
+        val normalizedKey = normalizedLocalEntryKey(normalized.trigger) ?: return LocalEntrySaveResult.Invalid
+        if (entries.any { it.id != normalized.id && normalizedLocalEntryKey(it.trigger) == normalizedKey }) {
+            return LocalEntrySaveResult.Duplicate
+        }
+        entries.removeAll { it.id == normalized.id }
         entries.add(0, normalized)
         trimToLimit()
+        return LocalEntrySaveResult.Saved
     }
 
     override fun list(): List<SnippetEntry> = entries.toList()
@@ -60,12 +68,16 @@ class SharedPreferencesSnippetRepository(
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences("verbally_snippets", Context.MODE_PRIVATE)
 
-    override fun save(entry: SnippetEntry) {
-        val normalized = entry.normalized() ?: return
-        val updated = listOf(normalized) + list().filterNot {
-            it.id == normalized.id || it.trigger.equals(normalized.trigger, ignoreCase = true)
+    override fun save(entry: SnippetEntry): LocalEntrySaveResult {
+        val normalized = entry.normalized() ?: return LocalEntrySaveResult.Invalid
+        val normalizedKey = normalizedLocalEntryKey(normalized.trigger) ?: return LocalEntrySaveResult.Invalid
+        val current = list()
+        if (current.any { it.id != normalized.id && normalizedLocalEntryKey(it.trigger) == normalizedKey }) {
+            return LocalEntrySaveResult.Duplicate
         }
+        val updated = listOf(normalized) + current.filterNot { it.id == normalized.id }
         persist(updated.take(limit))
+        return LocalEntrySaveResult.Saved
     }
 
     override fun list(): List<SnippetEntry> {
@@ -83,7 +95,9 @@ class SharedPreferencesSnippetRepository(
                     if (entry != null) add(entry)
                 }
             }
-        }.getOrDefault(emptyList()).take(limit)
+        }.getOrDefault(emptyList())
+            .let(::dedupeEntries)
+            .take(limit)
     }
 
     override fun search(query: String): List<SnippetEntry> {
@@ -128,5 +142,11 @@ private fun SnippetEntry.normalized(): SnippetEntry? {
         expansion = normalizedExpansion,
     )
 }
+
+private fun dedupeEntries(entries: List<SnippetEntry>): List<SnippetEntry> =
+    entries
+        .mapNotNull { it.normalized() }
+        .sortedByDescending { it.id }
+        .distinctBy { normalizedLocalEntryKey(it.trigger) }
 
 private const val DEFAULT_LIMIT = 200

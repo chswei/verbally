@@ -43,7 +43,7 @@ class DataScreensTest {
                     query = "",
                     entries = emptyList(),
                     onQueryChange = {},
-                    onSave = {},
+                    onSave = { LocalEntrySaveResult.Saved },
                     onDelete = {},
                 )
             }
@@ -81,7 +81,10 @@ class DataScreensTest {
                             it.note.orEmpty().contains(query, ignoreCase = true)
                     },
                     onQueryChange = { query = it },
-                    onSave = ::saveEntry,
+                    onSave = {
+                        saveEntry(it)
+                        LocalEntrySaveResult.Saved
+                    },
                     onDelete = { entry -> entries = entries.filterNot { it.id == entry.id } },
                 )
             }
@@ -139,6 +142,33 @@ class DataScreensTest {
     }
 
     @Test
+    fun dictionaryShowsValidationMessageWhenSaveConflictsWithSnippet() {
+        composeRule.setContent {
+            MaterialTheme {
+                DictionaryScreenContent(
+                    query = "",
+                    entries = emptyList(),
+                    onQueryChange = {},
+                    onSave = { LocalEntrySaveResult.Conflict },
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("新增字典詞彙")
+            .performClick()
+        composeRule.onNodeWithContentDescription("字典詞彙輸入")
+            .performTextInput("我的地址")
+        composeRule.onNodeWithText("儲存")
+            .performClick()
+
+        composeRule.onNodeWithText("這個名稱已經被字典或片段使用，請換一個。")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("新增字典詞彙")
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun snippetsShowsSearchEmptyStateAndAddAction() {
         composeRule.setContent {
             MaterialTheme {
@@ -146,7 +176,7 @@ class DataScreensTest {
                     query = "",
                     entries = emptyList(),
                     onQueryChange = {},
-                    onSave = {},
+                    onSave = { LocalEntrySaveResult.Saved },
                     onDelete = {},
                 )
             }
@@ -186,7 +216,10 @@ class DataScreensTest {
                             it.expansion.contains(query, ignoreCase = true)
                     },
                     onQueryChange = { query = it },
-                    onSave = ::saveEntry,
+                    onSave = {
+                        saveEntry(it)
+                        LocalEntrySaveResult.Saved
+                    },
                     onDelete = { entry -> entries = entries.filterNot { it.id == entry.id } },
                 )
             }
@@ -240,6 +273,35 @@ class DataScreensTest {
         composeRule.onAllNodesWithText("住家地址")
             .assertCountEquals(0)
         composeRule.onNodeWithText("尚未建立常用片段")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun snippetsShowsValidationMessageWhenSaveIsDuplicate() {
+        composeRule.setContent {
+            MaterialTheme {
+                SnippetsScreenContent(
+                    query = "",
+                    entries = emptyList(),
+                    onQueryChange = {},
+                    onSave = { LocalEntrySaveResult.Duplicate },
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("新增常用片段")
+            .performClick()
+        composeRule.onNodeWithContentDescription("片段觸發詞輸入")
+            .performTextInput("我的地址")
+        composeRule.onNodeWithContentDescription("片段展開內容輸入")
+            .performTextInput("台北市信義區一號")
+        composeRule.onNodeWithText("儲存")
+            .performClick()
+
+        composeRule.onNodeWithText("這個名稱已經存在，請換一個。")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("新增常用片段")
             .assertIsDisplayed()
     }
 

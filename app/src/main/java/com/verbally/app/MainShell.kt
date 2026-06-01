@@ -92,6 +92,7 @@ fun VerballyApp(
             showingPermissions = false
         }
     }
+    PermissionResumeRefreshEffect(onRefresh = { refreshPermissions() })
     if (showingPermissions) {
         PermissionScreen(
             onPermissionsChanged = { refreshPermissions() },
