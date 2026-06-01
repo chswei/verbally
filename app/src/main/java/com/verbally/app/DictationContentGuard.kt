@@ -76,6 +76,72 @@ internal object DictationContentGuard {
         return false
     }
 
+    fun cleanedTextShouldFallBackToRawTranscript(rawText: String, cleanedText: String): Boolean {
+        val rawCompact = compact(rawText)
+        val cleanedCompact = compact(cleanedText)
+        if (rawCompact.isBlank() || cleanedCompact.isBlank()) return false
+        if (rawCompact == sentinelCompact || cleanedCompact == sentinelCompact) return false
+        if (rawCompact == cleanedCompact) return false
+
+        return cleanedTextRequestsMissingOriginalContent(cleanedCompact) ||
+            cleanedTextLooksLikeAssistantMetaResponse(cleanedCompact)
+    }
+
+    private fun cleanedTextRequestsMissingOriginalContent(compact: String): Boolean {
+        if (compact.isBlank()) return false
+
+        val asksToProvideChinese = compact.startsWith("請提供") || compact.startsWith("请提供")
+        if (asksToProvideChinese) {
+            val mentionsOriginalTranscript = compact.contains("原始轉錄") ||
+                compact.contains("原始转录") ||
+                compact.contains("原始轉入") ||
+                compact.contains("原始转入")
+            val mentionsContent = compact.contains("內容") ||
+                compact.contains("内容") ||
+                compact.contains("文字")
+            val mentionsProcessing = compact.contains("處理") ||
+                compact.contains("处理") ||
+                compact.contains("轉換") ||
+                compact.contains("转换") ||
+                compact.contains("翻譯") ||
+                compact.contains("翻译")
+            return mentionsOriginalTranscript || (mentionsContent && mentionsProcessing)
+        }
+
+        val asksToProvideEnglish = compact.startsWith("pleaseprovide") || compact.startsWith("provide")
+        return asksToProvideEnglish &&
+            (compact.contains("originaltranscript") || compact.contains("content"))
+    }
+
+    private fun cleanedTextLooksLikeAssistantMetaResponse(compact: String): Boolean {
+        val acknowledgesChineseInstruction = compact.startsWith("好的我會") ||
+            compact.startsWith("好的我会") ||
+            compact.startsWith("我會") ||
+            compact.startsWith("我会") ||
+            compact.startsWith("已設定") ||
+            compact.startsWith("已设置") ||
+            compact.startsWith("我可以協助") ||
+            compact.startsWith("我可以协助")
+        if (acknowledgesChineseInstruction) {
+            return compact.contains("繁體中文") ||
+                compact.contains("繁体中文") ||
+                compact.contains("中文") ||
+                compact.contains("英文") ||
+                compact.contains("翻譯") ||
+                compact.contains("翻译") ||
+                compact.contains("轉錄") ||
+                compact.contains("转录")
+        }
+
+        val acknowledgesEnglishInstruction = compact.startsWith("sureiwill") ||
+            compact.startsWith("iwill") ||
+            compact.startsWith("ican") ||
+            compact.startsWith("icanhelp") ||
+            compact.startsWith("setto")
+        return acknowledgesEnglishInstruction &&
+            (compact.contains("english") || compact.contains("chinese") || compact.contains("translate"))
+    }
+
     private val sentinelCompact: String = compact(NoDictationSentinel)
 
     private fun compact(text: String): String {
