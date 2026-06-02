@@ -1,5 +1,6 @@
 package com.verbally.app
 
+import android.app.Application
 import android.app.LocaleManager
 import android.os.LocaleList
 import androidx.compose.material3.MaterialTheme
@@ -9,6 +10,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -27,6 +30,7 @@ import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.TranscriptionProvider
 import kotlin.math.abs
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -46,6 +50,14 @@ class ApiSettingsScreenTest {
             .applicationLocales = LocaleList.forLanguageTags("zh-TW")
     }
 
+    @After
+    fun resetPersistedSettings() {
+        val application = InstrumentationRegistry.getInstrumentation()
+            .targetContext
+            .applicationContext as Application
+        VerballyContainer(application).settingsRepository.save(AppSettings())
+    }
+
     @Test
     fun settingsOverviewShowsApiSettings() {
         composeRule.setContent {
@@ -60,13 +72,13 @@ class ApiSettingsScreenTest {
 
         composeRule.onNodeWithText("API 設定")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("先完成語音轉錄，再完成文字處理；兩個都儲存後就能用浮動按鈕聽寫。")
+        composeRule.onNodeWithText("先完成語音轉錄，再完成文字處理；有變動時儲存按鈕會亮起，儲存後就能用浮動按鈕聽寫。")
             .assertIsDisplayed()
         composeRule.onNodeWithText("設定順序：語音轉錄 → 文字處理 → 開始聽寫")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("選擇語音辨識模型，貼上 OpenAI API Key 後儲存。")
+        composeRule.onNodeWithText("選擇語音辨識模型，貼上對應服務的 API Key；有變動時再儲存。")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("選擇整理文字的模型；切換服務時只會顯示對應的 API Key。")
+        composeRule.onNodeWithText("選擇整理文字的模型；切換服務時只會顯示對應的 API Key，有變動時再儲存。")
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("API")
@@ -120,6 +132,198 @@ class ApiSettingsScreenTest {
             assertEquals(1, transcriptionTests)
             assertEquals(1, cleanupTests)
         }
+    }
+
+    @Test
+    fun apiKeyTestMessageIsCenteredUnderAction() {
+        composeRule.setContent {
+            MaterialTheme {
+                SettingsScreenContent(
+                    settings = AppSettings(),
+                    onSettingsChange = {},
+                    onSave = {},
+                    transcriptionTestState = ApiKeyTestUiState(message = "OpenAI API Key 可使用", isSuccess = true),
+                )
+            }
+        }
+
+        val actionBounds = composeRule.onNodeWithText("測試語音轉錄 API Key")
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val messageBounds = composeRule.onNodeWithText("OpenAI API Key 可使用")
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        assertTrue(
+            "API key test message should be centered under the action: action=$actionBounds message=$messageBounds",
+            abs(actionBounds.center.x - messageBounds.center.x) <= 2f,
+        )
+    }
+
+    @Test
+    fun transcriptionSaveButtonRequiresUnsavedChangesBeforePersisting() {
+        val application = InstrumentationRegistry.getInstrumentation()
+            .targetContext
+            .applicationContext as Application
+        val container = VerballyContainer(application)
+        container.settingsRepository.save(AppSettings())
+        var savedSettings by mutableStateOf(container.settingsRepository.load())
+
+        composeRule.setContent {
+            MaterialTheme {
+                SettingsScreen(
+                    container = container,
+                    savedSettings = savedSettings,
+                    onSettingsSaved = { savedSettings = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("儲存語音轉錄 API Key")
+            .assertIsNotEnabled()
+        composeRule.onNodeWithText("儲存文字處理設定")
+            .performScrollTo()
+            .assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription("選擇 語音轉錄模型")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithText("Groq: whisper-large-v3-turbo")
+            .performClick()
+        composeRule.onAllNodes(hasSetTextAction())
+            .onFirst()
+            .performTextInput("groq-key")
+        composeRule.waitForIdle()
+
+        val unchangedSettings = container.settingsRepository.load()
+        assertEquals(TranscriptionProvider.OPENAI, unchangedSettings.transcriptionProvider)
+        assertEquals("gpt-4o-mini-transcribe", unchangedSettings.transcriptionModel)
+        assertEquals("", unchangedSettings.groqApiKey)
+        composeRule.onNodeWithText("儲存語音轉錄 API Key")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+
+        val persistedSettings = container.settingsRepository.load()
+        assertEquals(TranscriptionProvider.GROQ, persistedSettings.transcriptionProvider)
+        assertEquals("whisper-large-v3-turbo", persistedSettings.transcriptionModel)
+        assertEquals("groq-key", persistedSettings.groqApiKey)
+        composeRule.onNodeWithText("儲存語音轉錄 API Key")
+            .assertIsNotEnabled()
+    }
+
+    @Test
+    fun cleanupSaveButtonRequiresUnsavedChangesBeforePersisting() {
+        val application = InstrumentationRegistry.getInstrumentation()
+            .targetContext
+            .applicationContext as Application
+        val container = VerballyContainer(application)
+        container.settingsRepository.save(AppSettings())
+        var savedSettings by mutableStateOf(container.settingsRepository.load())
+
+        composeRule.setContent {
+            MaterialTheme {
+                SettingsScreen(
+                    container = container,
+                    savedSettings = savedSettings,
+                    onSettingsSaved = { savedSettings = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("儲存文字處理設定")
+            .performScrollTo()
+            .assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription("選擇 文字處理模型")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithText("Gemini: gemini-3.1-flash-lite")
+            .performClick()
+        composeRule.waitForIdle()
+
+        val unchangedSettings = container.settingsRepository.load()
+        assertEquals(CleanupProvider.OPENAI, unchangedSettings.cleanupProvider)
+        assertEquals("gpt-5.4-nano", unchangedSettings.openAiCleanupModel)
+        composeRule.onNodeWithText("儲存文字處理設定")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+
+        val persistedSettings = container.settingsRepository.load()
+        assertEquals(CleanupProvider.GEMINI, persistedSettings.cleanupProvider)
+        assertEquals("gemini-3.1-flash-lite", persistedSettings.geminiCleanupModel)
+        composeRule.onNodeWithText("儲存文字處理設定")
+            .assertIsNotEnabled()
+    }
+
+    @Test
+    fun cleanupOpenAiKeyChangeDoesNotEnableTranscriptionSaveWhenTranscriptionUsesGroq() {
+        val initialSettings = AppSettings(
+            transcriptionProvider = TranscriptionProvider.GROQ,
+            transcriptionModel = "whisper-large-v3-turbo",
+            cleanupProvider = CleanupProvider.OPENAI,
+        )
+        val application = InstrumentationRegistry.getInstrumentation()
+            .targetContext
+            .applicationContext as Application
+        val container = VerballyContainer(application)
+        container.settingsRepository.save(initialSettings)
+        var savedSettings by mutableStateOf(container.settingsRepository.load())
+
+        composeRule.setContent {
+            MaterialTheme {
+                SettingsScreen(
+                    container = container,
+                    savedSettings = savedSettings,
+                    onSettingsSaved = { savedSettings = it },
+                )
+            }
+        }
+
+        composeRule.onAllNodes(hasSetTextAction())[1]
+            .performScrollTo()
+            .performTextInput("openai-cleanup-key")
+
+        composeRule.onNodeWithText("儲存語音轉錄 API Key")
+            .performScrollTo()
+            .assertIsNotEnabled()
+        composeRule.onNodeWithText("儲存文字處理設定")
+            .performScrollTo()
+            .assertIsEnabled()
+    }
+
+    @Test
+    fun transcriptionOpenAiKeyChangeDoesNotEnableCleanupSaveWhenCleanupUsesGemini() {
+        val initialSettings = AppSettings(
+            transcriptionProvider = TranscriptionProvider.OPENAI,
+            cleanupProvider = CleanupProvider.GEMINI,
+        )
+        val application = InstrumentationRegistry.getInstrumentation()
+            .targetContext
+            .applicationContext as Application
+        val container = VerballyContainer(application)
+        container.settingsRepository.save(initialSettings)
+        var savedSettings by mutableStateOf(container.settingsRepository.load())
+
+        composeRule.setContent {
+            MaterialTheme {
+                SettingsScreen(
+                    container = container,
+                    savedSettings = savedSettings,
+                    onSettingsSaved = { savedSettings = it },
+                )
+            }
+        }
+
+        composeRule.onAllNodes(hasSetTextAction())
+            .onFirst()
+            .performTextInput("openai-transcription-key")
+
+        composeRule.onNodeWithText("儲存語音轉錄 API Key")
+            .performScrollTo()
+            .assertIsEnabled()
+        composeRule.onNodeWithText("儲存文字處理設定")
+            .performScrollTo()
+            .assertIsNotEnabled()
     }
 
     @Test

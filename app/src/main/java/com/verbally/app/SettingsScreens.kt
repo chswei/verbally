@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.verbally.app.providers.ProviderKeyTestResult
@@ -113,6 +114,8 @@ internal fun SettingsScreen(
         settings = settings,
         onSettingsChange = ::updateSettings,
         onSave = saveSettings,
+        transcriptionSaveEnabled = settings.hasUnsavedTranscriptionChanges(savedSettings),
+        cleanupSaveEnabled = settings.hasUnsavedCleanupChanges(savedSettings),
         transcriptionTestState = transcriptionTestState,
         cleanupTestState = cleanupTestState,
         onTestTranscriptionApiKey = { testTranscriptionKey(container.providerKeyTester) },
@@ -518,6 +521,8 @@ fun SettingsScreenContent(
     onSettingsChange: (AppSettings) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
+    transcriptionSaveEnabled: Boolean = true,
+    cleanupSaveEnabled: Boolean = true,
     transcriptionTestState: ApiKeyTestUiState = ApiKeyTestUiState(),
     cleanupTestState: ApiKeyTestUiState = ApiKeyTestUiState(),
     onTestTranscriptionApiKey: () -> Unit = {},
@@ -548,6 +553,7 @@ fun SettingsScreenContent(
             )
             Button(
                 onClick = onSave,
+                enabled = transcriptionSaveEnabled,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(PrimaryActionHeight),
@@ -570,6 +576,7 @@ fun SettingsScreenContent(
             )
             Button(
                 onClick = onSave,
+                enabled = cleanupSaveEnabled,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(PrimaryActionHeight),
@@ -585,6 +592,37 @@ fun SettingsScreenContent(
         Spacer(modifier = Modifier.height(64.dp))
     }
 }
+
+private fun AppSettings.hasUnsavedTranscriptionChanges(savedSettings: AppSettings): Boolean =
+    transcriptionProvider != savedSettings.transcriptionProvider ||
+        transcriptionModel != savedSettings.transcriptionModel ||
+        transcriptionApiKeyFor(transcriptionProvider) != savedSettings.transcriptionApiKeyFor(transcriptionProvider)
+
+private fun AppSettings.hasUnsavedCleanupChanges(savedSettings: AppSettings): Boolean =
+    cleanupProvider != savedSettings.cleanupProvider ||
+        cleanupModelFor(cleanupProvider) != savedSettings.cleanupModelFor(cleanupProvider) ||
+        cleanupApiKeyFor(cleanupProvider) != savedSettings.cleanupApiKeyFor(cleanupProvider) ||
+        cleanupPrompt != savedSettings.cleanupPrompt ||
+        cleanupPromptIsCustom != savedSettings.cleanupPromptIsCustom
+
+private fun AppSettings.transcriptionApiKeyFor(provider: TranscriptionProvider): String =
+    when (provider) {
+        TranscriptionProvider.OPENAI -> openAiApiKey
+        TranscriptionProvider.SONIOX -> sonioxApiKey
+        TranscriptionProvider.GROQ -> groqApiKey
+    }
+
+private fun AppSettings.cleanupApiKeyFor(provider: CleanupProvider): String =
+    when (provider) {
+        CleanupProvider.OPENAI -> openAiApiKey
+        CleanupProvider.GEMINI -> geminiApiKey
+    }
+
+private fun AppSettings.cleanupModelFor(provider: CleanupProvider): String =
+    when (provider) {
+        CleanupProvider.OPENAI -> openAiCleanupModel
+        CleanupProvider.GEMINI -> geminiCleanupModel
+    }
 
 @Composable
 private fun ApiKeyTestAction(
@@ -610,7 +648,9 @@ private fun ApiKeyTestAction(
     state.message?.let { message ->
         Text(
             text = message,
+            modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
             color = if (state.isSuccess == true) {
                 MaterialTheme.colorScheme.primary
             } else {
