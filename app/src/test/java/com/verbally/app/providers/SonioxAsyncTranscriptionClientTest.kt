@@ -12,6 +12,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlin.system.measureTimeMillis
 
 class SonioxAsyncTranscriptionClientTest {
     private lateinit var server: MockWebServer
@@ -79,7 +80,97 @@ class SonioxAsyncTranscriptionClientTest {
         assertEquals("/v1/transcriptions/tx-123", server.takeRequest().target)
         assertEquals("/v1/transcriptions/tx-123/transcript", server.takeRequest().target)
 
-        val delete = server.takeRequest()
+        val delete = server.takeRequest(1, TimeUnit.SECONDS)
+            ?: throw AssertionError("Expected background Soniox transcription cleanup request")
+        assertEquals("DELETE", delete.method)
+        assertEquals("/v1/transcriptions/tx-123", delete.target)
+    }
+
+    @Test
+    fun defaultPollingChecksShortDictationsWithoutWaitingAFullSecond() = runBlocking {
+        server.enqueue(
+            MockResponse.Builder()
+                .code(201)
+                .body("""{"id":"file-123","filename":"clip.m4a","size":4,"created_at":"2026-06-02T00:00:00Z"}""")
+                .build(),
+        )
+        server.enqueue(
+            MockResponse.Builder()
+                .code(201)
+                .body("""{"id":"tx-123","status":"queued","model":"stt-async-v4","filename":"clip.m4a"}""")
+                .build(),
+        )
+        server.enqueue(MockResponse.Builder().code(200).body("""{"id":"tx-123","status":"processing"}""").build())
+        server.enqueue(MockResponse.Builder().code(200).body("""{"id":"tx-123","status":"completed"}""").build())
+        server.enqueue(MockResponse.Builder().code(200).body("""{"id":"tx-123","text":"你好 Soniox","tokens":[]}""").build())
+        server.enqueue(MockResponse.Builder().code(204).build())
+
+        val client = SonioxAsyncTranscriptionClient(
+            httpClient = OkHttpClient(),
+            baseUrl = server.url("/").toString(),
+        )
+
+        val elapsedMillis = measureTimeMillis {
+            client.transcribe(
+                apiKey = "soniox-test",
+                model = "stt-async-v4",
+                audioFile = tempAudio(),
+            )
+        }
+
+        assertTrue(
+            "Expected Soniox default polling to return without a full-second wait, elapsed=${elapsedMillis}ms",
+            elapsedMillis < 900,
+        )
+    }
+
+    @Test
+    fun returnsTranscriptBeforeSuccessfulRemoteCleanupFinishes() = runBlocking {
+        server.enqueue(
+            MockResponse.Builder()
+                .code(201)
+                .body("""{"id":"file-123","filename":"clip.m4a","size":4,"created_at":"2026-06-02T00:00:00Z"}""")
+                .build(),
+        )
+        server.enqueue(
+            MockResponse.Builder()
+                .code(201)
+                .body("""{"id":"tx-123","status":"queued","model":"stt-async-v4","filename":"clip.m4a"}""")
+                .build(),
+        )
+        server.enqueue(MockResponse.Builder().code(200).body("""{"id":"tx-123","status":"completed"}""").build())
+        server.enqueue(MockResponse.Builder().code(200).body("""{"id":"tx-123","text":"你好 Soniox","tokens":[]}""").build())
+        server.enqueue(
+            MockResponse.Builder()
+                .code(204)
+                .headersDelay(1, TimeUnit.SECONDS)
+                .build(),
+        )
+
+        val client = SonioxAsyncTranscriptionClient(
+            httpClient = OkHttpClient(),
+            baseUrl = server.url("/").toString(),
+            pollDelayMillis = 0,
+        )
+
+        val elapsedMillis = measureTimeMillis {
+            val transcript = client.transcribe(
+                apiKey = "soniox-test",
+                model = "stt-async-v4",
+                audioFile = tempAudio(),
+            )
+
+            assertEquals(RawTranscript(text = "你好 Soniox", model = "stt-async-v4", provider = "soniox"), transcript)
+        }
+
+        assertTrue(
+            "Expected transcript to return before remote cleanup response finishes, elapsed=${elapsedMillis}ms",
+            elapsedMillis < 700,
+        )
+
+        repeat(4) { server.takeRequest() }
+        val delete = server.takeRequest(1, TimeUnit.SECONDS)
+            ?: throw AssertionError("Expected background Soniox transcription cleanup request")
         assertEquals("DELETE", delete.method)
         assertEquals("/v1/transcriptions/tx-123", delete.target)
     }

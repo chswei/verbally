@@ -1,7 +1,10 @@
 package com.verbally.app.providers
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -13,11 +16,15 @@ import org.json.JSONObject
 import java.io.File
 
 class SonioxAsyncTranscriptionClient(
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = ProviderHttpClients.shared,
     private val baseUrl: String = "https://api.soniox.com",
-    private val pollDelayMillis: Long = 1_000,
+    private val pollDelayMillis: Long = 250,
+    private val maxPollDelayMillis: Long = 1_000,
     private val maxPollAttempts: Int = 120,
     private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
+    private val backgroundCleanup: ((() -> Unit) -> Unit) = { cleanup ->
+        SonioxRemoteCleanupWork.launch(cleanup)
+    },
 ) : TranscriptionClient {
     override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript =
         withContext(Dispatchers.IO) {
@@ -25,15 +32,19 @@ class SonioxAsyncTranscriptionClient(
 
             var fileId: String? = null
             var transcriptionId: String? = null
+            var cleanupScheduled = false
             try {
                 fileId = uploadFile(apiKey, audioFile)
                 transcriptionId = createTranscription(apiKey, model, fileId)
                 waitUntilCompleted(apiKey, transcriptionId)
                 val text = getTranscript(apiKey, transcriptionId)
                 if (text.isBlank()) throw ProviderException(messages.noTranscriptionText("Soniox"))
+                cleanupScheduled = cleanupRemoteArtifactsInBackground(apiKey, transcriptionId, fileId)
                 RawTranscript(text = text, model = model, provider = "soniox")
             } finally {
-                cleanupRemoteArtifacts(apiKey, transcriptionId, fileId)
+                if (!cleanupScheduled) {
+                    cleanupRemoteArtifacts(apiKey, transcriptionId, fileId)
+                }
             }
         }
 
@@ -78,7 +89,7 @@ class SonioxAsyncTranscriptionClient(
     }
 
     private suspend fun waitUntilCompleted(apiKey: String, transcriptionId: String) {
-        repeat(maxPollAttempts) {
+        repeat(maxPollAttempts) { attemptIndex ->
             val json = executeJson(
                 Request.Builder()
                     .url(endpoint("/v1/transcriptions/$transcriptionId"))
@@ -95,10 +106,15 @@ class SonioxAsyncTranscriptionClient(
                     throw ProviderException(messages.transcriptionFailed("Soniox", detail))
                 }
             }
-            if (pollDelayMillis > 0) delay(pollDelayMillis)
+            val delayMillis = pollDelayMillisFor(attemptIndex)
+            if (delayMillis > 0 && attemptIndex < maxPollAttempts - 1) delay(delayMillis)
         }
         throw ProviderException(messages.transcriptionFailed("Soniox", "timeout"))
     }
+
+    private fun pollDelayMillisFor(attemptIndex: Int): Long =
+        (pollDelayMillis * (attemptIndex + 1))
+            .coerceAtMost(maxPollDelayMillis)
 
     private fun getTranscript(apiKey: String, transcriptionId: String): String {
         val json = executeJson(
@@ -121,6 +137,13 @@ class SonioxAsyncTranscriptionClient(
             executeBestEffortDelete(endpoint("/v1/files/$fileId"), apiKey)
         }
     }
+
+    private fun cleanupRemoteArtifactsInBackground(apiKey: String, transcriptionId: String?, fileId: String?): Boolean =
+        runCatching {
+            backgroundCleanup {
+                cleanupRemoteArtifacts(apiKey, transcriptionId, fileId)
+            }
+        }.isSuccess
 
     private fun executeBestEffortDelete(url: String, apiKey: String): Boolean =
         runCatching {
@@ -154,4 +177,14 @@ class SonioxAsyncTranscriptionClient(
     }
 
     private fun endpoint(path: String): String = "${baseUrl.trimEnd('/')}$path"
+}
+
+private object SonioxRemoteCleanupWork {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    fun launch(cleanup: () -> Unit) {
+        scope.launch {
+            cleanup()
+        }
+    }
 }

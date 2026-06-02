@@ -7,7 +7,7 @@ import org.json.JSONObject
 import java.io.File
 
 class OpenAiTranscriptionClient(
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = ProviderHttpClients.shared,
     private val requestFactory: OpenAiTranscriptionRequestFactory = OpenAiTranscriptionRequestFactory(),
     private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
 ) : TranscriptionClient {
@@ -25,7 +25,7 @@ class OpenAiTranscriptionClient(
 }
 
 class GroqTranscriptionClient(
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = ProviderHttpClients.shared,
     private val requestFactory: GroqTranscriptionRequestFactory = GroqTranscriptionRequestFactory(),
     private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
 ) : TranscriptionClient {

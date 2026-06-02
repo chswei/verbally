@@ -19,7 +19,7 @@ interface TextCleanupClient {
 }
 
 class OpenAiTextCleanupClient(
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = ProviderHttpClients.shared,
     private val requestFactory: OpenAiCleanupRequestFactory = OpenAiCleanupRequestFactory(),
     private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
 ) : TextCleanupClient {
@@ -55,7 +55,7 @@ class OpenAiTextCleanupClient(
 }
 
 class GeminiTextCleanupClient(
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = ProviderHttpClients.shared,
     private val requestFactory: GeminiCleanupRequestFactory = GeminiCleanupRequestFactory(),
     private val messages: ProviderMessages = ProviderMessages.TraditionalChinese,
 ) : TextCleanupClient {

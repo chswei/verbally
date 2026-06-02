@@ -28,7 +28,7 @@ data class ProviderKeyTestEndpoints(
 )
 
 class ProviderApiKeyTester(
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = ProviderHttpClients.shared,
     private val endpoints: ProviderKeyTestEndpoints = ProviderKeyTestEndpoints(),
 ) : ProviderKeyTester {
     override suspend fun testTranscription(settings: AppSettings): ProviderKeyTestResult {
