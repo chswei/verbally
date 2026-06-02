@@ -99,17 +99,6 @@ class GroqTranscriptionRequestFactory(
     }
 }
 
-class SonioxRealtimeConfigFactory {
-    fun create(apiKey: String, model: String): String =
-        "{" +
-            "\"api_key\":${jsonString(apiKey)}," +
-            "\"model\":${jsonString(model)}," +
-            "\"audio_format\":\"auto\"," +
-            "\"enable_language_identification\":true," +
-            "\"enable_endpoint_detection\":true" +
-            "}"
-}
-
 internal fun jsonString(value: String): String = buildString {
     append('"')
     value.forEach { char ->

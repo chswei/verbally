@@ -206,9 +206,7 @@
     <string name="provider_missing_api_key">先に設定で %1$s API Key を入力してください。</string>
     <string name="provider_transcription_failed">%1$s の文字起こしに失敗しました：%2$s</string>
     <string name="provider_no_transcription_text">%1$s は文字起こしテキストを返しませんでした。</string>
-    <string name="provider_audio_stream_failed">Soniox の音声ストリーミングに失敗しました：%1$s</string>
     <string name="provider_response_parse_failed">%1$s の応答を解析できませんでした。</string>
-    <string name="provider_connection_closed">%1$s の接続が閉じられました。</string>
     <string name="provider_cleanup_failed">%1$s の文字処理に失敗しました：%2$s</string>
     <string name="provider_no_cleaned_text">%1$s は処理後のテキストを返しませんでした。</string>
 </resources>

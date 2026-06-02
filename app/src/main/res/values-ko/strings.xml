@@ -206,9 +206,7 @@
     <string name="provider_missing_api_key">먼저 설정에서 %1$s API Key를 입력하세요.</string>
     <string name="provider_transcription_failed">%1$s 전사 실패: %2$s</string>
     <string name="provider_no_transcription_text">%1$s에서 전사 텍스트를 반환하지 않았습니다.</string>
-    <string name="provider_audio_stream_failed">Soniox 오디오 스트리밍 실패: %1$s</string>
     <string name="provider_response_parse_failed">%1$s 응답 형식을 해석할 수 없습니다.</string>
-    <string name="provider_connection_closed">%1$s 연결이 닫혔습니다.</string>
     <string name="provider_cleanup_failed">%1$s 텍스트 처리 실패: %2$s</string>
     <string name="provider_no_cleaned_text">%1$s에서 처리된 텍스트를 반환하지 않았습니다.</string>
 </resources>

@@ -3,6 +3,7 @@ package com.verbally.app.providers
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.TranscriptionProvider
 import com.verbally.app.settings.transcriptionApiKey
+import com.verbally.app.settings.transcriptionModelForRequest
 import java.io.File
 
 interface TranscriptionClient {
@@ -22,7 +23,7 @@ class TranscriptionClientRouter(
         }
         return client.transcribe(
             apiKey = settings.transcriptionApiKey,
-            model = settings.transcriptionModel,
+            model = settings.transcriptionModelForRequest,
             audioFile = audioFile,
         )
     }

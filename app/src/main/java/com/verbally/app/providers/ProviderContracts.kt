@@ -21,9 +21,7 @@ interface ProviderMessages {
     fun missingApiKey(provider: String): String
     fun transcriptionFailed(provider: String, detail: String): String
     fun noTranscriptionText(provider: String): String
-    fun audioStreamFailed(detail: String): String
     fun responseParseFailed(provider: String): String
-    fun connectionClosed(provider: String): String
     fun cleanupFailed(provider: String, detail: String): String
     fun noCleanedText(provider: String): String
 
@@ -32,9 +30,7 @@ interface ProviderMessages {
             override fun missingApiKey(provider: String): String = "請先在設定中填入 $provider API Key。"
             override fun transcriptionFailed(provider: String, detail: String): String = "$provider 轉錄失敗：$detail"
             override fun noTranscriptionText(provider: String): String = "$provider 沒有回傳轉錄文字。"
-            override fun audioStreamFailed(detail: String): String = "Soniox 音訊串流失敗：$detail"
             override fun responseParseFailed(provider: String): String = "$provider 回傳格式無法解析。"
-            override fun connectionClosed(provider: String): String = "$provider 連線已關閉。"
             override fun cleanupFailed(provider: String, detail: String): String = "$provider 文字整理失敗：$detail"
             override fun noCleanedText(provider: String): String = "$provider 沒有回傳整理後文字。"
         }
@@ -51,14 +47,8 @@ class AndroidProviderMessages(private val context: Context) : ProviderMessages {
     override fun noTranscriptionText(provider: String): String =
         context.getString(R.string.provider_no_transcription_text, provider)
 
-    override fun audioStreamFailed(detail: String): String =
-        context.getString(R.string.provider_audio_stream_failed, detail)
-
     override fun responseParseFailed(provider: String): String =
         context.getString(R.string.provider_response_parse_failed, provider)
-
-    override fun connectionClosed(provider: String): String =
-        context.getString(R.string.provider_connection_closed, provider)
 
     override fun cleanupFailed(provider: String, detail: String): String =
         context.getString(R.string.provider_cleanup_failed, provider, detail)
