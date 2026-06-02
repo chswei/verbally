@@ -1,6 +1,8 @@
 package com.verbally.app.audio
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -30,7 +32,6 @@ internal object TemporaryAudioRecorderDefaults {
 
     internal const val BYTES_PER_SAMPLE: Int = BITS_PER_SAMPLE / 8
     internal const val MIN_BUFFER_DURATION_MILLIS: Int = 100
-    internal const val STOP_JOIN_TIMEOUT_MILLIS: Long = 2_000
 }
 
 class TemporaryAudioRecorder(
@@ -50,33 +51,35 @@ class TemporaryAudioRecorder(
 
     override fun start(): File {
         stopAndDelete()
-        val output = File.createTempFile(
-            "verbally-",
-            TemporaryAudioRecorderDefaults.FILE_EXTENSION,
-            context.cacheDir,
-        )
         val bufferSizeInBytes = bufferSizeInBytes()
         val recorder = createAudioRecord(bufferSizeInBytes)
-        val writerThread = thread(start = false, name = "VerballyAudioRecordWriter") {
-            writeAudioDataToFile(output, recorder, bufferSizeInBytes)
-        }
+        var output: File? = null
 
         return try {
+            val recordingFile = File.createTempFile(
+                "verbally-",
+                TemporaryAudioRecorderDefaults.FILE_EXTENSION,
+                context.cacheDir,
+            )
+            output = recordingFile
+            val writerThread = thread(start = false, name = "VerballyAudioRecordWriter") {
+                writeAudioDataToFile(recordingFile, recorder, bufferSizeInBytes)
+            }
             latestAmplitude = 0
-            currentFile = output
+            currentFile = recordingFile
             audioRecord = recorder
             recordingThread = writerThread
             recording = true
             recorder.startRecording()
             writerThread.start()
-            output
+            recordingFile
         } catch (error: Throwable) {
             recording = false
             currentFile = null
             audioRecord = null
             recordingThread = null
             runCatching { recorder.release() }
-            output.delete()
+            output?.delete()
             throw error
         }
     }
@@ -90,10 +93,10 @@ class TemporaryAudioRecorder(
         audioRecord = null
         recordingThread = null
         runCatching { recorder?.stop() }
-        if (writerThread != null && writerThread != Thread.currentThread()) {
-            runCatching { writerThread.join(TemporaryAudioRecorderDefaults.STOP_JOIN_TIMEOUT_MILLIS) }
-        }
         runCatching { recorder?.release() }
+        if (writerThread != null && writerThread != Thread.currentThread()) {
+            runCatching { writerThread.join() }
+        }
         return file
     }
 
@@ -109,14 +112,18 @@ class TemporaryAudioRecorder(
         file?.delete()
     }
 
-    private fun createAudioRecord(bufferSizeInBytes: Int): AudioRecord =
-        AudioRecord(
+    private fun createAudioRecord(bufferSizeInBytes: Int): AudioRecord {
+        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            throw SecurityException("RECORD_AUDIO permission is required to start dictation recording.")
+        }
+        return AudioRecord(
             audioSource,
             TemporaryAudioRecorderDefaults.SAMPLE_RATE_HZ,
             TemporaryAudioRecorderDefaults.CHANNEL_CONFIG,
             TemporaryAudioRecorderDefaults.AUDIO_ENCODING,
             bufferSizeInBytes,
         )
+    }
 
     private fun bufferSizeInBytes(): Int {
         val minimum = AudioRecord.getMinBufferSize(
