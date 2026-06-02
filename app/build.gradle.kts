@@ -43,6 +43,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20250517")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.3.2")
 
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.05.01"))

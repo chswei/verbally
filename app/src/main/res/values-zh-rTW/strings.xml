@@ -206,9 +206,7 @@
     <string name="provider_missing_api_key">請先在設定中填入 %1$s API Key。</string>
     <string name="provider_transcription_failed">%1$s 轉錄失敗：%2$s</string>
     <string name="provider_no_transcription_text">%1$s 沒有回傳轉錄文字。</string>
-    <string name="provider_audio_stream_failed">Soniox 音訊串流失敗：%1$s</string>
     <string name="provider_response_parse_failed">%1$s 回傳格式無法解析。</string>
-    <string name="provider_connection_closed">%1$s 連線已關閉。</string>
     <string name="provider_cleanup_failed">%1$s 文字整理失敗：%2$s</string>
     <string name="provider_no_cleaned_text">%1$s 沒有回傳整理後文字。</string>
 </resources>

@@ -11,7 +11,7 @@ class ModelOptionsTest {
             listOf(
                 "OpenAI: gpt-4o-mini-transcribe",
                 "OpenAI: gpt-4o-transcribe",
-                "Soniox: Soniox Realtime",
+                "Soniox: stt-async-v4",
                 "Groq: whisper-large-v3-turbo",
             ),
             ModelOptions.TranscriptionOptions.map { it.label },
@@ -44,13 +44,24 @@ class ModelOptionsTest {
 
     @Test
     fun appliesSelectedOptionLabelsToSettings() {
-        val transcription = AppSettings().withTranscriptionModelOption("Groq: whisper-large-v3-turbo")
+        val transcription = AppSettings().withTranscriptionModelOption("Soniox: stt-async-v4")
         val cleanup = AppSettings().withCleanupModelOption("Gemini: gemini-3.1-pro-preview")
 
-        assertEquals(TranscriptionProvider.GROQ, transcription.transcriptionProvider)
-        assertEquals("whisper-large-v3-turbo", transcription.transcriptionModel)
+        assertEquals(TranscriptionProvider.SONIOX, transcription.transcriptionProvider)
+        assertEquals("stt-async-v4", transcription.transcriptionModel)
         assertEquals(CleanupProvider.GEMINI, cleanup.cleanupProvider)
         assertEquals("gemini-3.1-pro-preview", cleanup.geminiCleanupModel)
         assertTrue(cleanup.cleanupModelOptionLabel.endsWith("gemini-3.1-pro-preview"))
+    }
+
+    @Test
+    fun fallsBackToSelectedProviderDefaultWhenStoredTranscriptionModelIsStale() {
+        val settings = AppSettings(
+            transcriptionProvider = TranscriptionProvider.SONIOX,
+            transcriptionModel = "stt-rt-v4",
+        )
+
+        assertEquals("Soniox: stt-async-v4", settings.transcriptionModelOptionLabel)
+        assertEquals("stt-async-v4", settings.transcriptionModelForRequest)
     }
 }

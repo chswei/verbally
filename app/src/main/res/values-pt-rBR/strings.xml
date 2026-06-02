@@ -206,9 +206,7 @@
     <string name="provider_missing_api_key">Insira primeiro a API Key de %1$s nas configurações.</string>
     <string name="provider_transcription_failed">A transcrição de %1$s falhou: %2$s</string>
     <string name="provider_no_transcription_text">%1$s não retornou texto de transcrição.</string>
-    <string name="provider_audio_stream_failed">Falha no streaming de áudio do Soniox: %1$s</string>
     <string name="provider_response_parse_failed">Não foi possível interpretar a resposta de %1$s.</string>
-    <string name="provider_connection_closed">A conexão de %1$s foi fechada.</string>
     <string name="provider_cleanup_failed">O processamento de texto de %1$s falhou: %2$s</string>
     <string name="provider_no_cleaned_text">%1$s não retornou texto processado.</string>
 </resources>

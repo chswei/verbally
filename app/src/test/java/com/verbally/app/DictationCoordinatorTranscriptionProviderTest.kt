@@ -55,6 +55,33 @@ class DictationCoordinatorTranscriptionProviderTest {
         assertEquals("gpt-5.4-nano", history.saved.cleanupModel)
     }
 
+    @Test
+    fun confirmRecordingUsesSelectedProviderDefaultWhenStoredModelIsStale() = runBlocking {
+        val soniox = CapturingTranscriptionClient(provider = "soniox")
+        val history = CapturingHistoryRepository()
+        val coordinator = coordinator(
+            settings = AppSettings(
+                sonioxApiKey = "soniox-key",
+                transcriptionProvider = TranscriptionProvider.SONIOX,
+                transcriptionModel = "stt-rt-v4",
+                cleanupProvider = CleanupProvider.OPENAI,
+            ),
+            router = TranscriptionClientRouter(
+                openAiClient = CapturingTranscriptionClient(provider = "openai"),
+                sonioxClient = soniox,
+                groqClient = CapturingTranscriptionClient(provider = "groq"),
+            ),
+            historyRepository = history,
+        )
+
+        coordinator.confirmRecording(appLabel = null)
+
+        assertEquals("soniox-key", soniox.apiKey)
+        assertEquals("stt-async-v4", soniox.model)
+        assertEquals("soniox", history.saved.transcriptionProvider)
+        assertEquals("stt-async-v4", history.saved.transcriptionModel)
+    }
+
     private fun coordinator(
         settings: AppSettings,
         router: TranscriptionClientRouter,

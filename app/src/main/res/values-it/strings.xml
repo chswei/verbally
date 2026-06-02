@@ -206,9 +206,7 @@
     <string name="provider_missing_api_key">Inserisci prima la API Key di %1$s nelle impostazioni.</string>
     <string name="provider_transcription_failed">Trascrizione %1$s non riuscita: %2$s</string>
     <string name="provider_no_transcription_text">%1$s non ha restituito testo trascritto.</string>
-    <string name="provider_audio_stream_failed">Streaming audio Soniox non riuscito: %1$s</string>
     <string name="provider_response_parse_failed">Impossibile analizzare la risposta di %1$s.</string>
-    <string name="provider_connection_closed">Connessione %1$s chiusa.</string>
     <string name="provider_cleanup_failed">Elaborazione testo %1$s non riuscita: %2$s</string>
     <string name="provider_no_cleaned_text">%1$s non ha restituito testo elaborato.</string>
 </resources>

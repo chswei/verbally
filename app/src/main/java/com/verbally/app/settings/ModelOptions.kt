@@ -32,8 +32,8 @@ object ModelOptions {
         ),
         TranscriptionModelOption(
             provider = TranscriptionProvider.SONIOX,
-            model = "stt-rt-v4",
-            label = "Soniox: Soniox Realtime",
+            model = "stt-async-v4",
+            label = "Soniox: stt-async-v4",
         ),
         TranscriptionModelOption(
             provider = TranscriptionProvider.GROQ,
@@ -71,10 +71,18 @@ object ModelOptions {
     )
 }
 
-val AppSettings.transcriptionModelOptionLabel: String
+private val AppSettings.transcriptionModelOption: TranscriptionModelOption
     get() = ModelOptions.TranscriptionOptions.firstOrNull {
         it.provider == transcriptionProvider && it.model == transcriptionModel
-    }?.label ?: ModelOptions.TranscriptionOptions.first().label
+    } ?: ModelOptions.TranscriptionOptions.firstOrNull {
+        it.provider == transcriptionProvider
+    } ?: ModelOptions.TranscriptionOptions.first()
+
+val AppSettings.transcriptionModelOptionLabel: String
+    get() = transcriptionModelOption.label
+
+val AppSettings.transcriptionModelForRequest: String
+    get() = transcriptionModelOption.model
 
 fun AppSettings.withTranscriptionModelOption(option: String): AppSettings {
     val selected = ModelOptions.TranscriptionOptions.firstOrNull { it.label == option } ?: return this

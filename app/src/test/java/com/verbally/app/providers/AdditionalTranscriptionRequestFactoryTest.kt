@@ -28,18 +28,6 @@ class AdditionalTranscriptionRequestFactoryTest {
         assertTrue(bodyText.contains("name=\"response_format\""))
     }
 
-    @Test
-    fun createsSonioxRealtimeConfigForRecordedAudioStream() {
-        val json = SonioxRealtimeConfigFactory()
-            .create(apiKey = "soniox-test", model = "stt-rt-v4")
-
-        assertTrue(json.contains("\"api_key\":\"soniox-test\""))
-        assertTrue(json.contains("\"model\":\"stt-rt-v4\""))
-        assertTrue(json.contains("\"audio_format\":\"auto\""))
-        assertTrue(json.contains("\"enable_language_identification\":true"))
-        assertTrue(json.contains("\"enable_endpoint_detection\":true"))
-    }
-
     private fun tempAudio(): File =
         File.createTempFile("verbally-test", ".m4a").apply {
             writeBytes(byteArrayOf(1, 2, 3, 4))

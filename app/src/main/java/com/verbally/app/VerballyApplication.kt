@@ -9,7 +9,7 @@ import com.verbally.app.providers.GroqTranscriptionClient
 import com.verbally.app.providers.OpenAiTextCleanupClient
 import com.verbally.app.providers.OpenAiTranscriptionClient
 import com.verbally.app.providers.ProviderApiKeyTester
-import com.verbally.app.providers.SonioxRealtimeTranscriptionClient
+import com.verbally.app.providers.SonioxAsyncTranscriptionClient
 import com.verbally.app.providers.TranscriptionClientRouter
 import com.verbally.app.settings.EncryptedSettingsRepository
 import com.verbally.app.snippets.SharedPreferencesSnippetRepository
@@ -39,7 +39,7 @@ class VerballyContainer(application: Application) {
     val styleRuleRepository = SharedPreferencesAppStyleRuleRepository(application)
     val transcriptionRouter = TranscriptionClientRouter(
         openAiClient = OpenAiTranscriptionClient(messages = providerMessages),
-        sonioxClient = SonioxRealtimeTranscriptionClient(messages = providerMessages),
+        sonioxClient = SonioxAsyncTranscriptionClient(messages = providerMessages),
         groqClient = GroqTranscriptionClient(messages = providerMessages),
     )
     val openAiCleanupClient = OpenAiTextCleanupClient(messages = providerMessages)

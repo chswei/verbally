@@ -206,9 +206,7 @@
     <string name="provider_missing_api_key">Renseignez d’abord la clé API %1$s dans les réglages.</string>
     <string name="provider_transcription_failed">La transcription %1$s a échoué : %2$s</string>
     <string name="provider_no_transcription_text">%1$s n’a renvoyé aucun texte de transcription.</string>
-    <string name="provider_audio_stream_failed">Le flux audio Soniox a échoué : %1$s</string>
     <string name="provider_response_parse_failed">La réponse %1$s n’a pas pu être analysée.</string>
-    <string name="provider_connection_closed">La connexion %1$s a été fermée.</string>
     <string name="provider_cleanup_failed">Le traitement du texte %1$s a échoué : %2$s</string>
     <string name="provider_no_cleaned_text">%1$s n’a renvoyé aucun texte nettoyé.</string>
 </resources>
