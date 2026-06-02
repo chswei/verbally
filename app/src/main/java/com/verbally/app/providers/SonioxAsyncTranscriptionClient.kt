@@ -12,6 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
@@ -37,10 +38,18 @@ class SonioxAsyncTranscriptionClient(
                 fileId = uploadFile(apiKey, audioFile)
                 transcriptionId = createTranscription(apiKey, model, fileId)
                 waitUntilCompleted(apiKey, transcriptionId)
-                val text = getTranscript(apiKey, transcriptionId)
-                if (text.isBlank()) throw ProviderException(messages.noTranscriptionText("Soniox"))
+                val transcript = getTranscript(apiKey, transcriptionId)
                 cleanupScheduled = cleanupRemoteArtifactsInBackground(apiKey, transcriptionId, fileId)
-                RawTranscript(text = text, model = model, provider = "soniox")
+                if (transcript.text.isBlank()) {
+                    noDictationRawTranscript(model, provider = "soniox")
+                } else {
+                    RawTranscript(
+                        text = transcript.text,
+                        model = model,
+                        provider = "soniox",
+                        confidence = transcript.confidence,
+                    )
+                }
             } finally {
                 if (!cleanupScheduled) {
                     cleanupRemoteArtifacts(apiKey, transcriptionId, fileId)
@@ -116,7 +125,7 @@ class SonioxAsyncTranscriptionClient(
         (pollDelayMillis * (attemptIndex + 1))
             .coerceAtMost(maxPollDelayMillis)
 
-    private fun getTranscript(apiKey: String, transcriptionId: String): String {
+    private fun getTranscript(apiKey: String, transcriptionId: String): SonioxTranscriptResult {
         val json = executeJson(
             Request.Builder()
                 .url(endpoint("/v1/transcriptions/$transcriptionId/transcript"))
@@ -124,7 +133,32 @@ class SonioxAsyncTranscriptionClient(
                 .get()
                 .build(),
         )
-        return json.optString("text").trim()
+        return SonioxTranscriptResult(
+            text = json.optString("text").trim(),
+            confidence = confidenceFromTokens(json.optJSONArray("tokens")),
+        )
+    }
+
+    private fun confidenceFromTokens(tokens: JSONArray?): TranscriptionConfidence? {
+        if (tokens == null || tokens.length() == 0) return null
+
+        var total = 0.0
+        var count = 0
+        for (index in 0 until tokens.length()) {
+            val token = tokens.optJSONObject(index) ?: continue
+            if (token.optBoolean("is_audio_event", false)) continue
+            if (token.optString("translation_status") == "translation") continue
+            if (token.optString("text").isBlank()) continue
+            if (!token.has("confidence")) continue
+
+            val confidence = token.optDouble("confidence", Double.NaN)
+            if (confidence.isNaN() || confidence.isInfinite()) continue
+            total += confidence.coerceIn(0.0, 1.0)
+            count += 1
+        }
+        if (count == 0) return null
+
+        return confidenceFromSonioxTokenAverage(total / count)
     }
 
     private fun cleanupRemoteArtifacts(apiKey: String, transcriptionId: String?, fileId: String?) {
@@ -188,3 +222,16 @@ private object SonioxRemoteCleanupWork {
         }
     }
 }
+
+private data class SonioxTranscriptResult(
+    val text: String,
+    val confidence: TranscriptionConfidence?,
+)
+
+private fun confidenceFromSonioxTokenAverage(confidence: Double): TranscriptionConfidence =
+    when {
+        confidence <= 0.2 -> TranscriptionConfidence.NONE
+        confidence <= 0.6 -> TranscriptionConfidence.LOW
+        confidence <= 0.85 -> TranscriptionConfidence.MEDIUM
+        else -> TranscriptionConfidence.HIGH
+    }

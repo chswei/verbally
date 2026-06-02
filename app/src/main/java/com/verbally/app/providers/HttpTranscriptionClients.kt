@@ -18,8 +18,17 @@ class OpenAiTranscriptionClient(
             response.use {
                 val body = it.body.string()
                 if (!it.isSuccessful) throw ProviderException(messages.transcriptionFailed("OpenAI", it.code.toString()))
-                val text = JSONObject(body).optString("text")
-                RawTranscript(text = text, model = model, provider = "openai")
+                val json = JSONObject(body)
+                val text = json.optString("text")
+                if (text.isBlank()) return@withContext noDictationRawTranscript(model, provider = "openai")
+                val averageLogprob = json.averageLogprob()
+                RawTranscript(
+                    text = text,
+                    model = model,
+                    provider = "openai",
+                    averageLogprob = averageLogprob,
+                    confidence = averageLogprob?.let(::confidenceFromAverageLogprob),
+                )
             }
         }
 }
@@ -37,7 +46,26 @@ class GroqTranscriptionClient(
                 val body = it.body.string()
                 if (!it.isSuccessful) throw ProviderException(messages.transcriptionFailed("Groq", it.code.toString()))
                 val text = JSONObject(body).optString("text")
-                RawTranscript(text = text, model = model, provider = "groq")
+                if (text.isBlank()) {
+                    noDictationRawTranscript(model, provider = "groq")
+                } else {
+                    RawTranscript(text = text, model = model, provider = "groq")
+                }
             }
         }
+}
+
+private fun JSONObject.averageLogprob(): Double? {
+    val logprobs = optJSONArray("logprobs") ?: return null
+    var count = 0
+    var total = 0.0
+    for (index in 0 until logprobs.length()) {
+        val token = logprobs.optJSONObject(index) ?: continue
+        val logprob = token.optDouble("logprob", Double.NaN)
+        if (!logprob.isNaN()) {
+            total += logprob
+            count += 1
+        }
+    }
+    return if (count == 0) null else total / count
 }

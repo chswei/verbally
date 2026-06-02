@@ -87,6 +87,92 @@ class SonioxAsyncTranscriptionClientTest {
     }
 
     @Test
+    fun blankTranscriptReturnsSilentNoContentResult() = runBlocking {
+        server.enqueue(
+            MockResponse.Builder()
+                .code(201)
+                .body("""{"id":"file-123","filename":"clip.m4a","size":4,"created_at":"2026-06-02T00:00:00Z"}""")
+                .build(),
+        )
+        server.enqueue(
+            MockResponse.Builder()
+                .code(201)
+                .body("""{"id":"tx-123","status":"queued","model":"stt-async-v4","filename":"clip.m4a"}""")
+                .build(),
+        )
+        server.enqueue(MockResponse.Builder().code(200).body("""{"id":"tx-123","status":"completed"}""").build())
+        server.enqueue(MockResponse.Builder().code(200).body("""{"id":"tx-123","text":"","tokens":[]}""").build())
+        server.enqueue(MockResponse.Builder().code(204).build())
+
+        val client = SonioxAsyncTranscriptionClient(
+            httpClient = OkHttpClient(),
+            baseUrl = server.url("/").toString(),
+            pollDelayMillis = 0,
+        )
+
+        val transcript = client.transcribe(
+            apiKey = "soniox-test",
+            model = "stt-async-v4",
+            audioFile = tempAudio(),
+        )
+
+        assertEquals("", transcript.text)
+        assertEquals(TranscriptionConfidence.NONE, transcript.confidence)
+        assertEquals(TranscriptionHallucination.SILENT, transcript.hallucination)
+    }
+
+    @Test
+    fun transcriptIncludesAverageTokenConfidence() = runBlocking {
+        server.enqueue(
+            MockResponse.Builder()
+                .code(201)
+                .body("""{"id":"file-123","filename":"clip.wav","size":4,"created_at":"2026-06-02T00:00:00Z"}""")
+                .build(),
+        )
+        server.enqueue(
+            MockResponse.Builder()
+                .code(201)
+                .body("""{"id":"tx-123","status":"queued","model":"stt-async-v4","filename":"clip.wav"}""")
+                .build(),
+        )
+        server.enqueue(MockResponse.Builder().code(200).body("""{"id":"tx-123","status":"completed"}""").build())
+        server.enqueue(
+            MockResponse.Builder()
+                .code(200)
+                .body(
+                    """
+                    {
+                      "id": "tx-123",
+                      "text": "Thanks for watching",
+                      "tokens": [
+                        {"text": "Thanks", "confidence": 0.32},
+                        {"text": " for", "confidence": 0.41},
+                        {"text": " watching", "confidence": 0.48}
+                      ]
+                    }
+                    """.trimIndent(),
+                )
+                .build(),
+        )
+        server.enqueue(MockResponse.Builder().code(204).build())
+
+        val client = SonioxAsyncTranscriptionClient(
+            httpClient = OkHttpClient(),
+            baseUrl = server.url("/").toString(),
+            pollDelayMillis = 0,
+        )
+
+        val transcript = client.transcribe(
+            apiKey = "soniox-test",
+            model = "stt-async-v4",
+            audioFile = tempAudio(),
+        )
+
+        assertEquals("Thanks for watching", transcript.text)
+        assertEquals(TranscriptionConfidence.LOW, transcript.confidence)
+    }
+
+    @Test
     fun defaultPollingChecksShortDictationsWithoutWaitingAFullSecond() = runBlocking {
         server.enqueue(
             MockResponse.Builder()

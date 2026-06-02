@@ -26,6 +26,7 @@ class OpenAiTranscriptionRequestFactory(
                 body = audioFile.asRequestBody(mediaTypeFor(audioFile).toMediaType()),
             )
             .addFormDataPart("response_format", "json")
+            .addFormDataPart("include[]", "logprobs")
             .addFormDataPart("chunking_strategy", "auto")
             .build()
 
