@@ -1,6 +1,7 @@
 package com.verbally.app
 
 import com.verbally.app.audio.AudioRecorder
+import com.verbally.app.audio.RecordedAudioQualityAnalyzer
 import com.verbally.app.dictionary.DictionaryRepository
 import com.verbally.app.history.DictationHistoryEntry
 import com.verbally.app.history.DictationHistoryRepository
@@ -102,7 +103,9 @@ class DictationCoordinator(
         }
 
         return try {
-            if (noAudioSamples) return DictationOutcome.NoDictatedContent
+            val recordingHasNoContent = noAudioSamples ||
+                RecordedAudioQualityAnalyzer.analyze(audioFile).clearlyHasNoSpeechContent()
+            if (recordingHasNoContent) return DictationOutcome.NoDictatedContent
 
             val storedSettings = settingsRepository.load()
             val styleRuleLanguage = defaultPromptLanguageFor(storedSettings.interfaceLanguage)
@@ -119,7 +122,7 @@ class DictationCoordinator(
                 customRule = styleRuleRepository.customRuleFor(styleRuleLanguage, outputStyle),
             )
             val raw = transcriptionRouter.transcribe(settings, audioFile)
-            if (DictationContentGuard.rawTranscriptHasNoContent(raw.text)) {
+            if (DictationContentGuard.rawTranscriptHasNoContent(raw)) {
                 return DictationOutcome.NoDictatedContent
             }
             val cleaned = when (settings.cleanupProvider) {

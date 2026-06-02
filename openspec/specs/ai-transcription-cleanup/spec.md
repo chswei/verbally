@@ -9,7 +9,23 @@ The system SHALL transcribe confirmed recordings by sending temporary audio capt
 #### Scenario: OpenAI transcription succeeds
 - **WHEN** the user confirms a recording and a valid OpenAI key is configured
 - **THEN** the system calls OpenAI transcription with the configured OpenAI transcription model
+- **AND** the request includes token confidence signals when the selected OpenAI transcription model supports them
 - **THEN** the system receives raw transcript text for cleanup
+
+#### Scenario: Low-confidence brief transcript is suppressed
+- **WHEN** a confirmed recording produces a brief raw transcript with low transcription confidence
+- **THEN** the system treats the result as no dictated content
+- **AND** the system does not clean, insert, or save that transcript
+
+#### Scenario: Short or silent recording is suppressed before transcription
+- **WHEN** a confirmed recording is too short to contain useful dictation or is clearly silent
+- **THEN** the system treats the result as no dictated content before calling the transcription provider
+- **AND** the system does not clean, insert, or save that recording
+
+#### Scenario: Provider marks transcript as no-content hallucination
+- **WHEN** a transcription provider returns an empty transcript or marks a transcript as no-content, silent, or hallucinated
+- **THEN** the system treats the result as no dictated content
+- **AND** the system does not clean, insert, or save that transcript
 
 #### Scenario: Soniox transcription succeeds
 - **WHEN** the user confirms a recording and Soniox is selected with a valid Soniox key

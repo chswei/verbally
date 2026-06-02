@@ -1,11 +1,17 @@
 package com.verbally.app
 
+import com.verbally.app.providers.RawTranscript
+import com.verbally.app.providers.TranscriptionConfidence
+import com.verbally.app.providers.TranscriptionHallucination
+import com.verbally.app.providers.confidenceFromAverageLogprob
 import java.util.Locale
 
 internal object DictationContentGuard {
     const val NoDictationSentinel: String = "<NO_DICTATION_CONTENT>"
 
     private const val ShortSystemMessageLimit = 80
+    private const val LowConfidenceLogprobThreshold = -1.0
+    private const val LowConfidenceBriefTranscriptLimit = 80
 
     private val removableCharacters =
         Regex("""[\s\p{Punct}，。！？、；：「」『』（）()【】\[\]《》〈〉…—－～~]+""")
@@ -65,6 +71,14 @@ internal object DictationContentGuard {
         val compact = compact(text)
         return compact.isBlank() ||
             compact == sentinelCompact
+    }
+
+    fun rawTranscriptHasNoContent(transcript: RawTranscript): Boolean {
+        if (rawTranscriptHasNoContent(transcript.text)) return true
+        if (transcript.hallucination.indicatesNoDictationContent()) return true
+        if (rawTranscriptLooksLikeKnownNoSpeechHallucination(transcript.text)) return true
+        if (transcript.effectiveConfidence().indicatesNoDictationContent(transcript.text)) return true
+        return rawTranscriptLooksLikeLowConfidenceNoSpeech(transcript)
     }
 
     fun cleanedTextHasNoContent(text: String): Boolean {
@@ -140,6 +154,51 @@ internal object DictationContentGuard {
             compact.startsWith("setto")
         return acknowledgesEnglishInstruction &&
             (compact.contains("english") || compact.contains("chinese") || compact.contains("translate"))
+    }
+
+    private fun rawTranscriptLooksLikeLowConfidenceNoSpeech(transcript: RawTranscript): Boolean {
+        val averageLogprob = transcript.averageLogprob ?: return false
+        if (averageLogprob > LowConfidenceLogprobThreshold) return false
+
+        val compact = compact(transcript.text)
+        if (compactLooksLikeKnownNoSpeechHallucination(compact)) return true
+        return compact.length <= LowConfidenceBriefTranscriptLimit
+    }
+
+    private fun rawTranscriptLooksLikeKnownNoSpeechHallucination(text: String): Boolean =
+        compactLooksLikeKnownNoSpeechHallucination(compact(text))
+
+    private fun compactLooksLikeKnownNoSpeechHallucination(compact: String): Boolean {
+        if (compact in noSpeechSystemMessages) return true
+        if (compact in knownNoSpeechHallucinations) return true
+        return compact.startsWith("subtitlesby") && compact.length <= ShortSystemMessageLimit
+    }
+
+    private fun RawTranscript.effectiveConfidence(): TranscriptionConfidence? =
+        confidence ?: averageLogprob?.let(::confidenceFromAverageLogprob)
+
+    private fun TranscriptionHallucination?.indicatesNoDictationContent(): Boolean =
+        when (this) {
+            TranscriptionHallucination.SILENT,
+            TranscriptionHallucination.CRITICAL,
+            -> true
+            TranscriptionHallucination.NONE,
+            null,
+            -> false
+        }
+
+    private fun TranscriptionConfidence?.indicatesNoDictationContent(text: String): Boolean {
+        val compact = compact(text)
+        return when (this) {
+            TranscriptionConfidence.NONE -> true
+            TranscriptionConfidence.LOW -> compact.length <= LowConfidenceBriefTranscriptLimit ||
+                compact in noSpeechSystemMessages ||
+                compact in knownNoSpeechHallucinations
+            TranscriptionConfidence.MEDIUM,
+            TranscriptionConfidence.HIGH,
+            null,
+            -> false
+        }
     }
 
     private val sentinelCompact: String = compact(NoDictationSentinel)

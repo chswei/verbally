@@ -7,7 +7,40 @@ data class RawTranscript(
     val text: String,
     val model: String,
     val provider: String = "openai",
+    val averageLogprob: Double? = null,
+    val confidence: TranscriptionConfidence? = null,
+    val hallucination: TranscriptionHallucination? = null,
 )
+
+enum class TranscriptionConfidence {
+    NONE,
+    LOW,
+    MEDIUM,
+    HIGH,
+}
+
+enum class TranscriptionHallucination {
+    NONE,
+    SILENT,
+    CRITICAL,
+}
+
+internal fun confidenceFromAverageLogprob(averageLogprob: Double): TranscriptionConfidence =
+    when {
+        averageLogprob <= -2.0 -> TranscriptionConfidence.NONE
+        averageLogprob <= -1.0 -> TranscriptionConfidence.LOW
+        averageLogprob <= -0.35 -> TranscriptionConfidence.MEDIUM
+        else -> TranscriptionConfidence.HIGH
+    }
+
+internal fun noDictationRawTranscript(model: String, provider: String): RawTranscript =
+    RawTranscript(
+        text = "",
+        model = model,
+        provider = provider,
+        confidence = TranscriptionConfidence.NONE,
+        hallucination = TranscriptionHallucination.SILENT,
+    )
 
 data class CleanedTranscript(
     val text: String,

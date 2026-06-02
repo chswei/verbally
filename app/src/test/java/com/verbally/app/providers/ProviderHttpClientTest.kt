@@ -52,6 +52,41 @@ class ProviderHttpClientTest {
         assertEquals(transcriptionRequest.connectionIndex, cleanupRequest.connectionIndex)
     }
 
+    @Test
+    fun openAiTranscriptionClientPreservesAverageTokenLogprob() = runBlocking {
+        server.enqueue(
+            MockResponse.Builder()
+                .code(200)
+                .body(
+                    """
+                    {
+                      "text": "Thank you for watching.",
+                      "logprobs": [
+                        {"token": "Thank", "logprob": -1.4},
+                        {"token": " you", "logprob": -1.8},
+                        {"token": " for", "logprob": -1.6}
+                      ]
+                    }
+                    """.trimIndent(),
+                )
+                .build(),
+        )
+
+        val transcriptionClient = OpenAiTranscriptionClient(
+            requestFactory = OpenAiTranscriptionRequestFactory(baseUrl = server.url("/").toString()),
+        )
+
+        val transcript = transcriptionClient.transcribe(
+            apiKey = "openai-test",
+            model = "gpt-4o-mini-transcribe",
+            audioFile = tempAudio(),
+        )
+
+        assertEquals("Thank you for watching.", transcript.text)
+        assertEquals(-1.6, transcript.averageLogprob!!, 0.001)
+        assertEquals(TranscriptionConfidence.LOW, transcript.confidence)
+    }
+
     private fun tempAudio(): File =
         File.createTempFile("verbally-openai", ".m4a").apply {
             writeBytes(byteArrayOf(1, 2, 3, 4))

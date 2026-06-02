@@ -34,5 +34,7 @@ class OpenAiTranscriptionRequestFactoryTest {
         assertTrue(bodyText.contains("verbally-test"))
         assertTrue(bodyText.contains("name=\"chunking_strategy\""))
         assertTrue(bodyText.contains("auto"))
+        assertTrue(bodyText.contains("name=\"include[]\""))
+        assertTrue(bodyText.contains("logprobs"))
     }
 }

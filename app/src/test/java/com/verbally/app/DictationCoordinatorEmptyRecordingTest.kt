@@ -1,6 +1,7 @@
 package com.verbally.app
 
 import com.verbally.app.audio.AudioRecorder
+import com.verbally.app.audio.WavFileWriter
 import com.verbally.app.dictionary.DictionaryEntry
 import com.verbally.app.dictionary.InMemoryDictionaryRepository
 import com.verbally.app.history.InMemoryDictationHistoryRepository
@@ -11,6 +12,8 @@ import com.verbally.app.providers.CleanedTranscript
 import com.verbally.app.providers.RawTranscript
 import com.verbally.app.providers.TextCleanupClient
 import com.verbally.app.providers.TranscriptionClient
+import com.verbally.app.providers.TranscriptionConfidence
+import com.verbally.app.providers.TranscriptionHallucination
 import com.verbally.app.settings.AppSettings
 import com.verbally.app.settings.CleanupProvider
 import com.verbally.app.settings.SettingsRepository
@@ -18,6 +21,7 @@ import com.verbally.app.snippets.InMemorySnippetRepository
 import com.verbally.app.style.CleanupStyleContext
 import com.verbally.app.style.InMemoryAppStyleProfileRepository
 import java.io.File
+import java.io.FileOutputStream
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -41,6 +45,38 @@ class DictationCoordinatorEmptyRecordingTest {
         )
 
         coordinator.startRecording()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        val result = coordinator.confirmRecording(appLabel = "Test")
+
+        assertTrue(result is DictationOutcome.NoDictatedContent)
+        assertEquals(0, transcription.calls)
+        assertEquals(0, cleanup.calls)
+        assertNull(insertion.insertedText)
+        assertTrue(history.list().isEmpty())
+        assertTrue(audioRecorder.deleted)
+    }
+
+    @Test
+    fun confirmRecordingSkipsTooShortRecordingBeforeTranscription() = runBlocking {
+        val history = InMemoryDictationHistoryRepository()
+        val audioRecorder = FakeAudioRecorder(
+            amplitudes = listOf(1_400, 1_800, 1_600),
+            file = tempWav(samples = ShortArray(16_000 / 4) { 1_800 }),
+        )
+        val transcription = CapturingTranscriptionClient(rawText = "Thank you for watching.")
+        val cleanup = CapturingCleanupClient(cleanedText = "Thank you for watching.")
+        val insertion = CapturingDirectTextTarget()
+        val coordinator = coordinator(
+            history = history,
+            audioRecorder = audioRecorder,
+            transcription = transcription,
+            cleanup = cleanup,
+            insertion = insertion,
+        )
+
+        coordinator.startRecording()
+        coordinator.currentAmplitude()
         coordinator.currentAmplitude()
         coordinator.currentAmplitude()
         val result = coordinator.confirmRecording(appLabel = "Test")
@@ -83,7 +119,7 @@ class DictationCoordinatorEmptyRecordingTest {
     }
 
     @Test
-    fun confirmRecordingSkipsKnownNoSpeechHallucinationFromBackgroundNoise() = runBlocking {
+    fun confirmRecordingSkipsKnownNoSpeechHallucinationBeforeCleanup() = runBlocking {
         val history = InMemoryDictationHistoryRepository()
         val audioRecorder = FakeAudioRecorder(amplitudes = listOf(1_400, 1_800, 1_600))
         val transcription = CapturingTranscriptionClient(rawText = "Thank you for watching.")
@@ -105,14 +141,14 @@ class DictationCoordinatorEmptyRecordingTest {
 
         assertTrue(result is DictationOutcome.NoDictatedContent)
         assertEquals(1, transcription.calls)
-        assertEquals(1, cleanup.calls)
+        assertEquals(0, cleanup.calls)
         assertNull(insertion.insertedText)
         assertTrue(history.list().isEmpty())
         assertTrue(audioRecorder.deleted)
     }
 
     @Test
-    fun confirmRecordingSkipsObservedNoSpeechHallucinationsFromBackgroundNoise() = runBlocking {
+    fun confirmRecordingSkipsObservedNoSpeechHallucinationsBeforeCleanup() = runBlocking {
         val hallucinations = listOf(
             "you" to "You.",
             "the" to "The.",
@@ -141,11 +177,137 @@ class DictationCoordinatorEmptyRecordingTest {
 
             assertTrue(result is DictationOutcome.NoDictatedContent)
             assertEquals(1, transcription.calls)
-            assertEquals(1, cleanup.calls)
+            assertEquals(0, cleanup.calls)
             assertNull(insertion.insertedText)
             assertTrue(history.list().isEmpty())
             assertTrue(audioRecorder.deleted)
         }
+    }
+
+    @Test
+    fun confirmRecordingSkipsLowConfidenceRawTranscriptBeforeCleanup() = runBlocking {
+        val history = InMemoryDictationHistoryRepository()
+        val audioRecorder = FakeAudioRecorder(amplitudes = listOf(1_400, 1_800, 1_600))
+        val transcription = CapturingTranscriptionClient(
+            rawText = "Thanks for watching",
+            averageLogprob = -1.45,
+        )
+        val cleanup = CapturingCleanupClient(cleanedText = "Thanks for watching, everyone.")
+        val insertion = CapturingDirectTextTarget()
+        val coordinator = coordinator(
+            history = history,
+            audioRecorder = audioRecorder,
+            transcription = transcription,
+            cleanup = cleanup,
+            insertion = insertion,
+        )
+
+        coordinator.startRecording()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        val result = coordinator.confirmRecording(appLabel = "Test")
+
+        assertTrue(result is DictationOutcome.NoDictatedContent)
+        assertEquals(1, transcription.calls)
+        assertEquals(0, cleanup.calls)
+        assertNull(insertion.insertedText)
+        assertTrue(history.list().isEmpty())
+        assertTrue(audioRecorder.deleted)
+    }
+
+    @Test
+    fun confirmRecordingSkipsSilentHallucinationMetadataBeforeCleanup() = runBlocking {
+        val history = InMemoryDictationHistoryRepository()
+        val audioRecorder = FakeAudioRecorder(amplitudes = listOf(1_400, 1_800, 1_600))
+        val transcription = CapturingTranscriptionClient(
+            rawText = "Thanks for watching.",
+            hallucination = TranscriptionHallucination.SILENT,
+        )
+        val cleanup = CapturingCleanupClient(cleanedText = "Thanks for watching.")
+        val insertion = CapturingDirectTextTarget()
+        val coordinator = coordinator(
+            history = history,
+            audioRecorder = audioRecorder,
+            transcription = transcription,
+            cleanup = cleanup,
+            insertion = insertion,
+        )
+
+        coordinator.startRecording()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        val result = coordinator.confirmRecording(appLabel = "Test")
+
+        assertTrue(result is DictationOutcome.NoDictatedContent)
+        assertEquals(1, transcription.calls)
+        assertEquals(0, cleanup.calls)
+        assertNull(insertion.insertedText)
+        assertTrue(history.list().isEmpty())
+        assertTrue(audioRecorder.deleted)
+    }
+
+    @Test
+    fun confirmRecordingSkipsLowConfidenceBriefTranscriptBeforeCleanup() = runBlocking {
+        val history = InMemoryDictationHistoryRepository()
+        val audioRecorder = FakeAudioRecorder(amplitudes = listOf(1_400, 1_800, 1_600))
+        val transcription = CapturingTranscriptionClient(
+            rawText = "Okay.",
+            confidence = TranscriptionConfidence.LOW,
+        )
+        val cleanup = CapturingCleanupClient(cleanedText = "Okay.")
+        val insertion = CapturingDirectTextTarget()
+        val coordinator = coordinator(
+            history = history,
+            audioRecorder = audioRecorder,
+            transcription = transcription,
+            cleanup = cleanup,
+            insertion = insertion,
+        )
+
+        coordinator.startRecording()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        val result = coordinator.confirmRecording(appLabel = "Test")
+
+        assertTrue(result is DictationOutcome.NoDictatedContent)
+        assertEquals(1, transcription.calls)
+        assertEquals(0, cleanup.calls)
+        assertNull(insertion.insertedText)
+        assertTrue(history.list().isEmpty())
+        assertTrue(audioRecorder.deleted)
+    }
+
+    @Test
+    fun confirmRecordingKeepsHighConfidenceShortRawTranscript() = runBlocking {
+        val history = InMemoryDictationHistoryRepository()
+        val audioRecorder = FakeAudioRecorder(amplitudes = listOf(1_400, 1_800, 1_600))
+        val transcription = CapturingTranscriptionClient(
+            rawText = "Thank you",
+            averageLogprob = -0.08,
+        )
+        val cleanup = CapturingCleanupClient(cleanedText = "Thank you.")
+        val insertion = CapturingDirectTextTarget()
+        val coordinator = coordinator(
+            history = history,
+            audioRecorder = audioRecorder,
+            transcription = transcription,
+            cleanup = cleanup,
+            insertion = insertion,
+        )
+
+        coordinator.startRecording()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        coordinator.currentAmplitude()
+        val result = coordinator.confirmRecording(appLabel = "Test")
+
+        assertTrue(result is DictationOutcome.Inserted)
+        assertEquals(1, cleanup.calls)
+        assertEquals("Thank you.", insertion.insertedText)
+        assertEquals("Thank you.", history.list().single().cleanedText)
     }
 
     @Test
@@ -318,8 +480,8 @@ class DictationCoordinatorEmptyRecordingTest {
 
     private class FakeAudioRecorder(
         private val amplitudes: List<Int>,
+        private val file: File = File.createTempFile("verbally-test-", ".m4a"),
     ) : AudioRecorder {
-        private val file = File.createTempFile("verbally-test-", ".m4a")
         private var amplitudeIndex = 0
         var deleted = false
 
@@ -338,14 +500,37 @@ class DictationCoordinatorEmptyRecordingTest {
         }
     }
 
+    private fun tempWav(samples: ShortArray): File {
+        val file = File.createTempFile("verbally-test-", ".wav")
+        val dataSizeBytes = samples.size * 2L
+        FileOutputStream(file).use { output ->
+            WavFileWriter.writeHeader(output, dataSizeBytes)
+            samples.forEach { sample ->
+                output.write(sample.toInt() and 0xff)
+                output.write((sample.toInt() shr 8) and 0xff)
+            }
+        }
+        file.deleteOnExit()
+        return file
+    }
+
     private class CapturingTranscriptionClient(
         private val rawText: String,
+        private val averageLogprob: Double? = null,
+        private val confidence: TranscriptionConfidence? = null,
+        private val hallucination: TranscriptionHallucination? = null,
     ) : TranscriptionClient {
         var calls = 0
 
         override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript {
             calls += 1
-            return RawTranscript(text = rawText, model = model)
+            return RawTranscript(
+                text = rawText,
+                model = model,
+                averageLogprob = averageLogprob,
+                confidence = confidence,
+                hallucination = hallucination,
+            )
         }
     }
 
