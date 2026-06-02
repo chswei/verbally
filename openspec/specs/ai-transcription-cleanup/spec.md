@@ -4,7 +4,7 @@
 TBD - created by archiving change add-android-floating-dictation. Update Purpose after archive.
 ## Requirements
 ### Requirement: Audio is transcribed with OpenAI BYOK
-The system SHALL transcribe confirmed recordings by sending temporary audio captured with Android's speech-recognition audio source directly to the selected BYOK transcription provider. Supported transcription options SHALL include OpenAI `gpt-4o-mini-transcribe`, OpenAI `gpt-4o-transcribe`, Soniox `stt-async-v4`, and Groq `whisper-large-v3-turbo`. Provider clients SHOULD share transport resources so repeated provider calls can reuse DNS, TLS, and HTTP connection pooling when the platform and endpoint allow it.
+The system SHALL transcribe confirmed recordings by sending temporary audio captured by the dictation recorder directly to the selected BYOK transcription provider. Supported transcription options SHALL include OpenAI `gpt-4o-mini-transcribe`, OpenAI `gpt-4o-transcribe`, Soniox `stt-async-v4`, and Groq `whisper-large-v3-turbo`. Provider clients SHOULD share transport resources so repeated provider calls can reuse DNS, TLS, and HTTP connection pooling when the platform and endpoint allow it.
 
 #### Scenario: OpenAI transcription succeeds
 - **WHEN** the user confirms a recording and a valid OpenAI key is configured
