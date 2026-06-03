@@ -23,6 +23,24 @@ class SnippetExpanderTest {
     }
 
     @Test
+    fun preservesExactExpansionFormattingForWholeTrigger() {
+        val snippets = listOf(SnippetEntry(trigger = "email signature", expansion = "\nBest,\nChris\n", id = 1L))
+
+        val expanded = SnippetExpander.expand("email signature.", snippets)
+
+        assertEquals("\nBest,\nChris\n", expanded)
+    }
+
+    @Test
+    fun preservesExactExpansionFormattingInsideLongerText() {
+        val snippets = listOf(SnippetEntry(trigger = "signoff", expansion = "\nBest,\nChris\n", id = 1L))
+
+        val expanded = SnippetExpander.expand("Please add signoff here.", snippets)
+
+        assertEquals("Please add \nBest,\nChris\n here.", expanded)
+    }
+
+    @Test
     fun prefersLongerTriggersWhenTriggersOverlap() {
         val snippets = listOf(
             SnippetEntry(trigger = "我的地址", expansion = "住家地址", id = 1L),
@@ -41,5 +59,14 @@ class SnippetExpanderTest {
         val expanded = SnippetExpander.expand("請問明天地址在哪裡？", snippets)
 
         assertEquals("請問明天地址在哪裡？", expanded)
+    }
+
+    @Test
+    fun leavesTextUnchangedWhenTriggerAppearsInsideLongerLatinToken() {
+        val snippets = listOf(SnippetEntry(trigger = "api", expansion = "API", id = 1L))
+
+        val expanded = SnippetExpander.expand("rapidapi endpoint api2", snippets)
+
+        assertEquals("rapidapi endpoint api2", expanded)
     }
 }

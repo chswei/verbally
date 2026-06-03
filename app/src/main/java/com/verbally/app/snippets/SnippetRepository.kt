@@ -135,11 +135,10 @@ class SharedPreferencesSnippetRepository(
 
 private fun SnippetEntry.normalized(): SnippetEntry? {
     val normalizedTrigger = trigger.trim()
-    val normalizedExpansion = expansion.trim()
-    if (normalizedTrigger.isEmpty() || normalizedExpansion.isEmpty()) return null
+    if (normalizedTrigger.isEmpty() || expansion.trim().isEmpty()) return null
     return copy(
         trigger = normalizedTrigger,
-        expansion = normalizedExpansion,
+        expansion = expansion,
     )
 }
 
