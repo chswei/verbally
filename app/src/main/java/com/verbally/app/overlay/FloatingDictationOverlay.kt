@@ -89,34 +89,28 @@ class FloatingDictationOverlay(
         get() = session.state
 
     fun show() {
-        if (!Settings.canDrawOverlays(context)) {
-            removeAttachedRoot()
-            return
-        }
-        if (rootView == null) {
-            attachFreshRoot()
-        } else {
-            setOverlayVisible(true, animate = true)
+        when (
+            OverlayRootLifecyclePolicy.actionForShow(
+                overlayPermissionGranted = Settings.canDrawOverlays(context),
+                rootAttached = rootView != null,
+            )
+        ) {
+            OverlayRootLifecycleAction.ATTACH_ROOT -> attachFreshRoot()
+            OverlayRootLifecycleAction.SHOW_ATTACHED_ROOT -> showAttachedRoot(animate = true)
+            OverlayRootLifecycleAction.DETACH_ROOT,
+            OverlayRootLifecycleAction.KEEP_DETACHED,
+            -> removeAttachedRoot()
         }
     }
 
     fun hide() {
-        val existing = rootView ?: run {
-            overlayVisible = false
-            return
-        }
-        setOverlayVisible(false, animate = true)
-        recordingWaveformView = null
-        waveformLevel = 0f
-        customContentDescription = null
-        repairTarget = null
-        repairMessage = null
-        val previous = session.state
-        session.forceState(OverlayUiState.READY)
-        if (previous != OverlayUiState.READY) {
-            refreshAttachedRoot(previousState = previous)
-        } else {
-            existing.contentDescription = contentDescriptionFor(OverlayUiState.READY)
+        when (OverlayRootLifecyclePolicy.actionForHide(rootAttached = rootView != null)) {
+            OverlayRootLifecycleAction.DETACH_ROOT,
+            OverlayRootLifecycleAction.KEEP_DETACHED,
+            -> removeAttachedRoot()
+            OverlayRootLifecycleAction.ATTACH_ROOT,
+            OverlayRootLifecycleAction.SHOW_ATTACHED_ROOT,
+            -> Unit
         }
     }
 
@@ -143,7 +137,7 @@ class FloatingDictationOverlay(
             show()
         } else {
             refreshAttachedRoot()
-            setOverlayVisible(true, animate = true)
+            showAttachedRoot(animate = true)
         }
     }
 
@@ -555,7 +549,7 @@ class FloatingDictationOverlay(
         currentLayoutParams = params
         windowManager.addView(view, params)
         rootView = view
-        setOverlayVisible(true, animate = false)
+        showAttachedRoot(animate = false)
     }
 
     private fun refreshAttachedRoot(previousState: OverlayUiState? = null) {
@@ -570,13 +564,19 @@ class FloatingDictationOverlay(
     }
 
     private fun removeAttachedRoot() {
-        val existing = rootView ?: return
+        val existing = rootView
         layoutAnimator?.cancel()
         layoutAnimator = null
-        existing.animate().cancel()
-        runCatching { windowManager.removeViewImmediate(existing) }
+        existing?.animate()?.cancel()
+        if (existing != null) {
+            runCatching { windowManager.removeViewImmediate(existing) }
+        }
         rootView = null
         currentLayoutParams = null
+        resetTransientState()
+    }
+
+    private fun resetTransientState() {
         overlayVisible = false
         recordingWaveformView = null
         waveformLevel = 0f
@@ -647,7 +647,7 @@ class FloatingDictationOverlay(
             width,
             height,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            OverlayWindowVisibility.flagsFor(baseFlags, visible = true),
+            baseFlags,
             PixelFormat.TRANSLUCENT,
         ).apply {
             val position = positionMemory.currentPosition(
@@ -664,31 +664,20 @@ class FloatingDictationOverlay(
         }
     }
 
-    private fun setOverlayVisible(visible: Boolean, animate: Boolean) {
+    private fun showAttachedRoot(animate: Boolean) {
         val root = rootView ?: run {
             overlayVisible = false
             return
         }
-        overlayVisible = visible
-        val params = currentLayoutParams
-        if (params != null) {
-            val nextFlags = OverlayWindowVisibility.flagsFor(params.flags, visible)
-            if (params.flags != nextFlags) {
-                params.flags = nextFlags
-                runCatching { windowManager.updateViewLayout(root, params) }
-            }
-        }
+        overlayVisible = true
         root.animate().cancel()
-        val targetAlpha = OverlayWindowVisibility.alphaFor(visible)
         if (animate) {
             root.animate()
-                .alpha(targetAlpha)
-                .setDuration(
-                    if (visible) 120L else 80L,
-                )
+                .alpha(VISIBLE_ROOT_ALPHA)
+                .setDuration(120L)
                 .start()
         } else {
-            root.alpha = targetAlpha
+            root.alpha = VISIBLE_ROOT_ALPHA
         }
     }
 
@@ -1015,5 +1004,6 @@ class FloatingDictationOverlay(
         private const val ACTIVE_CONTROL_CENTER_INDEX = 1
         private const val ACTIVE_CONTROL_TRAILING_INDEX = 2
         private const val ACTIVE_CENTER_REVEAL_START_SCALE = 0.18f
+        private const val VISIBLE_ROOT_ALPHA = 1f
     }
 }
