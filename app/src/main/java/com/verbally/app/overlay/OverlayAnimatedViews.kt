@@ -23,7 +23,6 @@ internal class RecordingWaveformView(context: Context) : View(context) {
         style = Paint.Style.FILL
     }
     private val barBounds = RectF()
-    private val amplitudes = floatArrayOf(0.14f, 0.34f, 0.56f, 0.78f, 0.78f, 0.56f, 0.34f, 0.14f)
     private var phase = 0f
     private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 1_000L
@@ -47,28 +46,22 @@ internal class RecordingWaveformView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val centerY = height / 2f
-        val horizontalInset = width * 0.16f
+        val marks = RecordingWaveformModel.marks(currentLevel, phase)
+        val horizontalInset = width * RecordingWaveformModel.HORIZONTAL_INSET_FRACTION
         val contentWidth = width - horizontalInset * 2
-        val spacing = contentWidth / (amplitudes.size + 1f)
-        val barWidth = max(3f, spacing * 0.28f)
-        val silenceThreshold = 0.05f
-        for (index in amplitudes.indices) {
-            val wave = ((phase * Math.PI * 2) + index * 0.42).toFloat()
-            val animatedScale = 0.9f + 0.1f * kotlin.math.sin(wave).let { (it + 1f) / 2f }
-            val barHeight = if (currentLevel <= silenceThreshold) {
-                barWidth
-            } else {
-                val liveScale = 0.14f + currentLevel * 0.86f
-                min(height * 0.6f, height * amplitudes[index] * animatedScale * liveScale)
-            }
-            val centerX = horizontalInset + spacing * (index + 1)
+        val step = contentWidth / (marks.size - 1).coerceAtLeast(1)
+        for (index in marks.indices) {
+            val mark = marks[index]
+            val barWidth = max(2f, step * mark.widthScale)
+            val barHeight = max(barWidth, height * mark.heightScale)
+            val centerX = horizontalInset + step * index
             barBounds.set(
                 centerX - barWidth / 2f,
                 centerY - barHeight / 2f,
                 centerX + barWidth / 2f,
                 centerY + barHeight / 2f,
             )
-            canvas.drawRoundRect(barBounds, barWidth, barWidth, paint)
+            canvas.drawRoundRect(barBounds, barWidth / 2f, barWidth / 2f, paint)
         }
     }
 
