@@ -15,7 +15,20 @@ class SnippetRepositoryTest {
         repository.save(SnippetEntry(trigger = "empty expansion", expansion = "   ", id = 3L))
 
         assertEquals(
-            listOf(SnippetEntry(trigger = "我的地址", expansion = "台北市信義區一號", id = 1L)),
+            listOf(SnippetEntry(trigger = "我的地址", expansion = "  台北市信義區一號  ", id = 1L)),
+            repository.list(),
+        )
+    }
+
+    @Test
+    fun savePreservesExpansionFormattingExactly() {
+        val repository = InMemorySnippetRepository()
+        val expansion = "\nBest regards,\nChris\n"
+
+        repository.save(SnippetEntry(trigger = "  my signature  ", expansion = expansion, id = 1L))
+
+        assertEquals(
+            listOf(SnippetEntry(trigger = "my signature", expansion = expansion, id = 1L)),
             repository.list(),
         )
     }
