@@ -109,7 +109,7 @@ The system SHALL store snippet entries locally on device and SHALL NOT require a
 - **THEN** the snippet operation succeeds using local storage
 
 ### Requirement: Dictation expands static snippets before insertion
-The system SHALL replace saved snippet trigger phrases in cleaned dictation text with their exact saved expansion before inserting text into the target app.
+The system SHALL replace saved snippet trigger phrases in cleaned dictation text with their exact saved expansion before inserting text into the target app. Snippet expansion SHALL preserve the saved expansion casing, punctuation, line breaks, and formatting whitespace. Snippet matching SHALL treat triggers as spoken cues or phrases and SHALL NOT expand a trigger when it only appears as a substring inside a longer Latin-style word or number token.
 
 #### Scenario: Trigger appears inside longer dictation
 - **WHEN** the cleaned dictation text contains a saved snippet trigger phrase inside a longer sentence
@@ -122,6 +122,10 @@ The system SHALL replace saved snippet trigger phrases in cleaned dictation text
 
 #### Scenario: No trigger appears
 - **WHEN** the cleaned dictation text contains no saved snippet trigger phrase
+- **THEN** the inserted text remains unchanged by snippets
+
+#### Scenario: Trigger appears inside a longer Latin token
+- **WHEN** the cleaned dictation text contains a saved snippet trigger only as part of a longer Latin-style word or number token
 - **THEN** the inserted text remains unchanged by snippets
 
 ### Requirement: Dictionary and snippet keys do not conflict
