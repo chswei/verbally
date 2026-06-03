@@ -1,5 +1,8 @@
 package com.verbally.app.overlay
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.ComponentCallbacks
 import android.content.Context
 import android.content.res.Configuration
@@ -11,9 +14,11 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.view.WindowInsets
 import android.view.WindowInsetsAnimation
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -37,6 +42,7 @@ class FloatingDictationOverlay(
     private val preferences = context.getSharedPreferences(POSITION_PREFS, Context.MODE_PRIVATE)
     private val positionMemory = OverlayPositionMemory(loadSavedPosition())
     private val edgeMargin = OverlayVisualDefaults.EDGE_MARGIN_DP.toPx()
+    private val motionFrameSize = OverlayVisualDefaults.MOTION_FRAME_SIZE_DP.toPx()
     private val bubbleSize = OverlayVisualDefaults.BUBBLE_SIZE_DP.toPx()
     private val bubbleCornerRadius = OverlayVisualDefaults.BUBBLE_CORNER_RADIUS_DP.toPx().toFloat()
     private val iconSize = OverlayVisualDefaults.ICON_SIZE_DP.toPx()
@@ -47,6 +53,7 @@ class FloatingDictationOverlay(
     private val activeSpacing = OverlayVisualDefaults.ACTIVE_SPACING_DP.toPx()
     private val activeCapsuleCornerRadius =
         OverlayVisualDefaults.ACTIVE_CAPSULE_CORNER_RADIUS_DP.toPx().toFloat()
+    private val activeFrameWidth = OverlayVisualDefaults.ACTIVE_FRAME_WIDTH_DP.toPx()
     private val rootTouchListener = DragTouchListener()
     private val session = OverlaySessionStateMachine()
     private var waveformLevel = 0f
@@ -56,6 +63,11 @@ class FloatingDictationOverlay(
     private var repairTarget: RuntimeRepairTarget? = null
     private var repairMessage: String? = null
     private var recordingWaveformView: RecordingWaveformView? = null
+    private var overlayVisible = false
+    private var layoutAnimator: ValueAnimator? = null
+    private var renderedWindowWidth = 0
+    private var renderedWindowHeight = 0
+    private var renderedContentGravity = Gravity.END
     private val configurationCallbacks = object : ComponentCallbacks {
         override fun onConfigurationChanged(newConfig: Configuration) {
             rootView?.post {
@@ -71,28 +83,45 @@ class FloatingDictationOverlay(
     }
 
     val isShown: Boolean
-        get() = rootView != null
+        get() = overlayVisible
 
     val currentState: OverlayUiState
         get() = session.state
 
     fun show() {
-        if (!Settings.canDrawOverlays(context) || rootView != null) return
-        attachFreshRoot()
+        if (!Settings.canDrawOverlays(context)) {
+            removeAttachedRoot()
+            return
+        }
+        if (rootView == null) {
+            attachFreshRoot()
+        } else {
+            setOverlayVisible(true, animate = true)
+        }
     }
 
     fun hide() {
-        rootView?.let { runCatching { windowManager.removeViewImmediate(it) } }
-        rootView = null
-        currentLayoutParams = null
+        val existing = rootView ?: run {
+            overlayVisible = false
+            return
+        }
+        setOverlayVisible(false, animate = true)
+        recordingWaveformView = null
+        waveformLevel = 0f
         customContentDescription = null
         repairTarget = null
         repairMessage = null
+        val previous = session.state
         session.forceState(OverlayUiState.READY)
+        if (previous != OverlayUiState.READY) {
+            refreshAttachedRoot(previousState = previous)
+        } else {
+            existing.contentDescription = contentDescriptionFor(OverlayUiState.READY)
+        }
     }
 
     fun dispose() {
-        hide()
+        removeAttachedRoot()
         runCatching { context.unregisterComponentCallbacks(configurationCallbacks) }
     }
 
@@ -114,6 +143,7 @@ class FloatingDictationOverlay(
             show()
         } else {
             refreshAttachedRoot()
+            setOverlayVisible(true, animate = true)
         }
     }
 
@@ -136,108 +166,285 @@ class FloatingDictationOverlay(
         recordingWaveformView?.setLiveLevel(waveformLevel)
     }
 
-    private fun renderState(root: FrameLayout) {
+    private fun renderState(root: FrameLayout, previousState: OverlayUiState? = null) {
         recordingWaveformView = null
+        val renderedState = session.state
         val content = when (session.state) {
             OverlayUiState.READY -> createReadyBubble()
             OverlayUiState.RECORDING -> createRecordingControls()
             OverlayUiState.PROCESSING -> createProcessingControls()
             OverlayUiState.REPAIR -> createRepairBubble()
         }
-        if (rootView === root) {
-            val width = content.resolvedWidth()
-            val height = content.resolvedHeight()
-            root.removeAllViews()
-            // In-place transitions resize while empty so active-state swaps do not briefly
-            // draw new controls inside stale window bounds.
-            realignToRememberedEdge(root, width, height)
+        val contentWidth = content.resolvedWidth()
+        val contentHeight = content.resolvedHeight()
+        val params = currentLayoutParams
+        val currentGravity = params?.gravity ?: positionMemory.currentPosition(
+            screenWidth = screenWidth(),
+            screenHeight = screenHeight(),
+            bubbleWidth = contentWidth,
+            bubbleHeight = contentHeight,
+            edgeMargin = edgeMargin,
+        ).gravity
+        val width = windowWidthForState(
+            state = renderedState,
+            currentGravity = currentGravity,
+            contentWidth = contentWidth,
+        )
+        val height = contentHeight
+        renderedWindowWidth = width
+        renderedWindowHeight = height
+        val deferContentSwap = rootView === root &&
+            params != null &&
+            OverlayContentSwapPolicy.deferUntilAfterLayout(
+                currentGravity = params.gravity,
+                currentWidth = params.width,
+                currentHeight = params.height,
+                nextWidth = width,
+                nextHeight = height,
+            )
+        root.contentDescription = customContentDescription ?: contentDescriptionFor(session.state)
+        val contentGravity = contentGravityForFrame(currentGravity)
+        renderedContentGravity = contentGravity
+        val animateAnchoredIntro = params != null &&
+            OverlayContentSwapPolicy.animateAnchoredIntro(
+                previousState = previousState,
+                nextState = renderedState,
+                currentGravity = params.gravity,
+            )
+        if (deferContentSwap) {
+            animateToRememberedEdge(root, width, height)
+            root.post {
+                if (rootView === root && session.state == renderedState) {
+                    root.removeAllViews()
+                    addStateContent(root, content, width, height, contentWidth, contentHeight, contentGravity)
+                    if (animateAnchoredIntro) {
+                        animateActiveContentFromBubbleAnchor(content, contentGravity)
+                    }
+                }
+            }
         } else {
             root.removeAllViews()
+            addStateContent(root, content, width, height, contentWidth, contentHeight, contentGravity)
+            if (animateAnchoredIntro) {
+                animateActiveContentFromBubbleAnchor(content, contentGravity)
+            }
+            if (rootView === root) {
+                animateToRememberedEdge(root, width, height)
+            }
         }
-        root.addView(content)
-        root.contentDescription = customContentDescription ?: contentDescriptionFor(session.state)
+    }
+
+    private fun windowWidthForState(
+        state: OverlayUiState,
+        currentGravity: Int,
+        contentWidth: Int,
+    ): Int =
+        if (OverlayContentSwapPolicy.useStableEdgeFrame(state, currentGravity)) {
+            activeFrameWidth.coerceAtLeast(contentWidth)
+        } else {
+            contentWidth
+        }
+
+    private fun contentGravityForFrame(currentGravity: Int): Int =
+        if (OverlayContentSwapPolicy.alignContentToStart(currentGravity)) {
+            Gravity.START or Gravity.CENTER_VERTICAL
+        } else {
+            Gravity.END or Gravity.CENTER_VERTICAL
+        }
+
+    private fun addStateContent(
+        root: FrameLayout,
+        content: View,
+        width: Int,
+        height: Int,
+        contentWidth: Int,
+        contentHeight: Int,
+        contentGravity: Int,
+    ) {
+        root.minimumWidth = width
+        root.minimumHeight = height
+        root.addView(
+            content,
+            FrameLayout.LayoutParams(contentWidth, contentHeight, contentGravity),
+        )
+    }
+
+    private fun animateActiveContentFromBubbleAnchor(content: View, contentGravity: Int) {
+        val motionFrame = content as? FrameLayout ?: return
+        motionFrame.viewTreeObserver.addOnPreDrawListener(
+            object : ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    if (motionFrame.viewTreeObserver.isAlive) {
+                        motionFrame.viewTreeObserver.removeOnPreDrawListener(this)
+                    }
+                    val row = motionFrame.getChildAt(0) as? LinearLayout ?: return true
+                    prepareActiveContentAtBubbleAnchor(row, contentGravity)
+                    motionFrame.post { animateActiveContentIntoPlace(row) }
+                    return true
+                }
+            },
+        )
+    }
+
+    private fun prepareActiveContentAtBubbleAnchor(row: LinearLayout, contentGravity: Int) {
+        if (row.childCount < ACTIVE_CONTROL_CHILD_COUNT) return
+        val leading = row.getChildAt(ACTIVE_CONTROL_LEADING_INDEX)
+        val center = row.getChildAt(ACTIVE_CONTROL_CENTER_INDEX)
+        val trailing = row.getChildAt(ACTIVE_CONTROL_TRAILING_INDEX)
+        val revealFromLeading = contentGravity and Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK == Gravity.START
+        if (revealFromLeading) {
+            val leadingCenter = leading.left + leading.width / 2f
+            val trailingStartOffset = leadingCenter - (trailing.left + trailing.width / 2f)
+            val centerStartOffset = leading.right - center.left.toFloat()
+            trailing.alpha = 0f
+            trailing.translationX = trailingStartOffset
+            center.translationX = centerStartOffset
+            center.pivotX = 0f
+        } else {
+            val trailingCenter = trailing.left + trailing.width / 2f
+            val leadingStartOffset = trailingCenter - (leading.left + leading.width / 2f)
+            val centerStartOffset = trailing.left - center.right.toFloat()
+            leading.alpha = 0f
+            leading.translationX = leadingStartOffset
+            center.translationX = centerStartOffset
+            center.pivotX = center.width.toFloat()
+        }
+        center.alpha = 0f
+        center.scaleX = ACTIVE_CENTER_REVEAL_START_SCALE
+    }
+
+    private fun animateActiveContentIntoPlace(row: LinearLayout) {
+        if (row.childCount < ACTIVE_CONTROL_CHILD_COUNT) return
+        val leading = row.getChildAt(ACTIVE_CONTROL_LEADING_INDEX)
+        val center = row.getChildAt(ACTIVE_CONTROL_CENTER_INDEX)
+        val trailing = row.getChildAt(ACTIVE_CONTROL_TRAILING_INDEX)
+        val interpolator = DecelerateInterpolator()
+
+        leading.animate()
+            .alpha(1f)
+            .translationX(0f)
+            .setDuration(OverlayVisualDefaults.ACTIVE_REVEAL_ANIMATION_DURATION_MS)
+            .setInterpolator(interpolator)
+            .start()
+        trailing.animate()
+            .alpha(1f)
+            .translationX(0f)
+            .setDuration(OverlayVisualDefaults.ACTIVE_REVEAL_ANIMATION_DURATION_MS)
+            .setInterpolator(interpolator)
+            .start()
+        center.animate()
+            .alpha(1f)
+            .translationX(0f)
+            .scaleX(1f)
+            .setDuration(OverlayVisualDefaults.ACTIVE_REVEAL_ANIMATION_DURATION_MS)
+            .setInterpolator(interpolator)
+            .start()
     }
 
     private fun createReadyBubble(): View =
-        FrameLayout(context).apply {
-            minimumWidth = bubbleSize
-            minimumHeight = bubbleSize
-            background = roundedBackground(
-                color = color(OverlayColorDefaults.READY_BUBBLE_BACKGROUND_RES),
-                cornerRadius = bubbleCornerRadius,
-            )
-            elevation = 8f
-            isClickable = true
-            isFocusable = true
-            contentDescription = customContentDescription ?: contentDescriptionFor(OverlayUiState.READY)
-            bindDragAndClick(this) { handleReadyTap() }
-            addView(
-                ImageView(context).apply {
-                    setImageResource(R.drawable.ic_verbally_waveform)
-                    setColorFilter(color(OverlayColorDefaults.READY_ICON_COLOR_RES))
-                    scaleType = ImageView.ScaleType.CENTER
-                },
-                FrameLayout.LayoutParams(iconSize, iconSize, Gravity.CENTER),
-            )
+        createMotionFrame(width = motionFrameSize, height = motionFrameSize) {
+            FrameLayout(context).apply {
+                minimumWidth = bubbleSize
+                minimumHeight = bubbleSize
+                background = roundedBackground(
+                    color = color(OverlayColorDefaults.READY_BUBBLE_BACKGROUND_RES),
+                    cornerRadius = bubbleCornerRadius,
+                )
+                elevation = 12f
+                isClickable = true
+                isFocusable = true
+                contentDescription = customContentDescription ?: contentDescriptionFor(OverlayUiState.READY)
+                bindDragAndClick(this) { handleReadyTap() }
+                addView(
+                    ImageView(context).apply {
+                        setImageResource(R.drawable.ic_verbally_waveform)
+                        setColorFilter(color(OverlayColorDefaults.READY_ICON_COLOR_RES))
+                        scaleType = ImageView.ScaleType.CENTER
+                    },
+                    FrameLayout.LayoutParams(iconSize, iconSize, Gravity.CENTER),
+                )
+            }
         }
 
     private fun createRecordingControls(): View =
-        createActiveControls(
-            centerView = RecordingWaveformView(context).also {
-                recordingWaveformView = it
-                it.setLiveLevel(waveformLevel)
-            },
-            trailingView = iconButton(
-                backgroundColor = color(OverlayColorDefaults.ACTIVE_CONFIRM_BACKGROUND_RES),
-                iconRes = R.drawable.ic_verbally_check,
-                iconTint = color(OverlayColorDefaults.ACTIVE_CONFIRM_ICON_COLOR_RES),
-            ),
-            onLeadingTap = { handleCancelTap() },
-            onTrailingTap = { handleConfirmTap() },
-            centerContentDescription = context.getString(R.string.overlay_recording),
-            trailingContentDescription = context.getString(R.string.overlay_send_recording),
-        )
+        createMotionFrame(width = activeFrameWidth, height = motionFrameSize) {
+            createActiveControls(
+                centerView = RecordingWaveformView(context).also {
+                    recordingWaveformView = it
+                    it.setLiveLevel(waveformLevel)
+                },
+                trailingView = iconButton(
+                    backgroundColor = color(OverlayColorDefaults.ACTIVE_CONFIRM_BACKGROUND_RES),
+                    iconRes = R.drawable.ic_verbally_check,
+                    iconTint = color(OverlayColorDefaults.ACTIVE_CONFIRM_ICON_COLOR_RES),
+                ),
+                onLeadingTap = { handleCancelTap() },
+                onTrailingTap = { handleConfirmTap() },
+                centerContentDescription = context.getString(R.string.overlay_recording),
+                trailingContentDescription = context.getString(R.string.overlay_send_recording),
+            )
+        }
 
     private fun createProcessingControls(): View =
-        createActiveControls(
-            centerView = ProcessingDotsView(
-                context,
-                dotColor = color(OverlayColorDefaults.PROCESSING_ACCENT_COLOR_RES),
-            ),
-            trailingView = SpinnerRingView(
-                context,
-                backgroundColor = color(OverlayColorDefaults.PROCESSING_BACKGROUND_RES),
-                trackColor = color(OverlayColorDefaults.PROCESSING_TRACK_COLOR_RES),
-                progressColor = color(OverlayColorDefaults.PROCESSING_ACCENT_COLOR_RES),
-            ),
-            onLeadingTap = null,
-            onTrailingTap = null,
-            centerContentDescription = context.getString(R.string.overlay_processing_transcription),
-            trailingContentDescription = context.getString(R.string.overlay_processing),
-        )
+        createMotionFrame(width = activeFrameWidth, height = motionFrameSize) {
+            createActiveControls(
+                centerView = ProcessingDotsView(
+                    context,
+                    dotColor = color(OverlayColorDefaults.PROCESSING_ACCENT_COLOR_RES),
+                ),
+                trailingView = SpinnerRingView(
+                    context,
+                    backgroundColor = color(OverlayColorDefaults.PROCESSING_BACKGROUND_RES),
+                    trackColor = color(OverlayColorDefaults.PROCESSING_TRACK_COLOR_RES),
+                    progressColor = color(OverlayColorDefaults.PROCESSING_ACCENT_COLOR_RES),
+                ),
+                onLeadingTap = null,
+                onTrailingTap = null,
+                centerContentDescription = context.getString(R.string.overlay_processing_transcription),
+                trailingContentDescription = context.getString(R.string.overlay_processing),
+            )
+        }
 
     private fun createRepairBubble(): View =
-        FrameLayout(context).apply {
-            minimumWidth = bubbleSize
-            minimumHeight = bubbleSize
-            background = roundedBackground(
-                color = context.getColor(android.R.color.white),
-                cornerRadius = bubbleCornerRadius,
-            )
-            elevation = 8f
-            isClickable = true
-            isFocusable = true
-            contentDescription = repairMessage ?: context.getString(R.string.overlay_repair_required)
-            bindDragAndClick(this) {
-                repairTarget?.let(onRepair)
+        createMotionFrame(width = motionFrameSize, height = motionFrameSize) {
+            FrameLayout(context).apply {
+                minimumWidth = bubbleSize
+                minimumHeight = bubbleSize
+                background = roundedBackground(
+                    color = context.getColor(android.R.color.white),
+                    cornerRadius = bubbleCornerRadius,
+                )
+                elevation = 12f
+                isClickable = true
+                isFocusable = true
+                contentDescription = repairMessage ?: context.getString(R.string.overlay_repair_required)
+                bindDragAndClick(this) {
+                    repairTarget?.let(onRepair)
+                }
+                addView(
+                    ImageView(context).apply {
+                        setImageResource(R.drawable.ic_verbally_warning)
+                        setColorFilter(context.getColor(android.R.color.holo_orange_dark))
+                        scaleType = ImageView.ScaleType.CENTER
+                    },
+                    FrameLayout.LayoutParams(iconSize, iconSize, Gravity.CENTER),
+                )
             }
+        }
+
+    private fun createMotionFrame(width: Int, height: Int, childFactory: () -> View): View =
+        FrameLayout(context).apply {
+            minimumWidth = width
+            minimumHeight = height
+            clipChildren = false
+            clipToPadding = false
             addView(
-                ImageView(context).apply {
-                    setImageResource(R.drawable.ic_verbally_warning)
-                    setColorFilter(context.getColor(android.R.color.holo_orange_dark))
-                    scaleType = ImageView.ScaleType.CENTER
-                },
-                FrameLayout.LayoutParams(iconSize, iconSize, Gravity.CENTER),
+                childFactory(),
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER,
+                ),
             )
         }
 
@@ -302,7 +509,7 @@ class FloatingDictationOverlay(
         FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(activeButtonSize, activeButtonSize)
             background = roundedBackground(backgroundColor, activeButtonSize / 2f)
-            elevation = 4f
+            elevation = 7f
             isClickable = true
             isFocusable = true
             addView(
@@ -348,32 +555,41 @@ class FloatingDictationOverlay(
         currentLayoutParams = params
         windowManager.addView(view, params)
         rootView = view
+        setOverlayVisible(true, animate = false)
     }
 
-    private fun refreshAttachedRoot() {
+    private fun refreshAttachedRoot(previousState: OverlayUiState? = null) {
         val existing = rootView ?: return
-        renderState(existing)
+        renderState(existing, previousState)
     }
 
     private fun updateAttachedRoot(previous: OverlayUiState, next: OverlayUiState) {
         when (OverlayRootTransitionPolicy.mode(previous, next)) {
-            OverlayRootUpdateMode.REBUILD_WINDOW -> replaceAttachedRoot()
-            OverlayRootUpdateMode.REFRESH_IN_PLACE -> refreshAttachedRoot()
+            OverlayRootUpdateMode.REFRESH_IN_PLACE -> refreshAttachedRoot(previousState = previous)
         }
     }
 
-    private fun replaceAttachedRoot() {
+    private fun removeAttachedRoot() {
         val existing = rootView ?: return
+        layoutAnimator?.cancel()
+        layoutAnimator = null
+        existing.animate().cancel()
         runCatching { windowManager.removeViewImmediate(existing) }
         rootView = null
         currentLayoutParams = null
-        attachFreshRoot()
+        overlayVisible = false
+        recordingWaveformView = null
+        waveformLevel = 0f
+        customContentDescription = null
+        repairTarget = null
+        repairMessage = null
+        session.forceState(OverlayUiState.READY)
     }
 
     private fun buildRootView(): FrameLayout =
         FrameLayout(context).apply {
-            clipChildren = false
-            clipToPadding = false
+            clipChildren = true
+            clipToPadding = true
             hideWithInputMethodAnimation()
             renderState(this)
         }
@@ -422,13 +638,16 @@ class FloatingDictationOverlay(
     private fun color(@ColorRes colorRes: Int): Int = context.getColor(colorRes)
 
     private fun layoutParams(view: View): WindowManager.LayoutParams {
-        val width = view.resolvedWidth()
-        val height = view.resolvedHeight()
+        val width = renderedWindowWidth.takeIf { it > 0 } ?: view.resolvedWidth()
+        val height = renderedWindowHeight.takeIf { it > 0 } ?: view.resolvedHeight()
+        val baseFlags =
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
         return WindowManager.LayoutParams(
             width,
             height,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            OverlayWindowVisibility.flagsFor(baseFlags, visible = true),
             PixelFormat.TRANSLUCENT,
         ).apply {
             val position = positionMemory.currentPosition(
@@ -445,10 +664,48 @@ class FloatingDictationOverlay(
         }
     }
 
+    private fun setOverlayVisible(visible: Boolean, animate: Boolean) {
+        val root = rootView ?: run {
+            overlayVisible = false
+            return
+        }
+        overlayVisible = visible
+        val params = currentLayoutParams
+        if (params != null) {
+            val nextFlags = OverlayWindowVisibility.flagsFor(params.flags, visible)
+            if (params.flags != nextFlags) {
+                params.flags = nextFlags
+                runCatching { windowManager.updateViewLayout(root, params) }
+            }
+        }
+        root.animate().cancel()
+        val targetAlpha = OverlayWindowVisibility.alphaFor(visible)
+        if (animate) {
+            root.animate()
+                .alpha(targetAlpha)
+                .setDuration(
+                    if (visible) 120L else 80L,
+                )
+                .start()
+        } else {
+            root.alpha = targetAlpha
+        }
+    }
+
     private fun applyAnchoredPosition(view: View, position: OverlayPosition) {
+        layoutAnimator?.cancel()
+        layoutAnimator = null
         val params = currentLayoutParams ?: return
-        params.width = view.resolvedWidth()
-        params.height = view.resolvedHeight()
+        val width = windowWidthForState(
+            state = session.state,
+            currentGravity = position.gravity,
+            contentWidth = naturalContentWidthForState(session.state),
+        )
+        val height = naturalContentHeightForState(session.state)
+        renderedWindowWidth = width
+        renderedWindowHeight = height
+        params.width = width
+        params.height = height
         params.gravity = position.gravity
         params.x = position.x
         params.y = position.y
@@ -456,26 +713,48 @@ class FloatingDictationOverlay(
     }
 
     private fun updatePosition(view: View, x: Int, y: Int) {
+        layoutAnimator?.cancel()
+        layoutAnimator = null
         val params = currentLayoutParams ?: return
+        val windowWidth = params.width.takeIf { it > 0 } ?: view.resolvedWidth()
+        val visibleWidth = naturalContentWidthForState(session.state)
         params.gravity = Gravity.TOP or Gravity.START
-        params.x = x.coerceAtLeast(0)
+        params.x = OverlayDragGeometry.boundedWindowXForVisibleControl(
+            proposedWindowX = x,
+            windowWidth = windowWidth,
+            visibleWidth = visibleWidth,
+            screenWidth = screenWidth(),
+            visibleOffset = visibleContentOffset(windowWidth, visibleWidth),
+        )
         params.y = y.coerceAtLeast(0)
         runCatching { windowManager.updateViewLayout(view, params) }
     }
 
     private fun snapAndRememberPosition(view: View, releasedX: Int, releasedY: Int) {
-        val width = view.resolvedWidth()
-        val height = view.resolvedHeight()
+        val windowWidth = currentLayoutParams?.width?.takeIf { it > 0 } ?: view.resolvedWidth()
+        val windowHeight = currentLayoutParams?.height?.takeIf { it > 0 } ?: view.resolvedHeight()
+        val snapWidth = naturalContentWidthForState(session.state)
+        val snapX = OverlayDragGeometry.visibleReleasedX(
+            releasedWindowX = releasedX,
+            windowWidth = windowWidth,
+            visibleWidth = snapWidth,
+            visibleOffset = visibleContentOffset(windowWidth, snapWidth),
+        )
         val position = positionMemory.rememberSnappedPosition(
-            releasedX = releasedX,
+            releasedX = snapX,
             releasedY = releasedY,
-            bubbleWidth = width,
+            bubbleWidth = snapWidth,
             screenWidth = screenWidth(),
             edgeMargin = edgeMargin,
             screenHeight = screenHeight(),
-            bubbleHeight = height,
+            bubbleHeight = naturalContentHeightForState(session.state).coerceAtMost(windowHeight),
         )
+        val previousContentGravity = renderedContentGravity
         applyAnchoredPosition(view, position)
+        val nextContentGravity = contentGravityForFrame(position.gravity)
+        if (view is FrameLayout && previousContentGravity != nextContentGravity) {
+            renderState(view, previousState = session.state)
+        }
         preferences.edit {
             putBoolean(KEY_HAS_POSITION, true)
             putString(KEY_EDGE, position.edge?.name)
@@ -483,13 +762,30 @@ class FloatingDictationOverlay(
         }
     }
 
+    private fun visibleContentOffset(windowWidth: Int, visibleWidth: Int): Int {
+        val contentAlignedStart =
+            renderedContentGravity and Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK == Gravity.START
+        return if (contentAlignedStart) {
+            0
+        } else {
+            (windowWidth - visibleWidth).coerceAtLeast(0)
+        }
+    }
+
     private fun realignToRememberedEdge(view: View) {
-        val width = view.resolvedWidth()
-        val height = view.resolvedHeight()
+        val gravity = positionMemory.currentPosition().gravity
+        val width = windowWidthForState(
+            state = session.state,
+            currentGravity = gravity,
+            contentWidth = naturalContentWidthForState(session.state),
+        )
+        val height = naturalContentHeightForState(session.state)
         realignToRememberedEdge(view, width, height)
     }
 
     private fun realignToRememberedEdge(view: View, width: Int, height: Int) {
+        layoutAnimator?.cancel()
+        layoutAnimator = null
         val params = currentLayoutParams ?: return
         val position = positionMemory.currentPosition(
             screenWidth = screenWidth(),
@@ -504,6 +800,85 @@ class FloatingDictationOverlay(
         params.x = position.x
         params.y = position.y
         runCatching { windowManager.updateViewLayout(view, params) }
+    }
+
+    private fun animateToRememberedEdge(view: View, width: Int, height: Int) {
+        val position = positionMemory.currentPosition(
+            screenWidth = screenWidth(),
+            screenHeight = screenHeight(),
+            bubbleWidth = width,
+            bubbleHeight = height,
+            edgeMargin = edgeMargin,
+        )
+        animateLayout(view, position, width, height)
+    }
+
+    private fun animateLayout(
+        view: View,
+        position: OverlayPosition,
+        width: Int,
+        height: Int,
+    ) {
+        val params = currentLayoutParams ?: return
+        val startWidth = params.width.takeIf { it > 0 } ?: width
+        val startHeight = params.height.takeIf { it > 0 } ?: height
+        val startX = params.x
+        val startY = params.y
+        if (
+            startWidth == width &&
+            startHeight == height &&
+            startX == position.x &&
+            startY == position.y &&
+            params.gravity == position.gravity
+        ) {
+            params.width = width
+            params.height = height
+            params.gravity = position.gravity
+            params.x = position.x
+            params.y = position.y
+            runCatching { windowManager.updateViewLayout(view, params) }
+            return
+        }
+        layoutAnimator?.cancel()
+        if (OverlayVisualDefaults.MOTION_ANIMATION_DURATION_MS <= 0L) {
+            params.width = width
+            params.height = height
+            params.gravity = position.gravity
+            params.x = position.x
+            params.y = position.y
+            runCatching { windowManager.updateViewLayout(view, params) }
+            return
+        }
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = OverlayVisualDefaults.MOTION_ANIMATION_DURATION_MS
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                val fraction = it.animatedValue as Float
+                params.width = lerp(startWidth, width, fraction)
+                params.height = lerp(startHeight, height, fraction)
+                params.gravity = position.gravity
+                params.x = lerp(startX, position.x, fraction)
+                params.y = lerp(startY, position.y, fraction)
+                runCatching { windowManager.updateViewLayout(view, params) }
+            }
+            addListener(
+                object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        if (layoutAnimator === animation) {
+                            layoutAnimator = null
+                        }
+                    }
+
+                    override fun onAnimationCancel(animation: Animator) {
+                        if (layoutAnimator === animation) {
+                            layoutAnimator = null
+                        }
+                    }
+                },
+            )
+        }
+        layoutAnimator = animator
+        animator.start()
     }
 
     private fun loadSavedPosition(): OverlayPosition? {
@@ -548,12 +923,26 @@ class FloatingDictationOverlay(
             context.resources.displayMetrics,
         ).roundToInt()
 
+    private fun lerp(start: Int, end: Int, fraction: Float): Int =
+        (start + (end - start) * fraction).roundToInt()
+
     private fun contentDescriptionFor(state: OverlayUiState): String = when (state) {
         OverlayUiState.READY -> context.getString(R.string.overlay_start_dictation)
         OverlayUiState.RECORDING -> context.getString(R.string.overlay_recording)
         OverlayUiState.PROCESSING -> context.getString(R.string.overlay_processing)
         OverlayUiState.REPAIR -> repairMessage ?: context.getString(R.string.overlay_repair_required)
     }
+
+    private fun naturalContentWidthForState(state: OverlayUiState): Int = when (state) {
+        OverlayUiState.READY,
+        OverlayUiState.REPAIR,
+        -> motionFrameSize
+        OverlayUiState.RECORDING,
+        OverlayUiState.PROCESSING,
+        -> activeFrameWidth
+    }
+
+    private fun naturalContentHeightForState(state: OverlayUiState): Int = motionFrameSize
 
     private inner class DragTouchListener : View.OnTouchListener {
         private var downRawX = 0f
@@ -621,5 +1010,10 @@ class FloatingDictationOverlay(
         private const val KEY_HAS_POSITION = "has_position"
         private const val KEY_EDGE = "edge"
         private const val KEY_Y = "y"
+        private const val ACTIVE_CONTROL_CHILD_COUNT = 3
+        private const val ACTIVE_CONTROL_LEADING_INDEX = 0
+        private const val ACTIVE_CONTROL_CENTER_INDEX = 1
+        private const val ACTIVE_CONTROL_TRAILING_INDEX = 2
+        private const val ACTIVE_CENTER_REVEAL_START_SCALE = 0.18f
     }
 }

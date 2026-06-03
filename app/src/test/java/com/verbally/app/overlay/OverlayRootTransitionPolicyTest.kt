@@ -5,33 +5,33 @@ import org.junit.Test
 
 class OverlayRootTransitionPolicyTest {
     @Test
-    fun `rebuilds window when ready bubble expands to recording controls`() {
+    fun `refreshes retained window when ready bubble expands to recording controls`() {
         val mode = OverlayRootTransitionPolicy.mode(
             previous = OverlayUiState.READY,
             next = OverlayUiState.RECORDING,
         )
 
-        assertEquals(OverlayRootUpdateMode.REBUILD_WINDOW, mode)
+        assertEquals(OverlayRootUpdateMode.REFRESH_IN_PLACE, mode)
     }
 
     @Test
-    fun `rebuilds window when active controls collapse back to ready bubble`() {
+    fun `refreshes retained window when active controls collapse back to ready bubble`() {
         val mode = OverlayRootTransitionPolicy.mode(
             previous = OverlayUiState.PROCESSING,
             next = OverlayUiState.READY,
         )
 
-        assertEquals(OverlayRootUpdateMode.REBUILD_WINDOW, mode)
+        assertEquals(OverlayRootUpdateMode.REFRESH_IN_PLACE, mode)
     }
 
     @Test
-    fun `rebuilds window when recording controls cancel back to ready bubble`() {
+    fun `refreshes retained window when recording controls cancel back to ready bubble`() {
         val mode = OverlayRootTransitionPolicy.mode(
             previous = OverlayUiState.RECORDING,
             next = OverlayUiState.READY,
         )
 
-        assertEquals(OverlayRootUpdateMode.REBUILD_WINDOW, mode)
+        assertEquals(OverlayRootUpdateMode.REFRESH_IN_PLACE, mode)
     }
 
     @Test

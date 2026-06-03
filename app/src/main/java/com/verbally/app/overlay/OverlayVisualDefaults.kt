@@ -1,14 +1,21 @@
 package com.verbally.app.overlay
 
 object OverlayVisualDefaults {
-    const val EDGE_MARGIN_DP = 20
-    const val BUBBLE_SIZE_DP = 50
+    const val EDGE_MARGIN_DP = 7
+    const val MOTION_FRAME_SIZE_DP = 75
+    const val BUBBLE_SIZE_DP = 48
     const val BUBBLE_CORNER_RADIUS_DP = 16
-    const val ICON_SIZE_DP = 25
-    const val ACTIVE_BUTTON_SIZE_DP = 50
-    const val ACTIVE_BUTTON_ICON_SIZE_DP = 25
-    const val ACTIVE_CAPSULE_WIDTH_DP = 98
-    const val ACTIVE_CAPSULE_HEIGHT_DP = 50
-    const val ACTIVE_SPACING_DP = 5
-    const val ACTIVE_CAPSULE_CORNER_RADIUS_DP = 25
+    const val ICON_SIZE_DP = 22
+    const val ACTIVE_BUTTON_SIZE_DP = 48
+    const val ACTIVE_BUTTON_ICON_SIZE_DP = 22
+    const val ACTIVE_CAPSULE_WIDTH_DP = 90
+    const val ACTIVE_CAPSULE_HEIGHT_DP = 48
+    const val ACTIVE_SPACING_DP = 6
+    const val ACTIVE_CAPSULE_CORNER_RADIUS_DP = 24
+    const val ACTIVE_FRAME_HORIZONTAL_PADDING_DP = 12
+    const val ACTIVE_ROW_WIDTH_DP =
+        ACTIVE_BUTTON_SIZE_DP * 2 + ACTIVE_CAPSULE_WIDTH_DP + ACTIVE_SPACING_DP * 2
+    const val ACTIVE_FRAME_WIDTH_DP = ACTIVE_ROW_WIDTH_DP + ACTIVE_FRAME_HORIZONTAL_PADDING_DP * 2
+    const val MOTION_ANIMATION_DURATION_MS = 0L
+    const val ACTIVE_REVEAL_ANIMATION_DURATION_MS = 120L
 }

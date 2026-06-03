@@ -12,7 +12,7 @@ class OverlayPositionMemoryTest {
         val position = memory.currentPosition()
 
         assertEquals(Gravity.END or Gravity.CENTER_VERTICAL, position.gravity)
-        assertEquals(20, position.x)
+        assertEquals(7, position.x)
         assertEquals(0, position.y)
     }
 
