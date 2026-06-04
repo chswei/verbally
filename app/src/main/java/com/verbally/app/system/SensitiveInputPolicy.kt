@@ -52,3 +52,22 @@ class SensitiveInputPolicy(
         )
     }
 }
+
+data class SensitiveInputObservation(
+    val sensitive: Boolean,
+    val hasInputMetadata: Boolean,
+    val inputMethodVisible: Boolean,
+)
+
+class SensitiveInputState {
+    private var activeInputSensitive = false
+
+    fun resolve(observation: SensitiveInputObservation): Boolean {
+        if (observation.sensitive) {
+            activeInputSensitive = true
+        } else if (observation.hasInputMetadata || !observation.inputMethodVisible) {
+            activeInputSensitive = false
+        }
+        return observation.sensitive || activeInputSensitive
+    }
+}

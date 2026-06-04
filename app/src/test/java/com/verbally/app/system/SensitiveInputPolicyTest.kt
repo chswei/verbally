@@ -68,4 +68,72 @@ class SensitiveInputPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun remembersSensitiveInputAcrossMetadataFreeInputMethodEvents() {
+        val state = SensitiveInputState()
+
+        assertTrue(
+            state.resolve(
+                SensitiveInputObservation(
+                    sensitive = true,
+                    hasInputMetadata = true,
+                    inputMethodVisible = true,
+                ),
+            ),
+        )
+        assertTrue(
+            state.resolve(
+                SensitiveInputObservation(
+                    sensitive = false,
+                    hasInputMetadata = false,
+                    inputMethodVisible = true,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun clearsSensitiveInputWhenNonSensitiveInputMetadataIsObserved() {
+        val state = SensitiveInputState()
+        state.resolve(
+            SensitiveInputObservation(
+                sensitive = true,
+                hasInputMetadata = true,
+                inputMethodVisible = true,
+            ),
+        )
+
+        assertFalse(
+            state.resolve(
+                SensitiveInputObservation(
+                    sensitive = false,
+                    hasInputMetadata = true,
+                    inputMethodVisible = true,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun clearsSensitiveInputWhenInputMethodIsHidden() {
+        val state = SensitiveInputState()
+        state.resolve(
+            SensitiveInputObservation(
+                sensitive = true,
+                hasInputMetadata = true,
+                inputMethodVisible = true,
+            ),
+        )
+
+        assertFalse(
+            state.resolve(
+                SensitiveInputObservation(
+                    sensitive = false,
+                    hasInputMetadata = false,
+                    inputMethodVisible = false,
+                ),
+            ),
+        )
+    }
 }

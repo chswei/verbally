@@ -40,6 +40,7 @@ class VerballyAccessibilityService : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val visibilityPolicy = OverlayVisibilityPolicy()
     private val sensitiveInputPolicy = SensitiveInputPolicy()
+    private val sensitiveInputState = SensitiveInputState()
     private val runtimeReadinessPolicy = DictationRuntimeReadinessPolicy()
     private val waveformSmoother = LiveWaveformLevelSmoother()
     private var overlay: FloatingDictationOverlay? = null
@@ -98,11 +99,19 @@ class VerballyAccessibilityService : AccessibilityService() {
         val source = event.source
         val packageName = event.packageName?.toString()
         val defaultInputMethodPackage = defaultInputMethodPackage()
-        val sensitiveInput = sensitiveInputPolicy.isSensitive(
+        val inputMethodVisible = isInputMethodVisible()
+        val observedSensitiveInput = sensitiveInputPolicy.isSensitive(
             SensitiveInputContext(
                 packageName = packageName,
                 isPassword = focused?.isPassword ?: source?.isPassword ?: false,
                 inputType = focused?.inputType ?: source?.inputType ?: 0,
+            ),
+        )
+        val sensitiveInput = sensitiveInputState.resolve(
+            SensitiveInputObservation(
+                sensitive = observedSensitiveInput,
+                hasInputMetadata = focused != null || source != null,
+                inputMethodVisible = inputMethodVisible,
             ),
         )
         val decision = visibilityPolicy.decide(
@@ -114,7 +123,7 @@ class VerballyAccessibilityService : AccessibilityService() {
                 sourceFocused = source?.isFocused,
                 focusedEditable = focused?.isEditable,
                 inputMethodEvent = packageName == defaultInputMethodPackage,
-                inputMethodVisible = isInputMethodVisible(),
+                inputMethodVisible = inputMethodVisible,
                 sensitiveInput = sensitiveInput,
             ),
             overlayShown = overlay?.isShown == true,
@@ -275,7 +284,7 @@ class VerballyAccessibilityService : AccessibilityService() {
         registerReceiver(
             debugInsertReceiver,
             IntentFilter(DEBUG_INSERT_TEXT_ACTION),
-            Context.RECEIVER_EXPORTED,
+            Context.RECEIVER_NOT_EXPORTED,
         )
     }
 

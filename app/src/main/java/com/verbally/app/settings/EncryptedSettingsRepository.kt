@@ -13,7 +13,7 @@ import com.verbally.app.providers.CleanupPromptFactory
 class EncryptedSettingsRepository(
     context: Context,
 ) : SettingsRepository {
-    private val prefs: SharedPreferences = encryptedPrefsOrFallback(context.applicationContext)
+    private val prefs: SharedPreferences = encryptedPrefs(context.applicationContext)
 
     override fun load(): AppSettings {
         val cleanupPrompt = prefs.getString(KEY_CLEANUP_PROMPT, CleanupPromptFactory.defaultCleanupPrompt)
@@ -78,7 +78,7 @@ class EncryptedSettingsRepository(
         }
     }
 
-    private fun encryptedPrefsOrFallback(context: Context): SharedPreferences {
+    private fun encryptedPrefs(context: Context): SharedPreferences {
         return runCatching {
             val masterKey = MasterKey.Builder(context)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -91,7 +91,10 @@ class EncryptedSettingsRepository(
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
             )
         }.getOrElse {
-            context.getSharedPreferences("verbally_settings_fallback", Context.MODE_PRIVATE)
+            throw IllegalStateException(
+                "Encrypted settings storage is unavailable; refusing to store provider API keys without encryption.",
+                it,
+            )
         }
     }
 
