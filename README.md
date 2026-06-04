@@ -1,119 +1,142 @@
 # Verbally
 
-Verbally 是一個 Android 14+ 的浮動語音聽寫工具原型，目標是做出類似 Wispr Flow Android / Spokenly 的「在任何文字框中說話輸入」體驗。
+Verbally is a local-first floating dictation app for Android 14+. It shows a small
+dictation bubble beside editable text fields, records only when the user taps it,
+transcribes speech through a user-selected provider, optionally cleans up the text,
+and inserts the result at the active cursor.
 
-目前版本以內測 APK 為主：使用者自行提供 OpenAI / Gemini API Key，App 不包含後端、不建立帳號，也不會把歷史同步到雲端。
+Traditional Chinese documentation is available in [README.zh-TW.md](README.zh-TW.md).
 
-## 目前功能
+## Project Status
 
-- 在輔助使用服務偵測到文字輸入框時顯示浮動聽寫按鈕。
-- 點擊浮動按鈕開始錄音，再點擊確認後才送出轉錄。
-- 可使用 OpenAI、Soniox、Groq 或 Deepgram 做語音轉文字。
-- 使用 OpenAI 或 Gemini 做自然文字整理。
-- 優先透過輔助使用 IME 直接將文字插入目前游標位置；無法確認插入成功時，會複製到剪貼簿並提示手動貼上。
-- 本機保存最近 100 筆轉錄歷史，可搜尋、複製、刪除。
-- 首頁 API 設定支援 OpenAI、Soniox、Groq、Deepgram、Gemini API Key、模型選項與 API Key 測試按鈕。
-- 介面文案以繁體中文為主。
+Verbally is preparing for its first public release on Google Play and F-Droid. The
+current app version is `0.1.0` (`versionCode = 1`). Expect rapid iteration before
+the first stable release.
 
-## 技術棧
+## Features
 
-- Kotlin
-- Jetpack Compose
-- Android Gradle Plugin 9.0.1
-- Gradle wrapper 9.1.0
-- `compileSdk 36` / `targetSdk 36` / `minSdk 34`
-- OkHttp
-- AndroidX Security Crypto
-- OpenSpec
+- Floating dictation bubble for Android text fields.
+- Tap-to-record flow; audio is sent only after the user confirms.
+- Speech-to-text providers: OpenAI, Soniox, Groq, and Deepgram.
+- Text cleanup providers: OpenAI and Gemini.
+- Bring-your-own-key provider setup; API keys are stored locally with Android
+  encrypted storage.
+- Direct cursor insertion through Android Accessibility IME support, with clipboard
+  fallback only when direct insertion cannot be verified.
+- Local dictation history with latest-100, 24-hour auto-delete, or no-history modes.
+- Local dictionary and snippets for preferred terms and deterministic expansions.
+- Interface localization across supported languages, with Traditional Chinese as the
+  primary product language.
 
-## 建置
+## Privacy Model
 
-本機需要 Android SDK，專案預期 SDK 位於：
+Verbally has no backend, account system, analytics SDK, advertising SDK, crash
+reporting SDK, or cloud sync. Audio is temporary and is deleted after success,
+failure, or cancellation. Dictation history stays on the device according to the
+user's retention setting.
 
-```zsh
-/opt/homebrew/share/android-commandlinetools
-```
+Verbally does use third-party AI network services selected by the user. Temporary
+audio, transcript text, cleanup text, and the matching user-provided API key are sent
+to the selected providers only for transcription and cleanup. See [PRIVACY.md](PRIVACY.md).
 
-如果你的 SDK 在別的位置，請建立或更新本機的 `local.properties`：
+## Accessibility Use
 
-```properties
-sdk.dir=/path/to/android/sdk
-```
+Verbally uses Android's `AccessibilityService` API to detect editable fields, show
+the floating dictation bubble, and insert or verify dictated text at the cursor. It
+is not declared as an accessibility tool because its primary purpose is general
+dictation, not disability-specific assistive access.
 
-執行測試：
+Before opening Android Accessibility settings, the app shows an in-app disclosure and
+requires affirmative consent. Sensitive fields such as passwords, numeric-only
+fields, phone fields, and known financial apps are excluded from bubble display.
+
+## Install From Source
+
+The app is built with Kotlin, Jetpack Compose, Android Gradle Plugin 9.0.1, and
+Gradle wrapper 9.1.0.
+
+Local requirements:
+
+- JDK compatible with the Android Gradle Plugin.
+- Android SDK. On this maintainer machine, `local.properties` points to
+  `/opt/homebrew/share/android-commandlinetools`.
+
+Run unit tests:
 
 ```zsh
 ./gradlew testDebugUnitTest
 ```
 
-產生 debug APK：
+Build a debug APK:
 
 ```zsh
 ./gradlew assembleDebug
 ```
 
-APK 會輸出到：
+Build a release app bundle for Play Console upload:
+
+```zsh
+./gradlew bundleRelease
+```
+
+The debug APK is generated at:
 
 ```text
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## 安裝與權限
+## Required Android Permissions
 
-安裝 APK：
+- `RECORD_AUDIO`
+- `SYSTEM_ALERT_WINDOW`
+- Accessibility service: `Verbally Floating Dictation`
 
-```zsh
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+Sideloaded/debug APKs may show Accessibility as controlled by restricted settings.
+Open Verbally's Android App info, use the top-right menu, choose "Allow restricted
+settings", then return to Accessibility settings and enable the service.
+
+## Store Metadata
+
+The upstream Fastlane/F-Droid metadata lives under:
+
+```text
+fastlane/metadata/android/
 ```
 
-第一次使用需要開啟：
+Release and store-preparation docs live under:
 
-- 麥克風權限
-- 浮動視窗權限
-- 輔助使用服務：`Verbally 浮動聽寫`
-
-側載或 debug 安裝的 APK 在 Android 上可能會出現「由受限制的設定控管」。這是 Android 對輔助使用服務的安全限制。手動處理方式：
-
-1. 開啟 Verbally 的 App 資訊。
-2. 點右上角選單。
-3. 選擇「允許受限制的設定」。
-4. 回到輔助使用頁面。
-5. 開啟 `Verbally 浮動聽寫`。
-
-在 emulator 上除錯時，也可以用 adb 快速開權限：
-
-```zsh
-adb shell pm grant com.verbally.app android.permission.RECORD_AUDIO
-adb shell appops set com.verbally.app SYSTEM_ALERT_WINDOW allow
-adb shell settings put secure accessibility_enabled 1
-adb shell settings put secure enabled_accessibility_services com.verbally.app/com.verbally.app.system.VerballyAccessibilityService
+```text
+docs/release.md
+docs/store/
 ```
 
-最後一行會覆蓋目前啟用的輔助使用服務，建議只在 emulator 使用。
+F-Droid official repository submission should declare the `NonFreeNet` anti-feature
+because the core dictation workflow depends on user-selected proprietary AI network
+services.
 
 ## OpenSpec
 
-本專案使用 OpenSpec 管理規格。正式 specs 位於：
+Verbally uses OpenSpec for product behavior specs.
 
-- `openspec/specs/floating-dictation-overlay/spec.md`
-- `openspec/specs/ai-transcription-cleanup/spec.md`
-- `openspec/specs/local-history-and-settings/spec.md`
-
-已封存的初始 change 位於：
-
-```text
-openspec/changes/archive/2026-05-21-add-android-floating-dictation/
-```
-
-驗證規格：
+Validate specs:
 
 ```zsh
 openspec validate --all --strict
 ```
 
-## 注意事項
+Current active release-preparation change:
 
-- 目前沒有 IME 鍵盤。
-- 目前沒有即時 partial transcription；使用者按確認後才轉錄、整理與插入。
-- 目前沒有後端、帳號、雲端同步或計費系統。
-- 真實輸入框相容性需要在 Pixel、Samsung，以及 Gmail、LINE、WhatsApp、Chrome、Google Keep/Docs 等 app 上逐一測試。
+```text
+openspec/changes/prepare-store-open-source-release/
+```
+
+## Contributing
+
+Issues and pull requests are welcome after the repository is made public. Please read
+[CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and
+[SECURITY.md](SECURITY.md) before contributing.
+
+## License
+
+Verbally is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE)
+and [NOTICE](NOTICE).

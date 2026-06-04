@@ -1,0 +1,24 @@
+Verbally is a floating dictation app for Android 14+.
+
+Tap the floating bubble beside a text field, speak, confirm the recording, and
+Verbally inserts the resulting text at the current cursor.
+
+Highlights:
+
+• Floating dictation bubble for Android text fields
+• Bring-your-own-key provider setup
+• Speech-to-text through OpenAI, Soniox, Groq, or Deepgram
+• Text cleanup through OpenAI or Gemini
+• Local history retention controls
+• Local dictionary and snippets
+• Direct cursor insertion with clipboard fallback only when needed
+
+Verbally uses Android AccessibilityService to detect editable fields, show the
+floating dictation bubble, and insert or verify dictated text at the cursor. The app
+shows an in-app disclosure and asks for consent before opening Accessibility
+settings.
+
+Verbally has no backend, account system, analytics SDK, advertising SDK, crash
+reporting SDK, or cloud sync. Audio is temporary and is deleted after success,
+failure, or cancellation. AI provider requests are sent only to the providers you
+select with your own API keys.

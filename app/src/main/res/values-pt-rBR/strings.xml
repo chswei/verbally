@@ -88,6 +88,10 @@
     <string name="open_app_info">Abrir Informações do app</string>
     <string name="permission_shortcut_title">Deixe o atalho desativado</string>
     <string name="permission_shortcut_description">Se você vir o atalho do Verbally, mantenha-o desativado.</string>
+    <string name="accessibility_disclosure_title">Divulgação de dados de acessibilidade</string>
+    <string name="accessibility_disclosure_body">O Verbally usa a Acessibilidade do Android para detectar campos de texto editáveis, mostrar o botão flutuante de ditado ao lado do teclado ativo e inserir ou verificar o texto ditado no cursor. O Verbally não usa Acessibilidade para ler senhas, campos apenas numéricos, campos de telefone ou apps financeiros conhecidos. Ao gravar, o áudio temporário e a transcrição são enviados apenas aos provedores de IA que você escolhe com suas próprias chaves de API. O histórico de ditado permanece neste dispositivo conforme sua configuração de histórico.</string>
+    <string name="accessibility_disclosure_accept">Entendo e concordo</string>
+    <string name="accessibility_disclosure_decline">Agora não</string>
     <string name="permission_banner_title">As permissões precisam ser verificadas</string>
     <string name="permission_banner_subtitle">O botão flutuante de ditado pode não aparecer se faltarem permissões.</string>
     <string name="permission_banner_button">Corrigir permissões</string>

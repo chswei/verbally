@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -85,8 +86,10 @@ class PermissionScreensTest {
                     microphoneGranted = true,
                     overlayGranted = false,
                     accessibilityGranted = false,
+                    accessibilityDisclosureAccepted = false,
                     primaryActionLabel = "開啟設定",
                     onContinue = {},
+                    onAcceptAccessibilityDisclosure = {},
                     onOpenAppDetails = {},
                 )
             }
@@ -98,6 +101,90 @@ class PermissionScreensTest {
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("輔助使用")
             .assertCountEquals(0)
+    }
+
+    @Test
+    fun permissionSetupShowsAccessibilityDisclosureBeforeOpeningSettings() {
+        var disclosureAccepted = false
+
+        composeRule.setContent {
+            MaterialTheme {
+                PermissionSetupContent(
+                    microphoneGranted = true,
+                    overlayGranted = true,
+                    accessibilityGranted = false,
+                    accessibilityDisclosureAccepted = false,
+                    primaryActionLabel = "開啟設定",
+                    onContinue = {},
+                    onAcceptAccessibilityDisclosure = { disclosureAccepted = true },
+                    onOpenAppDetails = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("輔助使用資料揭露")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("我了解並同意")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertTrue(disclosureAccepted)
+        }
+    }
+
+    @Test
+    fun permissionSetupDisclosureDeclineCanReturnWithoutConsent() {
+        var declined = false
+
+        composeRule.setContent {
+            MaterialTheme {
+                PermissionSetupContent(
+                    microphoneGranted = true,
+                    overlayGranted = true,
+                    accessibilityGranted = false,
+                    accessibilityDisclosureAccepted = false,
+                    primaryActionLabel = "開啟設定",
+                    onContinue = {},
+                    onAcceptAccessibilityDisclosure = {},
+                    onDeclineAccessibilityDisclosure = { declined = true },
+                    onOpenAppDetails = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("稍後再說")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertTrue(declined)
+        }
+    }
+
+    @Test
+    fun permissionSetupShowsAccessibilitySettingsHelpAfterDisclosureConsent() {
+        composeRule.setContent {
+            MaterialTheme {
+                PermissionSetupContent(
+                    microphoneGranted = true,
+                    overlayGranted = true,
+                    accessibilityGranted = false,
+                    accessibilityDisclosureAccepted = true,
+                    primaryActionLabel = "開啟設定",
+                    onContinue = {},
+                    onAcceptAccessibilityDisclosure = {},
+                    onOpenAppDetails = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("啟用輔助使用")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("輔助使用資料揭露")
+            .assertDoesNotExist()
+        composeRule.onNodeWithText("如果輔助使用被系統鎖定")
+            .assertIsDisplayed()
     }
 
     @Test

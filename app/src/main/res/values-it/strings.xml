@@ -88,6 +88,10 @@
     <string name="open_app_info">Apri info app</string>
     <string name="permission_shortcut_title">Lascia disattivato il collegamento</string>
     <string name="permission_shortcut_description">Se vedi il collegamento Verbally, lascialo disattivato.</string>
+    <string name="accessibility_disclosure_title">Informativa sui dati di accessibilità</string>
+    <string name="accessibility_disclosure_body">Verbally usa l’Accessibilità di Android per rilevare i campi di testo modificabili, mostrare il pulsante mobile di dettatura accanto alla tastiera attiva e inserire o verificare il testo dettato al cursore. Verbally non usa l’Accessibilità per leggere password, campi solo numerici, campi telefonici o app finanziarie note. Quando registri, l’audio temporaneo e la trascrizione vengono inviati solo ai provider AI che scegli con le tue chiavi API. La cronologia della dettatura resta su questo dispositivo in base alla relativa impostazione.</string>
+    <string name="accessibility_disclosure_accept">Capisco e accetto</string>
+    <string name="accessibility_disclosure_decline">Non ora</string>
     <string name="permission_banner_title">I permessi vanno ricontrollati</string>
     <string name="permission_banner_subtitle">Il pulsante flottante di dettatura potrebbe non apparire se mancano permessi.</string>
     <string name="permission_banner_button">Correggi permessi</string>

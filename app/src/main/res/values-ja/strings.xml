@@ -88,6 +88,10 @@
     <string name="open_app_info">アプリ情報を開く</string>
     <string name="permission_shortcut_title">ショートカットはオフのまま</string>
     <string name="permission_shortcut_description">Verbally ショートカットが表示された場合はオフのままにしてください。</string>
+    <string name="accessibility_disclosure_title">ユーザー補助データの開示</string>
+    <string name="accessibility_disclosure_body">Verbally は Android のユーザー補助を使用して編集可能なテキスト欄を検出し、アクティブなキーボードの横にフローティング音声入力ボタンを表示し、音声入力したテキストをカーソル位置に挿入または確認します。Verbally はパスワード欄、数字のみの欄、電話番号欄、既知の金融アプリを読み取るためにユーザー補助を使用しません。録音時、一時音声と文字起こしは、あなたが自分の API キーで選択した AI プロバイダーにのみ送信されます。音声入力履歴は履歴設定に従ってこのデバイス上に残ります。</string>
+    <string name="accessibility_disclosure_accept">理解して同意する</string>
+    <string name="accessibility_disclosure_decline">今はしない</string>
     <string name="permission_banner_title">権限の再確認が必要です</string>
     <string name="permission_banner_subtitle">権限が不足していると、フローティング音声入力ボタンが表示されないことがあります。</string>
     <string name="permission_banner_button">権限を設定</string>

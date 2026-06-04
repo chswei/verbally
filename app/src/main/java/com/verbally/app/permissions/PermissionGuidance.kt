@@ -13,6 +13,11 @@ enum class PermissionSetupStep {
     COMPLETE,
 }
 
+enum class AccessibilityPermissionAction {
+    SHOW_DISCLOSURE,
+    OPEN_SYSTEM_SETTINGS,
+}
+
 object PermissionGuidance {
     val restrictedSettingsExplanation: String =
         "如果 Verbally 浮動聽寫在輔助使用清單顯示「由受限制的設定控管」，" +
@@ -45,4 +50,16 @@ object PermissionGuidance {
         PermissionSetupStep.ACCESSIBILITY -> "開啟設定"
         PermissionSetupStep.COMPLETE -> "完成設定"
     }
+
+    fun accessibilityPermissionAction(disclosureAccepted: Boolean): AccessibilityPermissionAction =
+        if (disclosureAccepted) {
+            AccessibilityPermissionAction.OPEN_SYSTEM_SETTINGS
+        } else {
+            AccessibilityPermissionAction.SHOW_DISCLOSURE
+        }
+
+    fun shouldShowAccessibilityDisclosure(
+        step: PermissionSetupStep,
+        disclosureAccepted: Boolean,
+    ): Boolean = step == PermissionSetupStep.ACCESSIBILITY && !disclosureAccepted
 }

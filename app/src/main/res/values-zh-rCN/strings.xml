@@ -88,6 +88,10 @@
     <string name="open_app_info">打开 App 信息</string>
     <string name="permission_shortcut_title">快捷方式不用开</string>
     <string name="permission_shortcut_description">看到“Verbally 快捷方式”时保持关闭即可。</string>
+    <string name="accessibility_disclosure_title">无障碍数据披露</string>
+    <string name="accessibility_disclosure_body">Verbally 使用 Android 无障碍功能来检测可编辑文本框、在当前键盘旁显示浮动听写按钮，并将听写文本插入或确认到当前光标位置。Verbally 不会使用无障碍功能读取密码字段、纯数字字段、电话字段或已知金融 app。录音时，临时音频和转录文本只会发送到你用自己的 API Key 选择的 AI 服务。本地听写历史会根据你的历史设置保留在这台设备上。</string>
+    <string name="accessibility_disclosure_accept">我了解并同意</string>
+    <string name="accessibility_disclosure_decline">稍后再说</string>
     <string name="permission_banner_title">权限需要重新确认</string>
     <string name="permission_banner_subtitle">缺少权限时，浮动听写按钮可能不会出现。</string>
     <string name="permission_banner_button">补开权限</string>

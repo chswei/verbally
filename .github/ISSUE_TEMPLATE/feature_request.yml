@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest a focused product improvement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the desired behavior and what should stay out of scope.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope area
+      options:
+        - Dictation workflow
+        - Provider support
+        - Privacy / policy
+        - Local data
+        - Android compatibility
+        - Documentation
+    validations:
+      required: true

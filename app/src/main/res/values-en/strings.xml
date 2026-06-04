@@ -88,6 +88,10 @@
     <string name="open_app_info">Open App info</string>
     <string name="permission_shortcut_title">Leave the shortcut off</string>
     <string name="permission_shortcut_description">If you see the Verbally shortcut, keep it turned off.</string>
+    <string name="accessibility_disclosure_title">Accessibility data disclosure</string>
+    <string name="accessibility_disclosure_body">Verbally uses Android Accessibility to detect editable text fields, show the floating dictation button beside the active keyboard, and insert or verify dictated text at the cursor. Verbally does not use Accessibility to read passwords, numeric-only fields, phone fields, or known financial apps. When you record, your temporary audio and transcript are sent only to the AI providers you choose with your own API keys. Dictation history stays on this device according to your history setting.</string>
+    <string name="accessibility_disclosure_accept">I understand and agree</string>
+    <string name="accessibility_disclosure_decline">Not now</string>
     <string name="permission_banner_title">Permissions need another check</string>
     <string name="permission_banner_subtitle">The floating dictation button may not appear when permissions are missing.</string>
     <string name="permission_banner_button">Fix permissions</string>

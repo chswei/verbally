@@ -50,6 +50,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.verbally.app.permissions.PermissionAction
+import com.verbally.app.permissions.AccessibilityPermissionAction
 import com.verbally.app.permissions.PermissionGuidance
 import com.verbally.app.permissions.PermissionSetupStep
 
@@ -70,6 +71,9 @@ internal fun PermissionScreen(
     var accessibilityGranted by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
     var microphoneRequestedBefore by remember {
         mutableStateOf(permissionPrefs.getBoolean(KEY_MICROPHONE_REQUESTED, false))
+    }
+    var accessibilityDisclosureAccepted by remember {
+        mutableStateOf(permissionPrefs.getBoolean(KEY_ACCESSIBILITY_DISCLOSURE_ACCEPTED, false))
     }
     fun refreshLocalPermissions() {
         microphoneGranted = isMicrophoneGranted(context)
@@ -139,7 +143,16 @@ internal fun PermissionScreen(
                 )
             }
             PermissionSetupStep.ACCESSIBILITY -> {
-                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                when (
+                    PermissionGuidance.accessibilityPermissionAction(
+                        disclosureAccepted = accessibilityDisclosureAccepted,
+                    )
+                ) {
+                    AccessibilityPermissionAction.SHOW_DISCLOSURE -> Unit
+                    AccessibilityPermissionAction.OPEN_SYSTEM_SETTINGS -> {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    }
+                }
             }
             PermissionSetupStep.COMPLETE -> {
                 onComplete()
@@ -163,8 +176,16 @@ internal fun PermissionScreen(
             microphoneGranted = microphoneGranted,
             overlayGranted = overlayGranted,
             accessibilityGranted = accessibilityGranted,
+            accessibilityDisclosureAccepted = accessibilityDisclosureAccepted,
             primaryActionLabel = primaryActionLabel,
             onContinue = { continuePermissionSetup() },
+            onAcceptAccessibilityDisclosure = {
+                permissionPrefs.edit {
+                    putBoolean(KEY_ACCESSIBILITY_DISCLOSURE_ACCEPTED, true)
+                }
+                accessibilityDisclosureAccepted = true
+            },
+            onDeclineAccessibilityDisclosure = onComplete,
             onOpenAppDetails = { openAppDetails(context) },
             modifier = Modifier
                 .fillMaxSize()
@@ -178,8 +199,11 @@ fun PermissionSetupContent(
     microphoneGranted: Boolean,
     overlayGranted: Boolean,
     accessibilityGranted: Boolean,
+    accessibilityDisclosureAccepted: Boolean = false,
     primaryActionLabel: String,
     onContinue: () -> Unit,
+    onAcceptAccessibilityDisclosure: () -> Unit = {},
+    onDeclineAccessibilityDisclosure: () -> Unit = {},
     onOpenAppDetails: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -189,6 +213,10 @@ fun PermissionSetupContent(
         accessibilityGranted = accessibilityGranted,
     )
     val details = PermissionStepDetails.from(step)
+    val showAccessibilityDisclosure = PermissionGuidance.shouldShowAccessibilityDisclosure(
+        step = step,
+        disclosureAccepted = accessibilityDisclosureAccepted,
+    )
     Column(
         modifier = modifier
             .statusBarsPadding()
@@ -212,17 +240,24 @@ fun PermissionSetupContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (step == PermissionSetupStep.ACCESSIBILITY) {
+        if (showAccessibilityDisclosure) {
+            AccessibilityDisclosureCard(
+                onAccept = onAcceptAccessibilityDisclosure,
+                onDecline = onDeclineAccessibilityDisclosure,
+            )
+        } else if (step == PermissionSetupStep.ACCESSIBILITY) {
             ShortcutHintCard()
             TroubleshootingCard(onOpenAppDetails = onOpenAppDetails)
         }
-        Button(
-            onClick = onContinue,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(PrimaryActionHeight),
-        ) {
-            Text(primaryActionLabel)
+        if (!showAccessibilityDisclosure) {
+            Button(
+                onClick = onContinue,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(PrimaryActionHeight),
+            ) {
+                Text(primaryActionLabel)
+            }
         }
         Spacer(modifier = Modifier.height(12.dp))
     }
@@ -317,6 +352,50 @@ private fun TroubleshootingCard(
                     .height(PrimaryActionHeight),
             ) {
                 Text(stringResource(R.string.open_app_info))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccessibilityDisclosureCard(
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.accessibility_disclosure_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = stringResource(R.string.accessibility_disclosure_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Button(
+                onClick = onAccept,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(PrimaryActionHeight),
+            ) {
+                Text(stringResource(R.string.accessibility_disclosure_accept))
+            }
+            OutlinedButton(
+                onClick = onDecline,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(PrimaryActionHeight),
+            ) {
+                Text(stringResource(R.string.accessibility_disclosure_decline))
             }
         }
     }
@@ -454,6 +533,7 @@ internal fun PermissionBanner(
 }
 
 private const val KEY_MICROPHONE_REQUESTED = "microphone_requested"
+private const val KEY_ACCESSIBILITY_DISCLOSURE_ACCEPTED = "accessibility_disclosure_accepted"
 internal fun hasRequiredPermissions(context: Context): Boolean =
     isMicrophoneGranted(context) &&
         Settings.canDrawOverlays(context) &&

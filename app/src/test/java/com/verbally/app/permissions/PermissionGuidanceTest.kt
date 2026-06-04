@@ -85,4 +85,40 @@ class PermissionGuidanceTest {
         assertEquals("開啟設定", PermissionGuidance.actionLabel(PermissionSetupStep.ACCESSIBILITY))
         assertEquals("完成設定", PermissionGuidance.actionLabel(PermissionSetupStep.COMPLETE))
     }
+
+    @Test
+    fun accessibilitySetupRequiresDisclosureConsentBeforeOpeningSettings() {
+        assertEquals(
+            AccessibilityPermissionAction.SHOW_DISCLOSURE,
+            PermissionGuidance.accessibilityPermissionAction(disclosureAccepted = false),
+        )
+        assertEquals(
+            AccessibilityPermissionAction.OPEN_SYSTEM_SETTINGS,
+            PermissionGuidance.accessibilityPermissionAction(disclosureAccepted = true),
+        )
+    }
+
+    @Test
+    fun accessibilityDisclosureOnlyAppearsForUnacceptedAccessibilityStep() {
+        assertTrue(
+            PermissionGuidance.shouldShowAccessibilityDisclosure(
+                step = PermissionSetupStep.ACCESSIBILITY,
+                disclosureAccepted = false,
+            ),
+        )
+        assertEquals(
+            false,
+            PermissionGuidance.shouldShowAccessibilityDisclosure(
+                step = PermissionSetupStep.OVERLAY,
+                disclosureAccepted = false,
+            ),
+        )
+        assertEquals(
+            false,
+            PermissionGuidance.shouldShowAccessibilityDisclosure(
+                step = PermissionSetupStep.ACCESSIBILITY,
+                disclosureAccepted = true,
+            ),
+        )
+    }
 }

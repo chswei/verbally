@@ -88,6 +88,10 @@
     <string name="open_app_info">App-Infos öffnen</string>
     <string name="permission_shortcut_title">Kurzbefehl deaktiviert lassen</string>
     <string name="permission_shortcut_description">Wenn du den Verbally-Kurzbefehl siehst, lasse ihn deaktiviert.</string>
+    <string name="accessibility_disclosure_title">Hinweis zu Bedienungshilfen-Daten</string>
+    <string name="accessibility_disclosure_body">Verbally verwendet Android-Bedienungshilfen, um bearbeitbare Textfelder zu erkennen, die schwebende Diktat-Schaltfläche neben der aktiven Tastatur anzuzeigen und diktierten Text am Cursor einzufügen oder zu prüfen. Verbally nutzt Bedienungshilfen nicht zum Lesen von Passwörtern, reinen Zahlenfeldern, Telefonfeldern oder bekannten Finanz-Apps. Beim Aufnehmen werden temporäres Audio und Transkript nur an die AI-Dienste gesendet, die du mit eigenen API-Schlüsseln auswählst. Der Diktatverlauf bleibt gemäß deiner Verlaufseinstellung auf diesem Gerät.</string>
+    <string name="accessibility_disclosure_accept">Ich verstehe und stimme zu</string>
+    <string name="accessibility_disclosure_decline">Nicht jetzt</string>
     <string name="permission_banner_title">Berechtigungen müssen geprüft werden</string>
     <string name="permission_banner_subtitle">Die schwebende Diktat-Schaltfläche erscheint möglicherweise nicht, wenn Berechtigungen fehlen.</string>
     <string name="permission_banner_button">Berechtigungen korrigieren</string>
