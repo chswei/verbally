@@ -5,6 +5,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReleaseReadinessFilesTest {
+    private val releasePreparationChangeName = "prepare-store-open-source-release"
+
     @Test
     fun rootOpenSourceAndPolicyFilesExist() {
         assertProjectFileContains("LICENSE", "Apache License")
@@ -71,16 +73,18 @@ class ReleaseReadinessFilesTest {
 
     @Test
     fun openspecReleasePreparationChangeIsArchivedAndSynced() {
+        val archivedChangePath = archivedOpenSpecChangePath(releasePreparationChangeName)
+
         assertProjectFileContains(
-            "openspec/changes/archive/2026-06-04-prepare-store-open-source-release/proposal.md",
+            "$archivedChangePath/proposal.md",
             "Play Store",
         )
         assertProjectFileContains(
-            "openspec/changes/archive/2026-06-04-prepare-store-open-source-release/tasks.md",
+            "$archivedChangePath/tasks.md",
             "F-Droid",
         )
         assertProjectFileContains(
-            "openspec/changes/archive/2026-06-04-prepare-store-open-source-release/specs/floating-dictation-overlay/spec.md",
+            "$archivedChangePath/specs/floating-dictation-overlay/spec.md",
             "Accessibility disclosure",
         )
         assertProjectFileContains(
@@ -90,6 +94,27 @@ class ReleaseReadinessFilesTest {
         assertProjectFileContains(
             "openspec/specs/local-history-and-settings/spec.md",
             "Public privacy and store metadata",
+        )
+    }
+
+    @Test
+    fun releaseReadinessDocsDoNotPinActiveOpenSpecChangePaths() {
+        val scannedPaths = listOf(
+            "README.md",
+            "README.zh-TW.md",
+            "app/src/test/java/com/verbally/app/ReleaseReadinessFilesTest.kt",
+        )
+        val activeChangePathPattern = Regex("""openspec/changes/(?!archive(?:/|\b|$))[A-Za-z0-9._-]+/?""")
+        val violations = scannedPaths.flatMap { path ->
+            activeChangePathPattern.findAll(projectFile(path).readText())
+                .map { "$path: ${it.value}" }
+                .toList()
+        }
+
+        assertTrue(
+            "Release readiness docs/tests must use main specs or archived OpenSpec paths, " +
+                "not active change paths: $violations",
+            violations.isEmpty(),
         )
     }
 
@@ -109,6 +134,25 @@ class ReleaseReadinessFilesTest {
     private fun assertMaxLength(path: String, maxLength: Int) {
         val text = projectFile(path).readText().trim()
         assertTrue("Expected $path to be at most $maxLength chars", text.length <= maxLength)
+    }
+
+    private fun archivedOpenSpecChangePath(changeName: String): String {
+        val archivePath = "openspec/changes/archive"
+        val archiveRoot = projectFile(archivePath)
+        assertTrue("Expected $archivePath to exist", archiveRoot.isDirectory)
+
+        val matches = archiveRoot.listFiles()
+            ?.filter { it.isDirectory && it.name.endsWith("-$changeName") }
+            ?.sortedBy { it.name }
+            .orEmpty()
+
+        assertTrue(
+            "Expected exactly one archived OpenSpec change ending with -$changeName, " +
+                "found ${matches.map { it.name }}",
+            matches.size == 1,
+        )
+
+        return "$archivePath/${matches.single().name}"
     }
 
     private fun projectFile(path: String): File =
