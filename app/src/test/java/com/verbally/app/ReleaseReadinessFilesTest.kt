@@ -70,18 +70,26 @@ class ReleaseReadinessFilesTest {
     }
 
     @Test
-    fun openspecReleasePreparationChangeExists() {
+    fun openspecReleasePreparationChangeIsArchivedAndSynced() {
         assertProjectFileContains(
-            "openspec/changes/prepare-store-open-source-release/proposal.md",
+            "openspec/changes/archive/2026-06-04-prepare-store-open-source-release/proposal.md",
             "Play Store",
         )
         assertProjectFileContains(
-            "openspec/changes/prepare-store-open-source-release/tasks.md",
+            "openspec/changes/archive/2026-06-04-prepare-store-open-source-release/tasks.md",
             "F-Droid",
         )
         assertProjectFileContains(
-            "openspec/changes/prepare-store-open-source-release/specs/floating-dictation-overlay/spec.md",
+            "openspec/changes/archive/2026-06-04-prepare-store-open-source-release/specs/floating-dictation-overlay/spec.md",
             "Accessibility disclosure",
+        )
+        assertProjectFileContains(
+            "openspec/specs/floating-dictation-overlay/spec.md",
+            "Accessibility disclosure",
+        )
+        assertProjectFileContains(
+            "openspec/specs/local-history-and-settings/spec.md",
+            "Public privacy and store metadata",
         )
     }
 

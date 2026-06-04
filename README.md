@@ -124,10 +124,10 @@ Validate specs:
 openspec validate --all --strict
 ```
 
-Current active release-preparation change:
+Completed release-preparation change:
 
 ```text
-openspec/changes/prepare-store-open-source-release/
+openspec/changes/archive/2026-06-04-prepare-store-open-source-release/
 ```
 
 ## Contributing
