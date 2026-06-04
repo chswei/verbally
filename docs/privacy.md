@@ -1,3 +1,8 @@
+---
+title: Privacy Policy
+permalink: /privacy/
+---
+
 # Privacy Policy
 
 Public URL: https://chswei.github.io/verbally/privacy/

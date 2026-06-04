@@ -8,7 +8,7 @@ Last updated: 2026-06-04
 - Package name: `com.verbally.app`
 - Category: Productivity
 - Short description: Floating dictation for Android text fields, using your own AI keys.
-- Privacy policy URL: `https://github.com/chswei/verbally/blob/main/PRIVACY.md`
+- Privacy policy URL: `https://chswei.github.io/verbally/privacy/`
 - Contains ads: No
 - Target audience: Adults / general productivity users, not children.
 

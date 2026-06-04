@@ -9,7 +9,7 @@ class ReleaseReadinessFilesTest {
     fun rootOpenSourceAndPolicyFilesExist() {
         assertProjectFileContains("LICENSE", "Apache License")
         assertProjectFileContains("NOTICE", "Verbally")
-        assertProjectFileContains("PRIVACY.md", "https://github.com/chswei/verbally/blob/main/PRIVACY.md")
+        assertProjectFileContains("PRIVACY.md", "https://chswei.github.io/verbally/privacy/")
         assertProjectFileContains("README.md", "F-Droid")
         assertProjectFileContains("README.zh-TW.md", "F-Droid")
         assertProjectFileContains("CONTRIBUTING.md", "./gradlew testDebugUnitTest")
@@ -35,6 +35,8 @@ class ReleaseReadinessFilesTest {
         assertProjectFileContains("docs/store/accessibility-declaration.md", "AccessibilityService API")
         assertProjectFileContains("docs/store/f-droid.md", "NonFreeNet")
         assertProjectFileContains("docs/release.md", "bundleRelease")
+        assertProjectFileContains("docs/index.md", "Privacy Policy")
+        assertProjectFileContains("docs/privacy.md", "https://chswei.github.io/verbally/privacy/")
     }
 
     @Test
