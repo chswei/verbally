@@ -165,3 +165,23 @@ The system SHALL let the user choose how local dictation history is retained on 
 #### Scenario: Dictionary and snippets are unaffected by history retention
 - **WHEN** the user changes local history retention mode
 - **THEN** dictionary entries, snippet entries, API keys, theme, language, and style settings remain unchanged
+
+### Requirement: Public privacy and store metadata describe data handling
+The project SHALL maintain public privacy, release, Google Play, and F-Droid
+documentation that reflects Verbally's local-first BYOK behavior.
+
+#### Scenario: Privacy policy is published
+- **WHEN** a store reviewer or user opens the repository privacy policy
+- **THEN** it explains local storage, temporary audio, AI provider transmission,
+  AccessibilityService API use, and local history retention
+
+#### Scenario: F-Droid metadata is reviewed
+- **WHEN** F-Droid metadata is prepared
+- **THEN** it identifies Apache-2.0 licensing
+- **AND** it declares the `NonFreeNet` anti-feature for user-selected proprietary AI
+  network services
+
+#### Scenario: Google Play data safety is prepared
+- **WHEN** Play Console Data safety is filled
+- **THEN** the maintainer can use the repository draft to align declarations with the
+  privacy policy and app behavior
