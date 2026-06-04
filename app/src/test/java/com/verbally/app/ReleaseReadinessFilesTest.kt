@@ -99,15 +99,15 @@ class ReleaseReadinessFilesTest {
 
     @Test
     fun releaseReadinessDocsDoNotPinActiveOpenSpecChangePaths() {
-        val scannedPaths = listOf(
+        val scannedFiles = listOf(
             "README.md",
             "README.zh-TW.md",
             "app/src/test/java/com/verbally/app/ReleaseReadinessFilesTest.kt",
-        )
+        ).map(::projectFile) + projectFilesUnder("docs")
         val activeChangePathPattern = Regex("""openspec/changes/(?!archive(?:/|\b|$))[A-Za-z0-9._-]+/?""")
-        val violations = scannedPaths.flatMap { path ->
-            activeChangePathPattern.findAll(projectFile(path).readText())
-                .map { "$path: ${it.value}" }
+        val violations = scannedFiles.flatMap { file ->
+            activeChangePathPattern.findAll(file.readText())
+                .map { "${file.toProjectPath()}: ${it.value}" }
                 .toList()
         }
 
@@ -154,6 +154,18 @@ class ReleaseReadinessFilesTest {
 
         return "$archivePath/${matches.single().name}"
     }
+
+    private fun projectFilesUnder(path: String): List<File> {
+        val root = projectFile(path)
+        assertTrue("Expected $path to exist", root.exists())
+        return root.walkTopDown()
+            .filter { it.isFile }
+            .sortedBy { it.toProjectPath() }
+            .toList()
+    }
+
+    private fun File.toProjectPath(): String =
+        path.removePrefix("../")
 
     private fun projectFile(path: String): File =
         listOf(
