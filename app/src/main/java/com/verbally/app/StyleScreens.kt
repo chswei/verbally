@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -354,15 +355,13 @@ fun StyleRuleEditorScreen(
                     contentDescription = textContentDescription
                 },
         )
-        Button(
+        AdaptiveActionButton(
+            text = stringResource(R.string.style_rule_save_button, styleLabel),
             onClick = { onSave(ruleText) },
             modifier = Modifier
-                .fillMaxWidth()
-                .height(PrimaryActionHeight),
+                .fillMaxWidth(),
             enabled = ruleText.trim().isNotEmpty(),
-        ) {
-            Text(stringResource(R.string.style_rule_save_button, styleLabel))
-        }
+        )
         Spacer(modifier = Modifier.height(64.dp))
     }
 }
@@ -408,7 +407,7 @@ private fun StyleProfileRow(
                     )
                     val buttonModifier = Modifier
                         .weight(1f)
-                        .height(44.dp)
+                        .heightIn(min = 44.dp)
                         .semantics {
                             this.contentDescription = contentDescription
                         }
@@ -418,7 +417,10 @@ private fun StyleProfileRow(
                             modifier = buttonModifier,
                             contentPadding = PaddingValues(horizontal = 8.dp),
                         ) {
-                            Text(styleLabel)
+                            AdaptiveButtonText(
+                                text = styleLabel,
+                                maxLines = 1,
+                            )
                         }
                     } else {
                         OutlinedButton(
@@ -426,7 +428,10 @@ private fun StyleProfileRow(
                             modifier = buttonModifier,
                             contentPadding = PaddingValues(horizontal = 8.dp),
                         ) {
-                            Text(styleLabel)
+                            AdaptiveButtonText(
+                                text = styleLabel,
+                                maxLines = 1,
+                            )
                         }
                     }
                 }

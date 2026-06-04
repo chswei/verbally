@@ -7,6 +7,11 @@
     <string name="nav_snippets">片段</string>
     <string name="nav_style">語氣</string>
     <string name="nav_history">歷史</string>
+    <string name="nav_home_compact">首頁</string>
+    <string name="nav_dictionary_compact">字典</string>
+    <string name="nav_snippets_compact">片段</string>
+    <string name="nav_style_compact">語氣</string>
+    <string name="nav_history_compact">歷史</string>
     <string name="settings_title">設定</string>
     <string name="settings_subtitle">調整 Verbally 的外觀顯示模式、介面語言與本機歷史紀錄。</string>
     <string name="settings_appearance_mode">外觀模式</string>

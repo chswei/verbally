@@ -7,6 +7,11 @@
     <string name="nav_snippets">Snippets</string>
     <string name="nav_style">Style</string>
     <string name="nav_history">History</string>
+    <string name="nav_home_compact">Home</string>
+    <string name="nav_dictionary_compact">Dict.</string>
+    <string name="nav_snippets_compact">Snips</string>
+    <string name="nav_style_compact">Style</string>
+    <string name="nav_history_compact">History</string>
     <string name="settings_title">Settings</string>
     <string name="settings_subtitle">Adjust Verbally appearance, interface language, and local history.</string>
     <string name="settings_appearance_mode">Appearance</string>
@@ -36,10 +41,10 @@
     <string name="transcription_settings_subtitle">Choose a speech recognition model, paste the provider API key, then save.</string>
     <string name="cleanup_settings_title">Text processing</string>
     <string name="cleanup_settings_subtitle">Choose the text cleanup model. Switching services only shows the matching API key field.</string>
-    <string name="save_transcription_api_key">Save transcription API key</string>
-    <string name="save_cleanup_settings">Save text processing settings</string>
-    <string name="test_transcription_api_key">Test transcription API key</string>
-    <string name="test_cleanup_api_key">Test text processing API key</string>
+    <string name="save_transcription_api_key">Save transcription</string>
+    <string name="save_cleanup_settings">Save text processing</string>
+    <string name="test_transcription_api_key">Test API Key</string>
+    <string name="test_cleanup_api_key">Test API Key</string>
     <string name="api_key_test_in_progress">Testing…</string>
     <string name="api_key_test_success">%1$s API Key works</string>
     <string name="api_key_test_missing">Enter the %1$s API Key before testing.</string>
@@ -172,7 +177,7 @@
     <string name="style_rule_language_label">Language</string>
     <string name="style_rule_text_label">Rules</string>
     <string name="style_rule_text_content_description">%1$s rules input</string>
-    <string name="style_rule_save_button">Save %1$s rules</string>
+    <string name="style_rule_save_button">Save %1$s</string>
     <string name="style_rule_saved">Rules saved</string>
     <string name="style_rule_restored">Default rules restored</string>
     <string name="history_title">History</string>

@@ -13,13 +13,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -391,7 +391,7 @@ private fun ThemeModeRadioOption(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(SettingsChoiceRowHeight)
+            .heightIn(min = SettingsChoiceRowHeight)
             .selectable(
                 selected = selected,
                 onClick = onSelected,
@@ -412,6 +412,8 @@ private fun ThemeModeRadioOption(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -427,7 +429,7 @@ private fun InterfaceLanguageRadioOption(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(SettingsChoiceRowHeight)
+            .heightIn(min = SettingsChoiceRowHeight)
             .selectable(
                 selected = selected,
                 onClick = onSelected,
@@ -448,6 +450,8 @@ private fun InterfaceLanguageRadioOption(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -463,7 +467,7 @@ private fun HistoryRetentionModeRadioOption(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(SettingsChoiceRowHeight)
+            .heightIn(min = SettingsChoiceRowHeight)
             .selectable(
                 selected = selected,
                 onClick = onSelected,
@@ -484,6 +488,8 @@ private fun HistoryRetentionModeRadioOption(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -551,15 +557,13 @@ fun SettingsScreenContent(
                 settings = settings,
                 onSettingsChange = onSettingsChange,
             )
-            Button(
+            AdaptiveActionButton(
+                text = stringResource(R.string.save_transcription_api_key),
                 onClick = onSave,
                 enabled = transcriptionSaveEnabled,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(PrimaryActionHeight),
-            ) {
-                Text(stringResource(R.string.save_transcription_api_key))
-            }
+                    .fillMaxWidth(),
+            )
             ApiKeyTestAction(
                 label = stringResource(R.string.test_transcription_api_key),
                 state = transcriptionTestState,
@@ -574,15 +578,13 @@ fun SettingsScreenContent(
                 settings = settings,
                 onSettingsChange = onSettingsChange,
             )
-            Button(
+            AdaptiveActionButton(
+                text = stringResource(R.string.save_cleanup_settings),
                 onClick = onSave,
                 enabled = cleanupSaveEnabled,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(PrimaryActionHeight),
-            ) {
-                Text(stringResource(R.string.save_cleanup_settings))
-            }
+                    .fillMaxWidth(),
+            )
             ApiKeyTestAction(
                 label = stringResource(R.string.test_cleanup_api_key),
                 state = cleanupTestState,
@@ -630,21 +632,17 @@ private fun ApiKeyTestAction(
     state: ApiKeyTestUiState,
     onClick: () -> Unit,
 ) {
-    OutlinedButton(
+    AdaptiveOutlinedActionButton(
+        text = if (state.isTesting) {
+            stringResource(R.string.api_key_test_in_progress)
+        } else {
+            label
+        },
         onClick = onClick,
         enabled = !state.isTesting,
         modifier = Modifier
-            .fillMaxWidth()
-            .height(PrimaryActionHeight),
-    ) {
-        Text(
-            if (state.isTesting) {
-                stringResource(R.string.api_key_test_in_progress)
-            } else {
-                label
-            },
-        )
-    }
+            .fillMaxWidth(),
+    )
     state.message?.let { message ->
         Text(
             text = message,

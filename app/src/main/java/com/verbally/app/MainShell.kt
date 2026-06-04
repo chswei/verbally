@@ -45,6 +45,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.verbally.app.settings.AppSettings
 import kotlinx.coroutines.launch
@@ -171,12 +173,16 @@ fun VerballyApp(
     )
 }
 
-enum class AppDestination(@param:StringRes val labelRes: Int, @param:DrawableRes val iconRes: Int) {
-    HOME(R.string.nav_home, R.drawable.ic_app_home_24),
-    DICTIONARY(R.string.nav_dictionary, R.drawable.ic_app_dictionary_24),
-    SNIPPETS(R.string.nav_snippets, R.drawable.ic_app_snippets_24),
-    STYLE(R.string.nav_style, R.drawable.ic_app_style_24),
-    HISTORY(R.string.nav_history, R.drawable.ic_app_history_24),
+enum class AppDestination(
+    @param:StringRes val labelRes: Int,
+    @param:StringRes val compactLabelRes: Int,
+    @param:DrawableRes val iconRes: Int,
+) {
+    HOME(R.string.nav_home, R.string.nav_home_compact, R.drawable.ic_app_home_24),
+    DICTIONARY(R.string.nav_dictionary, R.string.nav_dictionary_compact, R.drawable.ic_app_dictionary_24),
+    SNIPPETS(R.string.nav_snippets, R.string.nav_snippets_compact, R.drawable.ic_app_snippets_24),
+    STYLE(R.string.nav_style, R.string.nav_style_compact, R.drawable.ic_app_style_24),
+    HISTORY(R.string.nav_history, R.string.nav_history_compact, R.drawable.ic_app_history_24),
 }
 
 @Composable
@@ -232,7 +238,11 @@ fun VerballyAppScaffold(
                 if (showAppChrome) {
                     NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                         AppDestination.entries.forEach { destination ->
+                            val destinationLabel = stringResource(destination.labelRes)
                             NavigationBarItem(
+                                modifier = Modifier.semantics {
+                                    contentDescription = destinationLabel
+                                },
                                 selected = !showingSettings && selectedDestination == destination,
                                 onClick = { onDestinationSelected(destination) },
                                 colors = NavigationBarItemDefaults.colors(
@@ -248,7 +258,14 @@ fun VerballyAppScaffold(
                                         contentDescription = null,
                                     )
                                 },
-                                label = { Text(stringResource(destination.labelRes)) },
+                                label = {
+                                    Text(
+                                        text = stringResource(destination.compactLabelRes),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                },
                             )
                         }
                     }

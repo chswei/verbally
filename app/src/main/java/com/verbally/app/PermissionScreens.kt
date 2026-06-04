@@ -22,11 +22,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -250,14 +248,12 @@ fun PermissionSetupContent(
             TroubleshootingCard(onOpenAppDetails = onOpenAppDetails)
         }
         if (!showAccessibilityDisclosure) {
-            Button(
+            AdaptiveActionButton(
+                text = primaryActionLabel,
                 onClick = onContinue,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(PrimaryActionHeight),
-            ) {
-                Text(primaryActionLabel)
-            }
+                    .fillMaxWidth(),
+            )
         }
         Spacer(modifier = Modifier.height(12.dp))
     }
@@ -345,14 +341,12 @@ private fun TroubleshootingCard(
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.bodySmall,
             )
-            OutlinedButton(
+            AdaptiveOutlinedActionButton(
+                text = stringResource(R.string.open_app_info),
                 onClick = onOpenAppDetails,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(PrimaryActionHeight),
-            ) {
-                Text(stringResource(R.string.open_app_info))
-            }
+                    .fillMaxWidth(),
+            )
         }
     }
 }
@@ -381,22 +375,18 @@ private fun AccessibilityDisclosureCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
-            Button(
+            AdaptiveActionButton(
+                text = stringResource(R.string.accessibility_disclosure_accept),
                 onClick = onAccept,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(PrimaryActionHeight),
-            ) {
-                Text(stringResource(R.string.accessibility_disclosure_accept))
-            }
-            OutlinedButton(
+                    .fillMaxWidth(),
+            )
+            AdaptiveOutlinedActionButton(
+                text = stringResource(R.string.accessibility_disclosure_decline),
                 onClick = onDecline,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(PrimaryActionHeight),
-            ) {
-                Text(stringResource(R.string.accessibility_disclosure_decline))
-            }
+                    .fillMaxWidth(),
+            )
         }
     }
 }
@@ -505,14 +495,13 @@ internal fun PermissionBanner(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column {
                 Text(
                     text = stringResource(R.string.permission_banner_title),
                     style = MaterialTheme.typography.titleMedium,
@@ -525,9 +514,11 @@ internal fun PermissionBanner(
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
-            Button(onClick = onOpenPermissions) {
-                Text(stringResource(R.string.permission_banner_button))
-            }
+            AdaptiveActionButton(
+                text = stringResource(R.string.permission_banner_button),
+                onClick = onOpenPermissions,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
