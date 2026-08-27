@@ -17,7 +17,7 @@ class OpenAiTranscriptionRequestFactory(
         model: String,
         audioFile: File,
     ): Request {
-        val body = MultipartBody.Builder()
+        val bodyBuilder = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("model", model)
             .addFormDataPart(
@@ -25,16 +25,26 @@ class OpenAiTranscriptionRequestFactory(
                 filename = audioFile.name,
                 body = audioFile.asRequestBody(mediaTypeFor(audioFile).toMediaType()),
             )
-            .addFormDataPart("response_format", "json")
-            .addFormDataPart("include[]", "logprobs")
-            .addFormDataPart("chunking_strategy", "auto")
-            .build()
+
+        if (model in MODELS_WITH_TOKEN_LOGPROBS) {
+            bodyBuilder
+                .addFormDataPart("response_format", "json")
+                .addFormDataPart("include[]", "logprobs")
+                .addFormDataPart("chunking_strategy", "auto")
+        }
 
         return Request.Builder()
             .url("${baseUrl.trimEnd('/')}/v1/audio/transcriptions")
             .header("Authorization", "Bearer $apiKey")
-            .post(body)
+            .post(bodyBuilder.build())
             .build()
+    }
+
+    private companion object {
+        val MODELS_WITH_TOKEN_LOGPROBS = setOf(
+            "gpt-4o-mini-transcribe",
+            "gpt-4o-transcribe",
+        )
     }
 }
 

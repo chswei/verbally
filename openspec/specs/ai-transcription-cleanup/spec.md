@@ -4,12 +4,18 @@
 TBD - created by archiving change add-android-floating-dictation. Update Purpose after archive.
 ## Requirements
 ### Requirement: Audio is transcribed with OpenAI BYOK
-The system SHALL transcribe confirmed recordings by sending temporary audio captured by the dictation recorder directly to the selected BYOK transcription provider. Supported transcription options SHALL include OpenAI `gpt-4o-mini-transcribe`, OpenAI `gpt-4o-transcribe`, Soniox `stt-async-v4`, and Groq `whisper-large-v3-turbo`. Provider clients SHOULD share transport resources so repeated provider calls can reuse DNS, TLS, and HTTP connection pooling when the platform and endpoint allow it.
+The system SHALL transcribe confirmed recordings by sending temporary audio captured by the dictation recorder directly to the selected BYOK transcription provider. Supported transcription options SHALL include OpenAI `gpt-transcribe`, OpenAI `gpt-4o-mini-transcribe`, OpenAI `gpt-4o-transcribe`, Soniox `stt-async-v4`, and Groq `whisper-large-v3-turbo`. Provider clients SHOULD share transport resources so repeated provider calls can reuse DNS, TLS, and HTTP connection pooling when the platform and endpoint allow it.
 
 #### Scenario: OpenAI transcription succeeds
 - **WHEN** the user confirms a recording and a valid OpenAI key is configured
 - **THEN** the system calls OpenAI transcription with the configured OpenAI transcription model
 - **AND** the request includes token confidence signals when the selected OpenAI transcription model supports them
+- **THEN** the system receives raw transcript text for cleanup
+
+#### Scenario: GPT Transcribe uses compatible request parameters
+- **WHEN** the user confirms a recording with OpenAI `gpt-transcribe` selected
+- **THEN** the system sends the recording to `/v1/audio/transcriptions` with the selected model
+- **AND** the request does not include token confidence or other legacy parameters unsupported by `gpt-transcribe`
 - **THEN** the system receives raw transcript text for cleanup
 
 #### Scenario: Low-confidence brief transcript is suppressed

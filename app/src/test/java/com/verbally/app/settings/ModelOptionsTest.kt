@@ -6,10 +6,11 @@ import org.junit.Test
 
 class ModelOptionsTest {
     @Test
-    fun transcriptionOptionsExposeFourCuratedChoices() {
+    fun transcriptionOptionsExposeFiveCuratedChoices() {
         assertEquals(
             listOf(
                 "OpenAI: gpt-4o-mini-transcribe",
+                "OpenAI: gpt-transcribe",
                 "OpenAI: gpt-4o-transcribe",
                 "Soniox: stt-async-v4",
                 "Groq: whisper-large-v3-turbo",

@@ -27,6 +27,11 @@ object ModelOptions {
         ),
         TranscriptionModelOption(
             provider = TranscriptionProvider.OPENAI,
+            model = "gpt-transcribe",
+            label = "OpenAI: gpt-transcribe",
+        ),
+        TranscriptionModelOption(
+            provider = TranscriptionProvider.OPENAI,
             model = "gpt-4o-transcribe",
             label = "OpenAI: gpt-4o-transcribe",
         ),

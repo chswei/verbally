@@ -36,5 +36,31 @@ class OpenAiTranscriptionRequestFactoryTest {
         assertTrue(bodyText.contains("auto"))
         assertTrue(bodyText.contains("name=\"include[]\""))
         assertTrue(bodyText.contains("logprobs"))
+        assertTrue(bodyText.contains("name=\"response_format\""))
+        assertTrue(bodyText.contains("json"))
+    }
+
+    @Test
+    fun createsMinimalDocumentedRequestForGptTranscribe() {
+        val audio = File.createTempFile("verbally-test", ".wav").apply {
+            writeBytes(byteArrayOf(1, 2, 3, 4))
+            deleteOnExit()
+        }
+
+        val request = OpenAiTranscriptionRequestFactory("https://api.openai.com")
+            .create(
+                apiKey = "sk-test",
+                model = "gpt-transcribe",
+                audioFile = audio,
+            )
+
+        val bodyText = Buffer().also { request.body!!.writeTo(it) }.readUtf8()
+        assertTrue(bodyText.contains("name=\"model\""))
+        assertTrue(bodyText.contains("gpt-transcribe"))
+        assertTrue(bodyText.contains("name=\"file\""))
+        assertTrue(bodyText.contains("verbally-test"))
+        assertTrue(!bodyText.contains("name=\"response_format\""))
+        assertTrue(!bodyText.contains("name=\"include[]\""))
+        assertTrue(!bodyText.contains("name=\"chunking_strategy\""))
     }
 }
