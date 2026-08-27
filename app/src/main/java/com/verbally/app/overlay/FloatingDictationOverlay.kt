@@ -7,7 +7,10 @@ import android.content.ComponentCallbacks
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.PixelFormat
+import android.graphics.Rect
+import android.graphics.Region
 import android.graphics.drawable.GradientDrawable
+import android.hardware.input.InputManager
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
@@ -54,6 +57,9 @@ class FloatingDictationOverlay(
     private val activeCapsuleCornerRadius =
         OverlayVisualDefaults.ACTIVE_CAPSULE_CORNER_RADIUS_DP.toPx().toFloat()
     private val activeFrameWidth = OverlayVisualDefaults.ACTIVE_FRAME_WIDTH_DP.toPx()
+    private val passThroughWindowAlpha = OverlayWindowTouchPolicy.passThroughWindowAlpha(
+        context.getSystemService(InputManager::class.java).maximumObscuringOpacityForTouch,
+    )
     private val rootTouchListener = DragTouchListener()
     private val session = OverlaySessionStateMachine()
     private var waveformLevel = 0f
@@ -68,6 +74,7 @@ class FloatingDictationOverlay(
     private var renderedWindowWidth = 0
     private var renderedWindowHeight = 0
     private var renderedContentGravity = Gravity.END
+    private var touchableSurface: View? = null
     private val configurationCallbacks = object : ComponentCallbacks {
         override fun onConfigurationChanged(newConfig: Configuration) {
             rootView?.post {
@@ -162,6 +169,7 @@ class FloatingDictationOverlay(
 
     private fun renderState(root: FrameLayout, previousState: OverlayUiState? = null) {
         recordingWaveformView = null
+        touchableSurface = null
         val renderedState = session.state
         val content = when (session.state) {
             OverlayUiState.READY -> createReadyBubble()
@@ -261,6 +269,7 @@ class FloatingDictationOverlay(
             content,
             FrameLayout.LayoutParams(contentWidth, contentHeight, contentGravity),
         )
+        scheduleTouchableRegionUpdate(root)
     }
 
     private fun animateActiveContentFromBubbleAnchor(content: View, contentGravity: Int) {
@@ -349,6 +358,7 @@ class FloatingDictationOverlay(
                 isFocusable = true
                 contentDescription = customContentDescription ?: contentDescriptionFor(OverlayUiState.READY)
                 bindDragAndClick(this) { handleReadyTap() }
+                registerTouchableSurface(this)
                 addView(
                     ImageView(context).apply {
                         setImageResource(R.drawable.ic_verbally_waveform)
@@ -415,6 +425,7 @@ class FloatingDictationOverlay(
                 bindDragAndClick(this) {
                     repairTarget?.let(onRepair)
                 }
+                registerTouchableSurface(this)
                 addView(
                     ImageView(context).apply {
                         setImageResource(R.drawable.ic_verbally_warning)
@@ -487,6 +498,7 @@ class FloatingDictationOverlay(
             addView(cancelButton)
             addView(centerCapsule, activeCenterLayoutParams())
             addView(actionButton)
+            registerTouchableSurface(this)
         }
 
     private fun activeCenterLayoutParams() =
@@ -549,6 +561,7 @@ class FloatingDictationOverlay(
         currentLayoutParams = params
         windowManager.addView(view, params)
         rootView = view
+        scheduleTouchableRegionUpdate(view)
         showAttachedRoot(animate = false)
     }
 
@@ -573,6 +586,7 @@ class FloatingDictationOverlay(
         }
         rootView = null
         currentLayoutParams = null
+        touchableSurface = null
         resetTransientState()
     }
 
@@ -590,9 +604,45 @@ class FloatingDictationOverlay(
         FrameLayout(context).apply {
             clipChildren = true
             clipToPadding = true
+            addOnLayoutChangeListener { changedView, _, _, _, _, _, _, _, _ ->
+                scheduleTouchableRegionUpdate(changedView as FrameLayout)
+            }
             hideWithInputMethodAnimation()
             renderState(this)
         }
+
+    private fun registerTouchableSurface(surface: View) {
+        touchableSurface = surface
+    }
+
+    private fun scheduleTouchableRegionUpdate(root: FrameLayout) {
+        root.post {
+            if (rootView === root && root.isAttachedToWindow) {
+                applyTouchableRegion(root)
+            }
+        }
+    }
+
+    private fun applyTouchableRegion(root: FrameLayout) {
+        val rootSurface = root.rootSurfaceControl ?: return
+        val candidateBounds = touchableSurface
+            ?.let { surface -> OverlayTouchableRegionCoordinates.boundsInRoot(root, surface) }
+            ?.let(::listOf)
+            .orEmpty()
+        val touchableBounds = OverlayTouchableRegionGeometry.clippedBounds(
+            windowWidth = root.width,
+            windowHeight = root.height,
+            candidates = candidateBounds,
+        )
+        val region = Region()
+        touchableBounds.forEach { bounds ->
+            region.op(
+                Rect(bounds.left, bounds.top, bounds.right, bounds.bottom),
+                Region.Op.UNION,
+            )
+        }
+        runCatching { rootSurface.setTouchableRegion(region) }
+    }
 
     private fun bindDragOnly(target: View) {
         target.setOnTouchListener(rootTouchListener)
@@ -660,6 +710,7 @@ class FloatingDictationOverlay(
             gravity = position.gravity
             x = position.x
             y = position.y
+            alpha = passThroughWindowAlpha
             windowAnimations = 0
         }
     }
