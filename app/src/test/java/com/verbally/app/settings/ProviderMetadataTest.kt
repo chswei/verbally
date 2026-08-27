@@ -8,14 +8,17 @@ class ProviderMetadataTest {
     fun transcriptionProvidersExposeDisplayNamesAndSelectedApiKey() {
         val settings = AppSettings(
             openAiApiKey = "openai-key",
+            geminiApiKey = "gemini-key",
             sonioxApiKey = "soniox-key",
             groqApiKey = "groq-key",
         )
 
         assertEquals("OpenAI", TranscriptionProvider.OPENAI.displayName)
+        assertEquals("Gemini", TranscriptionProvider.GEMINI.displayName)
         assertEquals("Soniox", TranscriptionProvider.SONIOX.displayName)
         assertEquals("Groq", TranscriptionProvider.GROQ.displayName)
         assertEquals("openai-key", settings.copy(transcriptionProvider = TranscriptionProvider.OPENAI).transcriptionApiKey)
+        assertEquals("gemini-key", settings.copy(transcriptionProvider = TranscriptionProvider.GEMINI).transcriptionApiKey)
         assertEquals("soniox-key", settings.copy(transcriptionProvider = TranscriptionProvider.SONIOX).transcriptionApiKey)
         assertEquals("groq-key", settings.copy(transcriptionProvider = TranscriptionProvider.GROQ).transcriptionApiKey)
     }

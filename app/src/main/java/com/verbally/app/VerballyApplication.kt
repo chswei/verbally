@@ -5,6 +5,7 @@ import com.verbally.app.dictionary.SharedPreferencesDictionaryRepository
 import com.verbally.app.history.SharedPreferencesDictationHistoryRepository
 import com.verbally.app.providers.AndroidProviderMessages
 import com.verbally.app.providers.GeminiTextCleanupClient
+import com.verbally.app.providers.GeminiTranscriptionClient
 import com.verbally.app.providers.GroqTranscriptionClient
 import com.verbally.app.providers.OpenAiTextCleanupClient
 import com.verbally.app.providers.OpenAiTranscriptionClient
@@ -39,6 +40,7 @@ class VerballyContainer(application: Application) {
     val styleRuleRepository = SharedPreferencesAppStyleRuleRepository(application)
     val transcriptionRouter = TranscriptionClientRouter(
         openAiClient = OpenAiTranscriptionClient(messages = providerMessages),
+        geminiClient = GeminiTranscriptionClient(messages = providerMessages),
         sonioxClient = SonioxAsyncTranscriptionClient(messages = providerMessages),
         groqClient = GroqTranscriptionClient(messages = providerMessages),
     )

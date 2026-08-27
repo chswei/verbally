@@ -31,6 +31,13 @@ internal fun ProviderKeyTestEndpoints.transcriptionTarget(settings: AppSettings)
             apiKey = settings.transcriptionApiKey,
             authScheme = ProviderKeyAuthScheme.BEARER,
         )
+        TranscriptionProvider.GEMINI -> ProviderKeyTestTarget(
+            providerName = provider.displayName,
+            baseUrl = geminiBaseUrl,
+            path = "/v1beta/models/${settings.transcriptionModel}",
+            apiKey = settings.transcriptionApiKey,
+            authScheme = ProviderKeyAuthScheme.GOOGLE_API_KEY,
+        )
         TranscriptionProvider.SONIOX -> ProviderKeyTestTarget(
             providerName = provider.displayName,
             baseUrl = sonioxBaseUrl,

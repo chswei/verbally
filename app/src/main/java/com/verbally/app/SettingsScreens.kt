@@ -610,6 +610,7 @@ private fun AppSettings.hasUnsavedCleanupChanges(savedSettings: AppSettings): Bo
 private fun AppSettings.transcriptionApiKeyFor(provider: TranscriptionProvider): String =
     when (provider) {
         TranscriptionProvider.OPENAI -> openAiApiKey
+        TranscriptionProvider.GEMINI -> geminiApiKey
         TranscriptionProvider.SONIOX -> sonioxApiKey
         TranscriptionProvider.GROQ -> groqApiKey
     }
@@ -705,6 +706,11 @@ private fun TranscriptionSettingsFields(
         TranscriptionProvider.OPENAI -> {
             SecretField(stringResource(R.string.api_key_label), settings.openAiApiKey) {
                 onSettingsChange(settings.copy(openAiApiKey = it))
+            }
+        }
+        TranscriptionProvider.GEMINI -> {
+            SecretField(stringResource(R.string.api_key_label), settings.geminiApiKey) {
+                onSettingsChange(settings.copy(geminiApiKey = it))
             }
         }
         TranscriptionProvider.SONIOX -> {

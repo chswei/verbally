@@ -39,6 +39,7 @@ class DictationCoordinatorTranscriptionProviderTest {
             ),
             router = TranscriptionClientRouter(
                 openAiClient = CapturingTranscriptionClient(provider = "openai"),
+                geminiClient = CapturingTranscriptionClient(provider = "gemini"),
                 sonioxClient = CapturingTranscriptionClient(provider = "soniox"),
                 groqClient = groq,
             ),
@@ -68,6 +69,7 @@ class DictationCoordinatorTranscriptionProviderTest {
             ),
             router = TranscriptionClientRouter(
                 openAiClient = CapturingTranscriptionClient(provider = "openai"),
+                geminiClient = CapturingTranscriptionClient(provider = "gemini"),
                 sonioxClient = soniox,
                 groqClient = CapturingTranscriptionClient(provider = "groq"),
             ),
@@ -80,6 +82,35 @@ class DictationCoordinatorTranscriptionProviderTest {
         assertEquals("stt-async-v4", soniox.model)
         assertEquals("soniox", history.saved.transcriptionProvider)
         assertEquals("stt-async-v4", history.saved.transcriptionModel)
+    }
+
+    @Test
+    fun confirmRecordingRoutesGeminiModelThroughGeminiKey() = runBlocking {
+        val gemini = CapturingTranscriptionClient(provider = "gemini")
+        val history = CapturingHistoryRepository()
+        val coordinator = coordinator(
+            settings = AppSettings(
+                openAiApiKey = "openai-key",
+                geminiApiKey = "gemini-key",
+                transcriptionProvider = TranscriptionProvider.GEMINI,
+                transcriptionModel = "gemini-3.5-transcribe",
+                cleanupProvider = CleanupProvider.OPENAI,
+            ),
+            router = TranscriptionClientRouter(
+                openAiClient = CapturingTranscriptionClient(provider = "openai"),
+                geminiClient = gemini,
+                sonioxClient = CapturingTranscriptionClient(provider = "soniox"),
+                groqClient = CapturingTranscriptionClient(provider = "groq"),
+            ),
+            historyRepository = history,
+        )
+
+        coordinator.confirmRecording(appLabel = null)
+
+        assertEquals("gemini-key", gemini.apiKey)
+        assertEquals("gemini-3.5-transcribe", gemini.model)
+        assertEquals("gemini", history.saved.transcriptionProvider)
+        assertEquals("gemini-3.5-transcribe", history.saved.transcriptionModel)
     }
 
     private fun coordinator(

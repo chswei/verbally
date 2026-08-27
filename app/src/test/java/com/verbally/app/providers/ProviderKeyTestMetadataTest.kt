@@ -8,6 +8,24 @@ import org.junit.Test
 
 class ProviderKeyTestMetadataTest {
     @Test
+    fun geminiTranscriptionKeyTestTargetUsesSelectedModel() {
+        val endpoints = ProviderKeyTestEndpoints(geminiBaseUrl = "https://gemini.example.test")
+        val target = endpoints.transcriptionTarget(
+            AppSettings(
+                geminiApiKey = "gemini-key",
+                transcriptionProvider = TranscriptionProvider.GEMINI,
+                transcriptionModel = "gemini-3.5-transcribe",
+            ),
+        )
+
+        assertEquals("Gemini", target.providerName)
+        assertEquals("https://gemini.example.test", target.baseUrl)
+        assertEquals("/v1beta/models/gemini-3.5-transcribe", target.path)
+        assertEquals("gemini-key", target.apiKey)
+        assertEquals(ProviderKeyAuthScheme.GOOGLE_API_KEY, target.authScheme)
+    }
+
+    @Test
     fun transcriptionKeyTestTargetUsesProviderMetadata() {
         val endpoints = ProviderKeyTestEndpoints(groqBaseUrl = "https://example.test/openai")
         val target = endpoints.transcriptionTarget(

@@ -6,12 +6,13 @@ import org.junit.Test
 
 class ModelOptionsTest {
     @Test
-    fun transcriptionOptionsExposeFiveCuratedChoices() {
+    fun transcriptionOptionsExposeSixCuratedChoices() {
         assertEquals(
             listOf(
                 "OpenAI: gpt-4o-mini-transcribe",
                 "OpenAI: gpt-transcribe",
                 "OpenAI: gpt-4o-transcribe",
+                "Gemini: gemini-3.5-transcribe",
                 "Soniox: stt-async-v4",
                 "Groq: whisper-large-v3-turbo",
             ),
@@ -45,11 +46,11 @@ class ModelOptionsTest {
 
     @Test
     fun appliesSelectedOptionLabelsToSettings() {
-        val transcription = AppSettings().withTranscriptionModelOption("Soniox: stt-async-v4")
+        val transcription = AppSettings().withTranscriptionModelOption("Gemini: gemini-3.5-transcribe")
         val cleanup = AppSettings().withCleanupModelOption("Gemini: gemini-3.1-pro-preview")
 
-        assertEquals(TranscriptionProvider.SONIOX, transcription.transcriptionProvider)
-        assertEquals("stt-async-v4", transcription.transcriptionModel)
+        assertEquals(TranscriptionProvider.GEMINI, transcription.transcriptionProvider)
+        assertEquals("gemini-3.5-transcribe", transcription.transcriptionModel)
         assertEquals(CleanupProvider.GEMINI, cleanup.cleanupProvider)
         assertEquals("gemini-3.1-pro-preview", cleanup.geminiCleanupModel)
         assertTrue(cleanup.cleanupModelOptionLabel.endsWith("gemini-3.1-pro-preview"))

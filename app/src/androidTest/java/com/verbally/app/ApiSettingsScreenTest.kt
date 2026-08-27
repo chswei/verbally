@@ -357,6 +357,8 @@ class ApiSettingsScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("OpenAI: gpt-4o-transcribe")
             .assertIsDisplayed()
+        composeRule.onNodeWithText("Gemini: gemini-3.5-transcribe")
+            .assertIsDisplayed()
         composeRule.onNodeWithText("Soniox: stt-async-v4")
             .assertIsDisplayed()
         composeRule.onNodeWithText("Groq: whisper-large-v3-turbo")
@@ -414,6 +416,42 @@ class ApiSettingsScreenTest {
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("OpenAI API Key、轉錄模型")
             .assertCountEquals(0)
+    }
+
+    @Test
+    fun geminiTranscriptionSelectionUsesGeminiApiKey() {
+        var settings by mutableStateOf(
+            AppSettings(
+                openAiApiKey = "openai-key",
+                geminiApiKey = "gemini-key",
+            ),
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                SettingsScreenContent(
+                    settings = settings,
+                    onSettingsChange = { settings = it },
+                    onSave = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("選擇 語音轉錄模型")
+            .performClick()
+        composeRule.onNodeWithText("Gemini: gemini-3.5-transcribe")
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(TranscriptionProvider.GEMINI, settings.transcriptionProvider)
+            assertEquals("gemini-3.5-transcribe", settings.transcriptionModel)
+        }
+        val transcriptionKey = composeRule.onAllNodes(hasSetTextAction())
+            .onFirst()
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.EditableText]
+            .text
+        assertTrue(transcriptionKey.contains("gemini-key"))
     }
 
     @Test

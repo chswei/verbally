@@ -12,12 +12,14 @@ interface TranscriptionClient {
 
 class TranscriptionClientRouter(
     private val openAiClient: TranscriptionClient,
+    private val geminiClient: TranscriptionClient,
     private val sonioxClient: TranscriptionClient,
     private val groqClient: TranscriptionClient,
 ) {
     suspend fun transcribe(settings: AppSettings, audioFile: File): RawTranscript {
         val client = when (settings.transcriptionProvider) {
             TranscriptionProvider.OPENAI -> openAiClient
+            TranscriptionProvider.GEMINI -> geminiClient
             TranscriptionProvider.SONIOX -> sonioxClient
             TranscriptionProvider.GROQ -> groqClient
         }
@@ -32,6 +34,7 @@ class TranscriptionClientRouter(
         fun single(client: TranscriptionClient): TranscriptionClientRouter =
             TranscriptionClientRouter(
                 openAiClient = client,
+                geminiClient = client,
                 sonioxClient = client,
                 groqClient = client,
             )

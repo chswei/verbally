@@ -68,6 +68,27 @@ class ProviderApiKeyTesterTest {
     }
 
     @Test
+    fun testsGeminiTranscriptionKeyWithModelRequest() = runBlocking {
+        server.enqueue(MockResponse.Builder().code(200).body("{}").build())
+        val tester = ProviderApiKeyTester(
+            endpoints = ProviderKeyTestEndpoints(geminiBaseUrl = server.url("/").toString()),
+        )
+
+        val result = tester.testTranscription(
+            AppSettings(
+                geminiApiKey = "gemini-test",
+                transcriptionProvider = TranscriptionProvider.GEMINI,
+                transcriptionModel = "gemini-3.5-transcribe",
+            ),
+        )
+
+        assertEquals(ProviderKeyTestResult.Success("Gemini"), result)
+        val request = server.takeRequest()
+        assertEquals("/v1beta/models/gemini-3.5-transcribe", request.target)
+        assertEquals("gemini-test", request.headers["x-goog-api-key"])
+    }
+
+    @Test
     fun testsSonioxTranscriptionKeyWithModelsRequest() = runBlocking {
         server.enqueue(MockResponse.Builder().code(200).body("{}").build())
         val tester = ProviderApiKeyTester(

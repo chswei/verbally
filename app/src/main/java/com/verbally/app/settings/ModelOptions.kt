@@ -2,6 +2,7 @@ package com.verbally.app.settings
 
 enum class TranscriptionProvider {
     OPENAI,
+    GEMINI,
     SONIOX,
     GROQ,
 }
@@ -34,6 +35,11 @@ object ModelOptions {
             provider = TranscriptionProvider.OPENAI,
             model = "gpt-4o-transcribe",
             label = "OpenAI: gpt-4o-transcribe",
+        ),
+        TranscriptionModelOption(
+            provider = TranscriptionProvider.GEMINI,
+            model = "gemini-3.5-transcribe",
+            label = "Gemini: gemini-3.5-transcribe",
         ),
         TranscriptionModelOption(
             provider = TranscriptionProvider.SONIOX,

@@ -4,7 +4,7 @@
 TBD - created by archiving change add-android-floating-dictation. Update Purpose after archive.
 ## Requirements
 ### Requirement: Audio is transcribed with OpenAI BYOK
-The system SHALL transcribe confirmed recordings by sending temporary audio captured by the dictation recorder directly to the selected BYOK transcription provider. Supported transcription options SHALL include OpenAI `gpt-transcribe`, OpenAI `gpt-4o-mini-transcribe`, OpenAI `gpt-4o-transcribe`, Soniox `stt-async-v4`, and Groq `whisper-large-v3-turbo`. Provider clients SHOULD share transport resources so repeated provider calls can reuse DNS, TLS, and HTTP connection pooling when the platform and endpoint allow it.
+The system SHALL transcribe confirmed recordings by sending temporary audio captured by the dictation recorder directly to the selected BYOK transcription provider. Supported transcription options SHALL include OpenAI `gpt-transcribe`, OpenAI `gpt-4o-mini-transcribe`, OpenAI `gpt-4o-transcribe`, Gemini `gemini-3.5-transcribe`, Soniox `stt-async-v4`, and Groq `whisper-large-v3-turbo`. Provider clients SHOULD share transport resources so repeated provider calls can reuse DNS, TLS, and HTTP connection pooling when the platform and endpoint allow it.
 
 #### Scenario: OpenAI transcription succeeds
 - **WHEN** the user confirms a recording and a valid OpenAI key is configured
@@ -17,6 +17,16 @@ The system SHALL transcribe confirmed recordings by sending temporary audio capt
 - **THEN** the system sends the recording to `/v1/audio/transcriptions` with the selected model
 - **AND** the request does not include token confidence or other legacy parameters unsupported by `gpt-transcribe`
 - **THEN** the system receives raw transcript text for cleanup
+
+#### Scenario: Gemini transcription succeeds
+- **WHEN** the user confirms a recording with Gemini `gemini-3.5-transcribe` selected and a valid Gemini key is configured
+- **THEN** the system Base64-encodes the temporary audio and sends it inline to the Gemini Interactions API with `gemini-3.5-transcribe`
+- **AND** the transcription uses one HTTP request without calling the Gemini Files API
+- **THEN** the system receives raw transcript text for cleanup
+
+#### Scenario: Gemini inline transcription fails
+- **WHEN** the Gemini Interactions API rejects the inline transcription request
+- **THEN** the system surfaces the transcription failure without making a Gemini Files API request
 
 #### Scenario: Low-confidence brief transcript is suppressed
 - **WHEN** a confirmed recording produces a brief raw transcript with low transcription confidence

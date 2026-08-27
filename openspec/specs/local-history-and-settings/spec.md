@@ -12,8 +12,13 @@ The system SHALL store OpenAI, Gemini, Soniox, Groq, and Deepgram API keys local
 
 #### Scenario: User edits transcription settings
 - **WHEN** the user views the voice transcription block
-- **THEN** the system shows a transcription model dropdown whose five options include provider names
+- **THEN** the system shows a transcription model dropdown whose six options include provider names
 - **THEN** the system shows only the generic API Key input for the provider implied by the selected transcription model
+
+#### Scenario: User selects Gemini transcription
+- **WHEN** the user selects `Gemini: gemini-3.5-transcribe`
+- **THEN** the transcription API Key input reads and updates the locally encrypted Gemini API key
+- **AND** the selected transcription provider sends that key only to the Gemini API
 
 #### Scenario: User edits text processing settings
 - **WHEN** the user views the text processing block

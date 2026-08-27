@@ -3,6 +3,7 @@ package com.verbally.app.settings
 val TranscriptionProvider.displayName: String
     get() = when (this) {
         TranscriptionProvider.OPENAI -> "OpenAI"
+        TranscriptionProvider.GEMINI -> "Gemini"
         TranscriptionProvider.SONIOX -> "Soniox"
         TranscriptionProvider.GROQ -> "Groq"
     }
@@ -16,6 +17,7 @@ val CleanupProvider.displayName: String
 val AppSettings.transcriptionApiKey: String
     get() = when (transcriptionProvider) {
         TranscriptionProvider.OPENAI -> openAiApiKey
+        TranscriptionProvider.GEMINI -> geminiApiKey
         TranscriptionProvider.SONIOX -> sonioxApiKey
         TranscriptionProvider.GROQ -> groqApiKey
     }
