@@ -1,7 +1,5 @@
 package com.verbally.app
 
-import android.app.LocaleManager
-import android.os.LocaleList
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -27,21 +25,15 @@ import com.verbally.app.style.OutputStyle
 import com.verbally.app.style.StyleRuleDefaults
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class StyleScreensTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule(order = 0)
+    val localeRule = TraditionalChineseLocaleRule()
 
-    @Before
-    fun useTraditionalChineseResources() {
-        InstrumentationRegistry.getInstrumentation()
-            .targetContext
-            .getSystemService(LocaleManager::class.java)
-            .applicationLocales = LocaleList.forLanguageTags("zh-TW")
-    }
+    @get:Rule(order = 1)
+    val composeRule = createComposeRule()
 
     @Test
     fun styleProfilesShowCategoriesAndSaveSelection() {

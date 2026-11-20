@@ -1,8 +1,6 @@
 package com.verbally.app
 
 import android.app.Application
-import android.app.LocaleManager
-import android.os.LocaleList
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -34,21 +32,15 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class ApiSettingsScreenTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule(order = 0)
+    val localeRule = TraditionalChineseLocaleRule()
 
-    @Before
-    fun useTraditionalChineseResources() {
-        InstrumentationRegistry.getInstrumentation()
-            .targetContext
-            .getSystemService(LocaleManager::class.java)
-            .applicationLocales = LocaleList.forLanguageTags("zh-TW")
-    }
+    @get:Rule(order = 1)
+    val composeRule = createComposeRule()
 
     @After
     fun resetPersistedSettings() {
@@ -446,12 +438,13 @@ class ApiSettingsScreenTest {
             assertEquals(TranscriptionProvider.GEMINI, settings.transcriptionProvider)
             assertEquals("gemini-3.5-transcribe", settings.transcriptionModel)
         }
-        val transcriptionKey = composeRule.onAllNodes(hasSetTextAction())
-            .onFirst()
-            .fetchSemanticsNode()
-            .config[SemanticsProperties.EditableText]
-            .text
-        assertTrue(transcriptionKey.contains("gemini-key"))
+        val transcriptionKey = composeRule.onAllNodes(hasSetTextAction()).onFirst()
+        transcriptionKey.performTextClearance()
+        transcriptionKey.performTextInput("updated-gemini-key")
+        composeRule.runOnIdle {
+            assertEquals("updated-gemini-key", settings.geminiApiKey)
+            assertEquals("openai-key", settings.openAiApiKey)
+        }
     }
 
     @Test
