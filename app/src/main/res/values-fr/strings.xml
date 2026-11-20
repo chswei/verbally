@@ -28,10 +28,10 @@
     <string name="settings_theme_dark">Sombre</string>
     <string name="settings_language_system">Suivre le système</string>
     <string name="settings_history_retention_latest_100">100 dernières dictées</string>
-    <string name="settings_history_retention_auto_delete_24h">Suppression automatique après 24 heures</string>
+    <string name="settings_history_retention_auto_delete_24h">Supprimer les entrées de plus de 24 h à la prochaine utilisation</string>
     <string name="settings_history_retention_none">Ne pas enregistrer l’historique</string>
     <string name="settings_history_retention_confirm_title">Modifier la conservation de l’historique ?</string>
-    <string name="settings_history_retention_confirm_auto_delete_description">L’ancien historique de dictée sera supprimé automatiquement après ce changement.</string>
+    <string name="settings_history_retention_confirm_auto_delete_description">Les entrées de plus de 24 h seront supprimées maintenant, puis à la prochaine utilisation de l’historique.</string>
     <string name="settings_history_retention_confirm_none_description">L’historique de dictée existant sera supprimé et les nouvelles dictées ne seront pas enregistrées.</string>
     <string name="settings_history_retention_confirm_button">Modifier la conservation</string>
     <string name="api_settings_title">Réglages API</string>
@@ -182,7 +182,7 @@
     <string name="style_rule_restored">Règles par défaut restaurées</string>
     <string name="history_title">Historique</string>
     <string name="history_subtitle">Seules les 100 dernières dictées sont conservées</string>
-    <string name="history_subtitle_auto_delete_24h">Seules les dictées des dernières 24 heures sont conservées</string>
+    <string name="history_subtitle_auto_delete_24h">Les entrées de plus de 24 h sont supprimées à la prochaine utilisation de l’historique</string>
     <string name="history_subtitle_none">L’historique est désactivé</string>
     <string name="history_search_placeholder">Rechercher dans l’historique</string>
     <string name="history_empty_title">Aucun historique de dictée</string>

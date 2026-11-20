@@ -28,10 +28,10 @@
     <string name="settings_theme_dark">다크</string>
     <string name="settings_language_system">시스템 따르기</string>
     <string name="settings_history_retention_latest_100">최근 받아쓰기 100개</string>
-    <string name="settings_history_retention_auto_delete_24h">24시간 후 자동 삭제</string>
+    <string name="settings_history_retention_auto_delete_24h">다음 사용 시 24시간이 지난 기록 삭제</string>
     <string name="settings_history_retention_none">기록 저장 안 함</string>
     <string name="settings_history_retention_confirm_title">기록 보관 방식을 변경할까요?</string>
-    <string name="settings_history_retention_confirm_auto_delete_description">변경 후 오래된 받아쓰기 기록은 자동으로 삭제됩니다.</string>
+    <string name="settings_history_retention_confirm_auto_delete_description">24시간이 지난 기록은 지금 삭제됩니다. 이후에는 기록을 다음에 사용할 때 삭제됩니다.</string>
     <string name="settings_history_retention_confirm_none_description">기존 받아쓰기 기록이 삭제되고 새 받아쓰기도 저장되지 않습니다.</string>
     <string name="settings_history_retention_confirm_button">보관 방식 변경</string>
     <string name="api_settings_title">API 설정</string>
@@ -182,7 +182,7 @@
     <string name="style_rule_restored">기본 규칙으로 복원되었습니다</string>
     <string name="history_title">기록</string>
     <string name="history_subtitle">최근 받아쓰기 100개만 보관됩니다</string>
-    <string name="history_subtitle_auto_delete_24h">최근 24시간의 받아쓰기만 보관됩니다</string>
+    <string name="history_subtitle_auto_delete_24h">기록을 다음에 사용할 때 24시간이 지난 항목을 삭제합니다</string>
     <string name="history_subtitle_none">기록이 꺼져 있습니다</string>
     <string name="history_search_placeholder">기록 검색</string>
     <string name="history_empty_title">아직 받아쓰기 기록이 없습니다</string>

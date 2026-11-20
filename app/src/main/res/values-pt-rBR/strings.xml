@@ -28,10 +28,10 @@
     <string name="settings_theme_dark">Escuro</string>
     <string name="settings_language_system">Seguir sistema</string>
     <string name="settings_history_retention_latest_100">Últimos 100 ditados</string>
-    <string name="settings_history_retention_auto_delete_24h">Excluir automaticamente após 24 horas</string>
+    <string name="settings_history_retention_auto_delete_24h">Excluir registros com mais de 24 h no próximo uso</string>
     <string name="settings_history_retention_none">Não salvar histórico</string>
     <string name="settings_history_retention_confirm_title">Alterar retenção do histórico?</string>
-    <string name="settings_history_retention_confirm_auto_delete_description">O histórico de ditado mais antigo será removido automaticamente após esta alteração.</string>
+    <string name="settings_history_retention_confirm_auto_delete_description">Os registros com mais de 24 h serão removidos agora e, depois, no próximo uso do histórico.</string>
     <string name="settings_history_retention_confirm_none_description">O histórico de ditado existente será excluído e novos ditados não serão salvos.</string>
     <string name="settings_history_retention_confirm_button">Alterar retenção</string>
     <string name="api_settings_title">Configurações de API</string>
@@ -182,7 +182,7 @@
     <string name="style_rule_restored">Regras padrão restauradas</string>
     <string name="history_title">Histórico</string>
     <string name="history_subtitle">Somente os últimos 100 ditados são mantidos</string>
-    <string name="history_subtitle_auto_delete_24h">Somente ditados das últimas 24 horas são mantidos</string>
+    <string name="history_subtitle_auto_delete_24h">Os registros com mais de 24 h são removidos no próximo uso do histórico</string>
     <string name="history_subtitle_none">O histórico está desativado</string>
     <string name="history_search_placeholder">Pesquisar histórico</string>
     <string name="history_empty_title">Ainda não há histórico de ditado</string>

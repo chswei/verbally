@@ -28,10 +28,10 @@
     <string name="settings_theme_dark">Dunkel</string>
     <string name="settings_language_system">System folgen</string>
     <string name="settings_history_retention_latest_100">Letzte 100 Diktate</string>
-    <string name="settings_history_retention_auto_delete_24h">Nach 24 Stunden automatisch löschen</string>
+    <string name="settings_history_retention_auto_delete_24h">Beim nächsten Nutzen Einträge über 24 Stunden löschen</string>
     <string name="settings_history_retention_none">Verlauf nicht speichern</string>
     <string name="settings_history_retention_confirm_title">Verlaufsaufbewahrung ändern?</string>
-    <string name="settings_history_retention_confirm_auto_delete_description">Älterer Diktatverlauf wird nach dieser Änderung automatisch entfernt.</string>
+    <string name="settings_history_retention_confirm_auto_delete_description">Einträge über 24 Stunden werden jetzt entfernt. Danach werden sie beim nächsten Nutzen des Verlaufs gelöscht.</string>
     <string name="settings_history_retention_confirm_none_description">Vorhandener Diktatverlauf wird gelöscht und neue Diktate werden nicht gespeichert.</string>
     <string name="settings_history_retention_confirm_button">Aufbewahrung ändern</string>
     <string name="api_settings_title">API-Einstellungen</string>
@@ -182,7 +182,7 @@
     <string name="style_rule_restored">Standardregeln wiederhergestellt</string>
     <string name="history_title">Verlauf</string>
     <string name="history_subtitle">Nur die letzten 100 Diktate werden behalten</string>
-    <string name="history_subtitle_auto_delete_24h">Nur Diktate der letzten 24 Stunden werden behalten</string>
+    <string name="history_subtitle_auto_delete_24h">Einträge über 24 Stunden werden beim nächsten Nutzen des Verlaufs gelöscht</string>
     <string name="history_subtitle_none">Verlauf ist deaktiviert</string>
     <string name="history_search_placeholder">Verlauf suchen</string>
     <string name="history_empty_title">Noch kein Diktatverlauf</string>

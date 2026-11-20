@@ -28,10 +28,10 @@
     <string name="settings_theme_dark">Scuro</string>
     <string name="settings_language_system">Segui sistema</string>
     <string name="settings_history_retention_latest_100">Ultime 100 dettature</string>
-    <string name="settings_history_retention_auto_delete_24h">Elimina automaticamente dopo 24 ore</string>
+    <string name="settings_history_retention_auto_delete_24h">Elimina le voci più vecchie di 24 ore al prossimo utilizzo</string>
     <string name="settings_history_retention_none">Non salvare la cronologia</string>
     <string name="settings_history_retention_confirm_title">Cambiare conservazione cronologia?</string>
-    <string name="settings_history_retention_confirm_auto_delete_description">La cronologia di dettatura più vecchia sarà rimossa automaticamente dopo questa modifica.</string>
+    <string name="settings_history_retention_confirm_auto_delete_description">Le voci più vecchie di 24 ore saranno eliminate ora e, in seguito, al prossimo utilizzo della cronologia.</string>
     <string name="settings_history_retention_confirm_none_description">La cronologia di dettatura esistente sarà eliminata e le nuove dettature non saranno salvate.</string>
     <string name="settings_history_retention_confirm_button">Cambia conservazione</string>
     <string name="api_settings_title">Impostazioni API</string>
@@ -182,7 +182,7 @@
     <string name="style_rule_restored">Regole predefinite ripristinate</string>
     <string name="history_title">Cronologia</string>
     <string name="history_subtitle">Vengono conservate solo le ultime 100 dettature</string>
-    <string name="history_subtitle_auto_delete_24h">Vengono conservate solo le dettature delle ultime 24 ore</string>
+    <string name="history_subtitle_auto_delete_24h">Le voci più vecchie di 24 ore vengono eliminate al prossimo utilizzo della cronologia</string>
     <string name="history_subtitle_none">La cronologia è disattivata</string>
     <string name="history_search_placeholder">Cerca cronologia</string>
     <string name="history_empty_title">Nessuna cronologia di dettatura</string>
