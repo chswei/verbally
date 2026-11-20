@@ -28,6 +28,7 @@ import com.verbally.app.overlay.FloatingDictationOverlay
 import com.verbally.app.overlay.LiveWaveformLevelSmoother
 import com.verbally.app.overlay.OverlayUiState
 import com.verbally.app.settings.AppLanguage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,7 +48,7 @@ class VerballyAccessibilityService : AccessibilityService() {
     private var appLabel: String? = null
     private var waveformJob: Job? = null
     private var debugInsertReceiver: BroadcastReceiver? = null
-    private val coordinator: DictationCoordinator by lazy {
+    private val coordinatorDelegate = lazy {
         val container = (application as VerballyApplication).container
         DictationCoordinator(
             settingsRepository = container.settingsRepository,
@@ -71,6 +72,11 @@ class VerballyAccessibilityService : AccessibilityService() {
                 )
             },
         )
+    }
+
+    private val coordinator by coordinatorDelegate
+    private val lifetime = DictationServiceLifetime(scope) {
+        if (coordinatorDelegate.isInitialized()) coordinator.cancelRecording()
     }
 
     override fun onServiceConnected() {
@@ -141,8 +147,13 @@ class VerballyAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         stopWaveformUpdates()
         unregisterDebugInsertReceiver()
-        overlay?.dispose()
-        super.onDestroy()
+        try {
+            lifetime.close()
+        } finally {
+            overlay?.dispose()
+            overlay = null
+            super.onDestroy()
+        }
     }
 
     private fun defaultPromptLanguageFor(language: AppLanguage): AppLanguage =
@@ -163,6 +174,7 @@ class VerballyAccessibilityService : AccessibilityService() {
                     }
                 }
                 .onFailure { error ->
+                    if (error is CancellationException) throw error
                     reportProcessingFailure(error.message ?: getString(R.string.error_generic))
                 }
         }

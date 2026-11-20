@@ -52,12 +52,12 @@ class SonioxAsyncTranscriptionClient(
                 }
             } finally {
                 if (!cleanupScheduled) {
-                    cleanupRemoteArtifacts(apiKey, transcriptionId, fileId)
+                    cleanupRemoteArtifactsInBackground(apiKey, transcriptionId, fileId)
                 }
             }
         }
 
-    private fun uploadFile(apiKey: String, audioFile: File): String {
+    private suspend fun uploadFile(apiKey: String, audioFile: File): String {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart(
@@ -79,7 +79,7 @@ class SonioxAsyncTranscriptionClient(
         }
     }
 
-    private fun createTranscription(apiKey: String, model: String, fileId: String): String {
+    private suspend fun createTranscription(apiKey: String, model: String, fileId: String): String {
         val jsonBody = "{" +
             "\"model\":${jsonString(model)}," +
             "\"file_id\":${jsonString(fileId)}," +
@@ -125,7 +125,7 @@ class SonioxAsyncTranscriptionClient(
         (pollDelayMillis * (attemptIndex + 1))
             .coerceAtMost(maxPollDelayMillis)
 
-    private fun getTranscript(apiKey: String, transcriptionId: String): SonioxTranscriptResult {
+    private suspend fun getTranscript(apiKey: String, transcriptionId: String): SonioxTranscriptResult {
         val json = executeJson(
             Request.Builder()
                 .url(endpoint("/v1/transcriptions/$transcriptionId/transcript"))
@@ -190,14 +190,13 @@ class SonioxAsyncTranscriptionClient(
             ).execute().use { it.isSuccessful }
         }.getOrDefault(false)
 
-    private fun executeJson(request: Request): JSONObject {
-        val response = httpClient.newCall(request).execute()
-        response.use {
+    private suspend fun executeJson(request: Request): JSONObject {
+        return httpClient.newCall(request).awaitResponse {
             val body = it.body.string()
             if (!it.isSuccessful) {
                 throw ProviderException(messages.transcriptionFailed("Soniox", errorDetail(it.code, body)))
             }
-            return runCatching { JSONObject(body) }.getOrElse {
+            runCatching { JSONObject(body) }.getOrElse {
                 throw ProviderException(messages.responseParseFailed("Soniox"))
             }
         }

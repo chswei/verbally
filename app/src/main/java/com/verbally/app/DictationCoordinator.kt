@@ -22,6 +22,8 @@ import com.verbally.app.style.CleanupStyleContext
 import com.verbally.app.style.InMemoryAppStyleRuleRepository
 import com.verbally.app.style.normalizedStyleRuleLanguage
 import java.io.File
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 class DictationCoordinator(
     private val settingsRepository: SettingsRepository,
@@ -155,7 +157,9 @@ class DictationCoordinator(
             if (DictationContentGuard.cleanedTextHasNoContent(expandedText)) {
                 return DictationOutcome.NoDictatedContent
             }
+            currentCoroutineContext().ensureActive()
             val insertResult = insertionFactory().insert(expandedText)
+            currentCoroutineContext().ensureActive()
             historyRepository.save(
                 DictationHistoryEntry(
                     rawTranscript = raw.text,
