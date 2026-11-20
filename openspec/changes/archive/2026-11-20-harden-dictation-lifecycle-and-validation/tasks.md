@@ -5,6 +5,6 @@
 - [x] 2.1 Update all localized retention copy and public documentation
 ## 3. Android validation
 - [x] 3.1 Add emulator instrumentation CI and diagnostic artifacts
-- [ ] 3.2 Run strict specs, unit tests, lint, debug build and emulator instrumentation
+- [x] 3.2 Run strict specs, unit tests, lint, debug build and emulator instrumentation
 ## 4. Delivery
-- [ ] 4.1 Review implementation and synchronize specifications for archival
+- [x] 4.1 Review implementation and synchronize specifications for archival
