@@ -75,3 +75,4 @@ The system SHALL allow users to customize the Formal and Casual rule text used b
 - **WHEN** the user restores a custom Formal or Casual rule to default
 - **THEN** the custom rule for that language and output style is removed
 - **AND** future cleanup uses the built-in default rule for that language and output style
+

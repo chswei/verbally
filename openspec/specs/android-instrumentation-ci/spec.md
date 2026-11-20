@@ -1,7 +1,7 @@
 # android-instrumentation-ci Specification
 
 ## Purpose
-TBD - created by archiving change harden-dictation-lifecycle-and-validation. Update Purpose after archive.
+Keep Android-facing behavior covered by emulator instrumentation on pull requests and main.
 ## Requirements
 ### Requirement: CI runs Android instrumentation
 The project SHALL run the Android instrumentation suite on an explicitly selected emulator for pull requests and pushes to main, alongside existing unit, lint and build checks. CI SHALL retain instrumentation reports even on failure and SHALL bound execution time.

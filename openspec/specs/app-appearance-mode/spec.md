@@ -56,3 +56,4 @@ The system SHALL apply the selected appearance mode to the main Compose Material
 - **THEN** the brand blue remains the primary identity color
 - **THEN** supporting teal or mint roles are available for support and permission states
 - **THEN** supporting lavender roles are available for AI, style, or preference accents
+

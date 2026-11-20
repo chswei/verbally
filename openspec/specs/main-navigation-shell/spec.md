@@ -64,3 +64,4 @@ The system SHALL present the main app shell with Material-style navigation, read
 - **THEN** selected bottom navigation state is visually distinct from unselected destinations
 - **THEN** the fifth bottom navigation item fits without overlapping labels or icons
 - **THEN** major surfaces, buttons, fields, and support accents use consistent Material color roles
+
