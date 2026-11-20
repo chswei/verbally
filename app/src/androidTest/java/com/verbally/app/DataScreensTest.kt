@@ -1,7 +1,5 @@
 package com.verbally.app
 
-import android.app.LocaleManager
-import android.os.LocaleList
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -19,21 +17,15 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
 import com.verbally.app.dictionary.DictionaryEntry
 import com.verbally.app.snippets.SnippetEntry
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class DataScreensTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule(order = 0)
+    val localeRule = TraditionalChineseLocaleRule()
 
-    @Before
-    fun useTraditionalChineseResources() {
-        InstrumentationRegistry.getInstrumentation()
-            .targetContext
-            .getSystemService(LocaleManager::class.java)
-            .applicationLocales = LocaleList.forLanguageTags("zh-TW")
-    }
+    @get:Rule(order = 1)
+    val composeRule = createComposeRule()
 
     @Test
     fun dictionaryShowsSearchEmptyStateAndAddAction() {

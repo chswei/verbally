@@ -28,10 +28,10 @@
     <string name="settings_theme_dark">Oscuro</string>
     <string name="settings_language_system">Seguir el sistema</string>
     <string name="settings_history_retention_latest_100">Últimos 100 dictados</string>
-    <string name="settings_history_retention_auto_delete_24h">Eliminar automáticamente tras 24 horas</string>
+    <string name="settings_history_retention_auto_delete_24h">Borrar registros de más de 24 h en el próximo uso</string>
     <string name="settings_history_retention_none">No guardar historial</string>
     <string name="settings_history_retention_confirm_title">¿Cambiar retención del historial?</string>
-    <string name="settings_history_retention_confirm_auto_delete_description">El historial de dictado más antiguo se eliminará automáticamente después de este cambio.</string>
+    <string name="settings_history_retention_confirm_auto_delete_description">Los registros de más de 24 h se borrarán ahora y, después, al volver a usar el historial.</string>
     <string name="settings_history_retention_confirm_none_description">El historial de dictado existente se eliminará y los dictados nuevos no se guardarán.</string>
     <string name="settings_history_retention_confirm_button">Cambiar retención</string>
     <string name="api_settings_title">Configuración de API</string>
@@ -182,7 +182,7 @@
     <string name="style_rule_restored">Reglas predeterminadas restauradas</string>
     <string name="history_title">Historial</string>
     <string name="history_subtitle">Solo se conservan los últimos 100 dictados</string>
-    <string name="history_subtitle_auto_delete_24h">Solo se conservan los dictados de las últimas 24 horas</string>
+    <string name="history_subtitle_auto_delete_24h">Los registros de más de 24 h se borran al volver a usar el historial</string>
     <string name="history_subtitle_none">El historial está desactivado</string>
     <string name="history_search_placeholder">Buscar historial</string>
     <string name="history_empty_title">Aún no hay historial de dictado</string>

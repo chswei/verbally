@@ -23,12 +23,53 @@ import com.verbally.app.style.InMemoryAppStyleProfileRepository
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DictationCoordinatorEmptyRecordingTest {
+    @Test
+    fun cancelledTranscriptionDeletesAudioWithoutInsertionOrHistory() = runBlocking {
+        val history = InMemoryDictationHistoryRepository()
+        val audioRecorder = FakeAudioRecorder(amplitudes = listOf(1_400))
+        val insertion = CapturingDirectTextTarget()
+        val cleanup = CapturingCleanupClient(cleanedText = "unused")
+        val coordinator = coordinator(
+            history, audioRecorder,
+            CapturingTranscriptionClient("unused", beforeReturn = { awaitCancellation() }),
+            cleanup, insertion,
+        )
+        coordinator.startRecording()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) { coordinator.confirmRecording("Test") }
+        job.cancelAndJoin()
+        assertTrue(audioRecorder.deleted)
+        assertTrue(history.list().isEmpty())
+        assertNull(insertion.insertedText)
+        assertEquals(0, cleanup.calls)
+    }
+
+    @Test
+    fun cancelledCleanupDeletesAudioWithoutInsertionOrHistory() = runBlocking {
+        val history = InMemoryDictationHistoryRepository()
+        val audioRecorder = FakeAudioRecorder(amplitudes = listOf(1_400))
+        val insertion = CapturingDirectTextTarget()
+        val coordinator = coordinator(
+            history, audioRecorder, CapturingTranscriptionClient("Hello world"),
+            CapturingCleanupClient("unused", beforeReturn = { awaitCancellation() }), insertion,
+        )
+        coordinator.startRecording()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) { coordinator.confirmRecording("Test") }
+        job.cancelAndJoin()
+        assertTrue(audioRecorder.deleted)
+        assertTrue(history.list().isEmpty())
+        assertNull(insertion.insertedText)
+    }
+
     @Test
     fun confirmRecordingSkipsInsertionWhenNoSpeechActivityWasObserved() = runBlocking {
         val history = InMemoryDictationHistoryRepository()
@@ -519,11 +560,13 @@ class DictationCoordinatorEmptyRecordingTest {
         private val averageLogprob: Double? = null,
         private val confidence: TranscriptionConfidence? = null,
         private val hallucination: TranscriptionHallucination? = null,
+        private val beforeReturn: suspend () -> Unit = {},
     ) : TranscriptionClient {
         var calls = 0
 
         override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript {
             calls += 1
+            beforeReturn()
             return RawTranscript(
                 text = rawText,
                 model = model,
@@ -536,6 +579,7 @@ class DictationCoordinatorEmptyRecordingTest {
 
     private class CapturingCleanupClient(
         private val cleanedText: String,
+        private val beforeReturn: suspend () -> Unit = {},
     ) : TextCleanupClient {
         var calls = 0
 
@@ -548,6 +592,7 @@ class DictationCoordinatorEmptyRecordingTest {
             styleContext: CleanupStyleContext,
         ): CleanedTranscript {
             calls += 1
+            beforeReturn()
             return CleanedTranscript(text = cleanedText, provider = "openai", model = model)
         }
     }

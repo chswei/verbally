@@ -23,7 +23,7 @@ the first stable release.
   encrypted storage.
 - Direct cursor insertion through Android Accessibility IME support, with clipboard
   fallback only when direct insertion cannot be verified.
-- Local dictation history with latest-100, 24-hour auto-delete, or no-history modes.
+- Local dictation history with latest-100, clear entries older than 24 hours on next history use, or no-history modes.
 - Local dictionary and snippets for preferred terms and deterministic expansions.
 - Interface localization across supported languages, with Traditional Chinese as the
   primary product language.

@@ -28,10 +28,10 @@
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_language_system">Follow system</string>
     <string name="settings_history_retention_latest_100">Latest 100 dictations</string>
-    <string name="settings_history_retention_auto_delete_24h">Auto-delete after 24 hours</string>
+    <string name="settings_history_retention_auto_delete_24h">Clear entries older than 24 hours on next use</string>
     <string name="settings_history_retention_none">Do not save history</string>
     <string name="settings_history_retention_confirm_title">Change history retention?</string>
-    <string name="settings_history_retention_confirm_auto_delete_description">Older dictation history will be removed automatically after this change.</string>
+    <string name="settings_history_retention_confirm_auto_delete_description">Expired entries will be removed now. On next history use, entries older than 24 hours will be cleared.</string>
     <string name="settings_history_retention_confirm_none_description">Existing dictation history will be deleted and new dictations will not be saved.</string>
     <string name="settings_history_retention_confirm_button">Change retention</string>
     <string name="api_settings_title">API Settings</string>
@@ -182,7 +182,7 @@
     <string name="style_rule_restored">Default rules restored</string>
     <string name="history_title">History</string>
     <string name="history_subtitle">Only the latest 100 dictations are kept</string>
-    <string name="history_subtitle_auto_delete_24h">Only dictations from the last 24 hours are kept</string>
+    <string name="history_subtitle_auto_delete_24h">Entries older than 24 hours are cleared on next history use</string>
     <string name="history_subtitle_none">History is off</string>
     <string name="history_search_placeholder">Search history</string>
     <string name="history_empty_title">No dictation history yet</string>

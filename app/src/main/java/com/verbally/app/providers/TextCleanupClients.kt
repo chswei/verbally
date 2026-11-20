@@ -33,10 +33,9 @@ class OpenAiTextCleanupClient(
     ): CleanedTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException(messages.missingApiKey("OpenAI"))
-            val response = httpClient.newCall(
+            httpClient.newCall(
                 requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt, dictionaryEntries, styleContext),
-            ).execute()
-            response.use {
+            ).awaitResponse {
                 val body = it.body.string()
                 if (!it.isSuccessful) throw ProviderException(messages.cleanupFailed("OpenAI", it.code.toString()))
                 val json = JSONObject(body)
@@ -69,10 +68,9 @@ class GeminiTextCleanupClient(
     ): CleanedTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException(messages.missingApiKey("Gemini"))
-            val response = httpClient.newCall(
+            httpClient.newCall(
                 requestFactory.create(apiKey, model, rawTranscript, cleanupPrompt, dictionaryEntries, styleContext),
-            ).execute()
-            response.use {
+            ).awaitResponse {
                 val body = it.body.string()
                 if (!it.isSuccessful) throw ProviderException(messages.cleanupFailed("Gemini", it.code.toString()))
                 val text = JSONObject(body)

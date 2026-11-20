@@ -1,7 +1,5 @@
 package com.verbally.app
 
-import android.app.LocaleManager
-import android.os.LocaleList
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -22,21 +20,15 @@ import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class HistoryScreenTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule(order = 0)
+    val localeRule = TraditionalChineseLocaleRule()
 
-    @Before
-    fun useTraditionalChineseResources() {
-        InstrumentationRegistry.getInstrumentation()
-            .targetContext
-            .getSystemService(LocaleManager::class.java)
-            .applicationLocales = LocaleList.forLanguageTags("zh-TW")
-    }
+    @get:Rule(order = 1)
+    val composeRule = createComposeRule()
 
     @Test
     fun historyScreenClearsHistoryFromOverflowMenuWithConfirmation() {
@@ -222,8 +214,10 @@ class HistoryScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("歷史紀錄已關閉")
-            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("歷史紀錄已關閉")
+            .assertCountEquals(2)
+        composeRule.onAllNodesWithText("歷史紀錄已關閉")[0].assertIsDisplayed()
+        composeRule.onAllNodesWithText("歷史紀錄已關閉")[1].assertIsDisplayed()
         composeRule.onNodeWithText("Verbally 不會保存新的聽寫紀錄。")
             .assertIsDisplayed()
         composeRule.onAllNodesWithContentDescription("歷史選單")

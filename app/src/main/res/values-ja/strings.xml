@@ -28,10 +28,10 @@
     <string name="settings_theme_dark">ダーク</string>
     <string name="settings_language_system">システムに合わせる</string>
     <string name="settings_history_retention_latest_100">最新 100 件の音声入力</string>
-    <string name="settings_history_retention_auto_delete_24h">24 時間後に自動削除</string>
+    <string name="settings_history_retention_auto_delete_24h">次回使用時に24時間以上前の履歴を削除</string>
     <string name="settings_history_retention_none">履歴を保存しない</string>
     <string name="settings_history_retention_confirm_title">履歴保持を変更しますか？</string>
-    <string name="settings_history_retention_confirm_auto_delete_description">変更後、古い音声入力履歴は自動的に削除されます。</string>
+    <string name="settings_history_retention_confirm_auto_delete_description">24時間以上前の履歴は今すぐ削除されます。以後は履歴の次回使用時に削除されます。</string>
     <string name="settings_history_retention_confirm_none_description">既存の音声入力履歴は削除され、新しい音声入力も保存されません。</string>
     <string name="settings_history_retention_confirm_button">保持方式を変更</string>
     <string name="api_settings_title">API 設定</string>
@@ -182,7 +182,7 @@
     <string name="style_rule_restored">デフォルト規則に戻しました</string>
     <string name="history_title">履歴</string>
     <string name="history_subtitle">最新 100 件の音声入力だけを保持します</string>
-    <string name="history_subtitle_auto_delete_24h">直近 24 時間の音声入力だけを保持します</string>
+    <string name="history_subtitle_auto_delete_24h">履歴の次回使用時に24時間以上前の記録を削除します</string>
     <string name="history_subtitle_none">履歴はオフです</string>
     <string name="history_search_placeholder">履歴を検索</string>
     <string name="history_empty_title">音声入力履歴はまだありません</string>

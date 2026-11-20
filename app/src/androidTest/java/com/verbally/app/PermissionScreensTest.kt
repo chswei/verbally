@@ -1,7 +1,5 @@
 package com.verbally.app
 
-import android.app.LocaleManager
-import android.os.LocaleList
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
@@ -9,6 +7,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.lifecycle.Lifecycle
@@ -17,21 +16,15 @@ import androidx.lifecycle.LifecycleRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class PermissionScreensTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    @get:Rule(order = 0)
+    val localeRule = TraditionalChineseLocaleRule()
 
-    @Before
-    fun useTraditionalChineseResources() {
-        InstrumentationRegistry.getInstrumentation()
-            .targetContext
-            .getSystemService(LocaleManager::class.java)
-            .applicationLocales = LocaleList.forLanguageTags("zh-TW")
-    }
+    @get:Rule(order = 1)
+    val composeRule = createComposeRule()
 
     @Test
     fun drawerPermissionSupportStaysOpenWhenPermissionsAreAlreadyComplete() {
@@ -179,11 +172,13 @@ class PermissionScreensTest {
             }
         }
 
-        composeRule.onNodeWithText("啟用輔助使用")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        composeRule.onNodeWithText(context.getString(R.string.permission_step_accessibility_title))
             .assertIsDisplayed()
         composeRule.onNodeWithText("輔助使用資料揭露")
             .assertDoesNotExist()
-        composeRule.onNodeWithText("如果輔助使用被系統鎖定")
+        composeRule.onNodeWithText(context.getString(R.string.permission_troubleshooting_title))
+            .performScrollTo()
             .assertIsDisplayed()
     }
 

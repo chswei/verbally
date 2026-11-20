@@ -52,8 +52,10 @@ user's behalf.
 
 API keys are stored on device using Android encrypted storage. Dictation history,
 dictionary entries, snippets, and app settings are stored locally. The user can keep
-the latest 100 dictations, auto-delete dictations older than 24 hours, or disable
+the latest 100 dictations, remove dictations older than 24 hours on next history use, or disable
 history storage.
+
+The 24-hour option clears expired entries when history is loaded or a new entry is saved. It does not run a background deletion timer while the app is unused.
 
 Temporary audio is deleted after dictation succeeds, fails, or is canceled.
 

@@ -14,13 +14,12 @@ class OpenAiTranscriptionClient(
     override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException(messages.missingApiKey("OpenAI"))
-            val response = httpClient.newCall(requestFactory.create(apiKey, model, audioFile)).execute()
-            response.use {
+            httpClient.newCall(requestFactory.create(apiKey, model, audioFile)).awaitResponse {
                 val body = it.body.string()
                 if (!it.isSuccessful) throw ProviderException(messages.transcriptionFailed("OpenAI", it.code.toString()))
                 val json = JSONObject(body)
                 val text = json.optString("text")
-                if (text.isBlank()) return@withContext noDictationRawTranscript(model, provider = "openai")
+                if (text.isBlank()) return@awaitResponse noDictationRawTranscript(model, provider = "openai")
                 val averageLogprob = json.averageLogprob()
                 RawTranscript(
                     text = text,
@@ -41,8 +40,7 @@ class GroqTranscriptionClient(
     override suspend fun transcribe(apiKey: String, model: String, audioFile: File): RawTranscript =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw ProviderException(messages.missingApiKey("Groq"))
-            val response = httpClient.newCall(requestFactory.create(apiKey, model, audioFile)).execute()
-            response.use {
+            httpClient.newCall(requestFactory.create(apiKey, model, audioFile)).awaitResponse {
                 val body = it.body.string()
                 if (!it.isSuccessful) throw ProviderException(messages.transcriptionFailed("Groq", it.code.toString()))
                 val text = JSONObject(body).optString("text")

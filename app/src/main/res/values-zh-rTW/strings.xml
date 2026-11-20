@@ -28,10 +28,10 @@
     <string name="settings_theme_dark">深色</string>
     <string name="settings_language_system">跟隨系統</string>
     <string name="settings_history_retention_latest_100">保留最近 100 筆聽寫</string>
-    <string name="settings_history_retention_auto_delete_24h">24 小時後自動刪除</string>
+    <string name="settings_history_retention_auto_delete_24h">下次使用時清除超過 24 小時的紀錄</string>
     <string name="settings_history_retention_none">不保存歷史</string>
     <string name="settings_history_retention_confirm_title">要變更歷史紀錄保存方式嗎？</string>
-    <string name="settings_history_retention_confirm_auto_delete_description">變更後，較舊的聽寫歷史會自動移除。</string>
+    <string name="settings_history_retention_confirm_auto_delete_description">變更後會立即移除已超過 24 小時的紀錄；之後於下次使用歷史紀錄時清除過期紀錄。</string>
     <string name="settings_history_retention_confirm_none_description">現有聽寫歷史會被刪除，之後新的聽寫也不會保存。</string>
     <string name="settings_history_retention_confirm_button">變更保存方式</string>
     <string name="api_settings_title">API 設定</string>
@@ -182,7 +182,7 @@
     <string name="style_rule_restored">已還原預設規則</string>
     <string name="history_title">歷史</string>
     <string name="history_subtitle">只保留最近 100 筆轉錄紀錄</string>
-    <string name="history_subtitle_auto_delete_24h">只保留最近 24 小時內的聽寫紀錄</string>
+    <string name="history_subtitle_auto_delete_24h">下次使用歷史紀錄時，清除超過 24 小時的紀錄</string>
     <string name="history_subtitle_none">歷史紀錄已關閉</string>
     <string name="history_search_placeholder">搜尋歷史</string>
     <string name="history_empty_title">尚無轉錄歷史</string>

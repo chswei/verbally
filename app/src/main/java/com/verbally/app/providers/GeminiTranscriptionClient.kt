@@ -23,7 +23,7 @@ class GeminiTranscriptionClient(
             createInteraction(apiKey, model, audioFile)
         }
 
-    private fun createInteraction(
+    private suspend fun createInteraction(
         apiKey: String,
         model: String,
         audioFile: File,
@@ -43,7 +43,7 @@ class GeminiTranscriptionClient(
             .post(body.toRequestBody(JSON_MEDIA_TYPE))
             .build()
 
-        return httpClient.newCall(request).execute().use { response ->
+        return httpClient.newCall(request).awaitResponse { response ->
             val responseBody = response.body.string()
             if (!response.isSuccessful) {
                 throw ProviderException(messages.transcriptionFailed(PROVIDER_NAME, response.code.toString()))

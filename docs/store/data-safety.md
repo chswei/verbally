@@ -32,7 +32,7 @@ analytics or crash reporting SDKs.
 
 - Data is encrypted in transit with HTTPS.
 - API keys are stored locally using Android encrypted storage.
-- Local history can be capped, auto-deleted after 24 hours, or disabled.
+- Local history can be capped, cleared of entries older than 24 hours on next history use, or disabled.
 - Temporary audio is deleted after success, failure, or cancellation.
 
 ## Account And Deletion
